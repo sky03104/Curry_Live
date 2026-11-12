@@ -1,12 +1,12 @@
 // ============================================================
-// 遊戲規則層：上場、攻擊、鎖定、倒地、復活、排行榜。
+// 遊戲規則層：上場、攻擊、鎖定、倒地、復活、等級、離場、排行榜。
 // 這裡完全不碰畫面，只算數字，然後用 onFx 通知畫面「發生了什麼事」。
 // ============================================================
 window.ML = window.ML || {};
 
 ML.createGame = function (config, heroes) {
   const players = new Map();   // 觀眾代號 → 場上的武將
-  const scores = new Map();    // 觀眾代號 → 累計傷害（離場後仍保留在排行榜）
+  const scores = new Map();    // 觀眾代號 → 這位觀眾的累計紀錄：傷害、擊倒數、等級、經驗值（離場後仍保留）
   const fxListeners = [];
   let time = 0;                // 遊戲內經過的秒數
 
@@ -20,6 +20,40 @@ ML.createGame = function (config, heroes) {
 
   function fx(e) { fxListeners.forEach(fn => fn(e)); }
   function notice(text) { fx({ type: 'notice', text }); }
+  // ---------- 等級與能力值 ----------
+  // 等級跟著「觀眾」走（不是跟著武將），所以換武將、倒地、離場再回來，等級都還在。
+  // 能力值 = 武將的基礎值 ×（1 + 每級成長 ×（等級 - 1））
+  function stats(p) {
+    const g = config.leveling, up = p.prof.level - 1;
+    return {
+      maxHp: Math.round(p.hero.baseHp * config.hpMultiplier * (1 + g.hpPerLevel * up)),
+      atk: p.hero.baseAtk * (1 + g.atkPerLevel * up),
+      def: p.hero.baseArmor * (1 + g.defPerLevel * up),
+    };
+  }
+  // 升到下一級需要多少經驗值
+  function xpNeed(level) { return config.leveling.xpNeedBase + config.leveling.xpNeedPerLevel * level; }
+  // 等級或武將變了之後重算最大血量；目前血量照比例帶過去（不會因此補血）
+  function refreshHp(p) {
+    const ratio = p.maxHp ? p.hp / p.maxHp : 1;
+    p.maxHp = stats(p).maxHp;
+    p.hp = p.down ? 0 : Math.max(1, Math.round(p.maxHp * ratio));
+  }
+  // 擊倒對手拿經驗值：對手等級越高拿越多；滿了就升級（一次可以連升好幾級）
+  function gainKillXp(p, victim) {
+    const g = config.leveling, prof = p.prof;
+    if (prof.level >= g.maxLevel) return;
+    prof.xp += g.xpPerKillBase + g.xpPerKillPerVictimLevel * victim.prof.level;
+    const before = prof.level;
+    while (prof.level < g.maxLevel && prof.xp >= xpNeed(prof.level)) { prof.xp -= xpNeed(prof.level); prof.level++; }
+    if (prof.level >= g.maxLevel) prof.xp = 0;
+    if (prof.level > before) {
+      refreshHp(p);
+      fx({ type: 'levelup', id: p.id, level: prof.level });
+      notice(`${p.name} 升到 Lv.${prof.level}！`);
+    }
+  }
+
   function others(p) { return [...players.values()].filter(o => o !== p && !o.down); }
 
   // ---------- 留言 ----------
@@ -49,13 +83,13 @@ ML.createGame = function (config, heroes) {
     if (me) { switchHero(me, text, hit[1]); return; }
     if (players.size >= config.maxOnStage) { notice(`場上已滿，${user.name} 請稍候`); return; }
     const hero = hit[1];
-    const maxHp = Math.round(hero.baseHp * config.hpMultiplier);
-    const p = { id: user.id, name: user.name, hero, maxHp, hp: maxHp, down: false, downAt: 0, lockId: null };
+    if (!scores.has(user.id)) scores.set(user.id, { id: user.id, damage: 0, kills: 0, level: 1, xp: 0 });
+    const prof = Object.assign(scores.get(user.id), { name: user.name, heroName: hero.displayName });
+    const p = { id: user.id, name: user.name, hero, prof, maxHp: 0, hp: 0, down: false, downAt: 0, lockId: null, lastActive: time };
+    p.maxHp = p.hp = stats(p).maxHp;
     players.set(user.id, p);
-    if (!scores.has(user.id)) scores.set(user.id, { id: user.id, name: user.name, heroName: hero.displayName, damage: 0, kills: 0 });
-    else Object.assign(scores.get(user.id), { name: user.name, heroName: hero.displayName });
     fx({ type: 'join', id: p.id });
-    notice(`${p.name} 的 ${hero.displayName} 上場！`);
+    notice(p.prof.level > 1 ? `${p.name} 的 ${hero.displayName}（Lv.${p.prof.level}）上場！` : `${p.name} 的 ${hero.displayName} 上場！`);
   }
 
   // ---------- 換武將 ----------
@@ -64,12 +98,10 @@ ML.createGame = function (config, heroes) {
   function switchHero(me, text, hero) {
     if (text !== hit_name(text) || hero === me.hero) return;
     if (time < (me.switchReadyAt || 0)) { notice(`${me.name} 剛換過武將，請稍等`); return; }
-    const ratio = me.hp / me.maxHp;
     me.hero = hero;
-    me.maxHp = Math.round(hero.baseHp * config.hpMultiplier);
-    me.hp = me.down ? 0 : Math.max(1, Math.round(me.maxHp * ratio));
+    refreshHp(me);
     me.switchReadyAt = time + config.switchCooldownSeconds;
-    scores.get(me.id).heroName = hero.displayName;
+    me.prof.heroName = hero.displayName;
     fx({ type: 'switch', id: me.id });
     notice(`${me.name} 換成了 ${hero.displayName}`);
   }
@@ -112,17 +144,21 @@ ML.createGame = function (config, heroes) {
     }
     if (!targets.length) { notice(`${me.name} 找不到對手`); return; }
 
-    const score = scores.get(me.id);
+    // 傷害 = 我的攻擊 × 動作倍率 × 禮物數量 × 浮動，再被對方的防禦打折：
+    //   防禦等於 defenseFactor 時傷害剩一半，防禦越高折得越多，但永遠不會變成 0
+    const atk = stats(me).atk;
+    const downed = [];
     const hits = targets.map(t => {
       const roll = 1 + (Math.random() * 2 - 1) * config.damageVariance;
-      const dmg = Math.min(t.hp, Math.max(1, Math.round(me.hero.baseAtk * action.atkMultiplier * count * roll)));
+      const reduce = config.defenseFactor / (config.defenseFactor + stats(t).def);
+      const dmg = Math.min(t.hp, Math.max(1, Math.round(atk * action.atkMultiplier * count * roll * reduce)));
       t.hp -= dmg;
-      score.damage += dmg;
-      if (t.hp <= 0) { t.down = true; t.downAt = time; score.kills++; }
+      me.prof.damage += dmg;
+      if (t.hp <= 0) { t.down = true; t.downAt = time; me.prof.kills++; downed.push(t); }
       return { id: t.id, dmg, down: t.down };
     });
     fx({ type: 'attack', id: me.id, action: gift.action, icon: gift.icon, skillName: me.hero.skillName, hits });
-    hits.filter(h => h.down).forEach(h => notice(`${me.name} 擊倒了 ${players.get(h.id).name}！`));
+    downed.forEach(t => { notice(`${me.name} 擊倒了 ${t.name}！`); gainKillXp(me, t); });
   }
 
   function reviveRemaining(p) { return p.down ? Math.max(0, config.reviveSeconds - (time - p.downAt)) : 0; }
@@ -130,6 +166,9 @@ ML.createGame = function (config, heroes) {
   return {
     onFx(fn) { fxListeners.push(fn); },
     handleEvent(ev) {
+      // 任何留言或送禮都算「有動作」，用來判斷這位觀眾還在不在
+      const me = ev.user && players.get(ev.user.id);
+      if (me) me.lastActive = time;
       if (ev.type === 'chat') handleChat(ev.user, ev.text);
       else if (ev.type === 'gift') handleGift(ev.user, ev.giftId, ev.count);
     },
@@ -140,6 +179,9 @@ ML.createGame = function (config, heroes) {
         if (p.down && time - p.downAt >= config.removeDownedAfterSeconds) {
           players.delete(p.id);
           notice(`${p.name} 倒地太久，離場了`);
+        } else if (time - p.lastActive >= config.idleRemoveSeconds) {
+          players.delete(p.id);   // 太久沒留言也沒送禮：當作已經離開直播間，把位置讓出來（等級和傷害紀錄保留）
+          notice(`${p.name} 太久沒動作，離場了`);
         }
       }
     },
@@ -147,6 +189,8 @@ ML.createGame = function (config, heroes) {
     getPlayers() { return [...players.values()]; },
     getPlayer(id) { return players.get(id); },
     reviveRemaining,
+    stats,
+    xpNeed,
     getLeaderboard() {
       return [...scores.values()].filter(s => s.damage > 0)
         .sort((a, b) => b.damage - a.damage).slice(0, config.leaderboardSize);
