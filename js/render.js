@@ -51,7 +51,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
     if (e.type === 'join') {
       const p = game.getPlayer(e.id);
       views.set(e.id, { id: e.id, x: null, y: null, size: 80, hp: p.hp, shownHp: p.hp, down: false,
-        flash: 0, shake: 0, hop: 1, hopH: 1.2, lunge: null, pending: 0, kbx: 0, kby: 0, phase: Math.random() * 6 });
+        flash: 0, shake: 0, hop: 1, hopH: 1.2, lunge: null, pending: 0, kbx: 0, kby: 0, face: -1, faceShown: -1, phase: Math.random() * 6 });
       return;
     }
     const v = views.get(e.id);
@@ -74,6 +74,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
       let delay;       // 幾秒後「打中」
       let onHit;       // 打中那一刻，在每個被打的人身上放的特效
       v.hold = 1.4; v.goal = null;   // 出招期間站定不走動
+      if (tv0 && e.action !== 'aoe' && tv0.x !== v.x) v.face = Math.sign(tv0.x - v.x);   // 轉身面向對手
 
       if (e.action === 'aoe') {
         // 全場攻擊：原地跳起，落地震波
@@ -222,6 +223,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
       if (v.tsize) v.size += (v.tsize - v.size) * k;
       if (v.tx !== undefined) { v.x += (v.tx - v.x) * k; v.y += (v.ty - v.y) * k; }
       v.hold = Math.max(0, (v.hold || 0) - dt);
+      v.faceShown += clamp(v.face - v.faceShown, -dt * 12, dt * 12);   // 轉身不是瞬間翻面，而是很快地轉過去
       v.flash = Math.max(0, v.flash - dt * 4);
       v.shake = Math.max(0, v.shake - dt * 4);
       v.hop = Math.max(0, v.hop - dt * 2.2);
@@ -265,6 +267,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
       if (d <= step) { v.goal = null; v.rest = cfg.restMin + Math.random() * (cfg.restMax - cfg.restMin); continue; }
       v.x += dx / d * step; v.y += dy / d * step;
       v.moving = true; v.dir = Math.sign(dx);
+      if (Math.abs(v.goal.x - v.x) > v.size * 0.2) v.face = v.dir;   // 面向前進方向（幾乎直上直下時不轉身）
     }
     // 互相靠太近就輕輕推開，避免疊在一起；倒地的不會被推走
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
@@ -303,7 +306,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
     let lean = 0;
     if (v.lunge) { const t = views.get(v.lunge.to); if (t) lean = Math.sign(t.x - v.x || 1) * 0.22 * Math.sin(Math.PI * v.lunge.t / v.lunge.dur); }
     else lean = clamp(v.kbx / size * 1.4, -0.35, 0.35) + (v.moving ? v.dir * 0.06 : 0);   // 走路時微微往前進方向傾
-    sprite.draw(ctx, p.hero, x, y, size, { pose, poseTime: v.lunge ? v.lunge.t : time, flash: v.flash, lean });
+    sprite.draw(ctx, p.hero, x, y, size, { pose, poseTime: v.lunge ? v.lunge.t : time, flash: v.flash, lean, facing: v.faceShown });
 
     // 血條
     const bw = Math.max(54, size * 0.95), bh = Math.max(7, size * 0.09);
@@ -409,7 +412,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
   return {
     frame(dt) { update(dt); draw(); },
     // 自動測試用：讀出每隻武將目前的位置
-    debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down })); },
+    debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down, face: v.face, moving: v.moving })); },
     debugBounds() { return bounds; },
     reset() { views.clear(); floats = []; rings = []; timers = []; toasts = []; dim = null; quake = 0; effects.clear(); },
   };

@@ -32,7 +32,7 @@ ML.createHeroSprite = function (heroes, config, basePath) {
 
   return {
     ready,
-    // (x, y) 是角色中心，size 是角色高度。state = { pose, poseTime, flash(0~1 閃白強度), lean(身體傾斜角度) }
+    // (x, y) 是角色中心，size 是角色高度。state = { pose, poseTime, flash(0~1 閃白強度), lean(身體傾斜角度), facing(-1 面向左 ~ 1 面向右) }
     draw(ctx, hero, x, y, size, state) {
       const color = (config.factions[hero.faction] || {}).color || '#888';
       const img = images.get(hero.heroId);
@@ -61,6 +61,11 @@ ML.createHeroSprite = function (heroes, config, basePath) {
       } else {
         ctx.translate(x, footY);
         ctx.rotate(state.lean || 0);   // 以腳為軸心前傾／後仰
+        // 左右翻面：facing 是 -1（面向左）到 1（面向右），中間值是正在轉身。
+        // 原圖預設面向左；config.artFacesRight 裡列的武將原圖是面向右的。
+        const artDir = (config.artFacesRight || []).includes(hero.heroId) ? 1 : -1;
+        const turn = (state.facing === undefined ? -1 : state.facing) * artDir;   // 1 = 照原圖畫，-1 = 左右相反
+        ctx.scale(Math.sign(turn || 1) * Math.max(0.15, Math.abs(turn)), 1);
       }
       // 以下以「腳底中央」為原點往上畫
       if (img) {
