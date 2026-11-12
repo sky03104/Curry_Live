@@ -32,7 +32,7 @@ ML.createHeroSprite = function (heroes, config, basePath) {
 
   return {
     ready,
-    // (x, y) 是角色中心，size 是角色高度。state = { pose, poseTime, flash(0~1 閃白強度) }
+    // (x, y) 是角色中心，size 是角色高度。state = { pose, poseTime, flash(0~1 閃白強度), lean(身體傾斜角度) }
     draw(ctx, hero, x, y, size, state) {
       const color = (config.factions[hero.faction] || {}).color || '#888';
       const img = images.get(hero.heroId);
@@ -60,6 +60,7 @@ ML.createHeroSprite = function (heroes, config, basePath) {
         ctx.translate(0, h / 2 * 0.8);
       } else {
         ctx.translate(x, footY);
+        ctx.rotate(state.lean || 0);   // 以腳為軸心前傾／後仰
       }
       // 以下以「腳底中央」為原點往上畫
       if (img) {

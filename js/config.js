@@ -38,6 +38,20 @@ window.GAME_CONFIG = {
     { id: 'heart',    name: '愛心', icon: '💖', action: 'heal' },
   ],
 
+  // ---------- 技能演出 ----------
+  // 每個兵種放技能時的演出方式（skillFx）：
+  //   slam   衝過去重擊，地面裂開
+  //   magic  對手腳下出現法陣，然後落雷
+  //   ranged 射出光彈
+  //   aura   自身光環爆發，對手被光柱擊中
+  troops: {
+    Vanguard:   { label: '猛將', skillFx: 'slam' },
+    Strategist: { label: '謀士', skillFx: 'magic' },
+    Ranger:     { label: '遊俠', skillFx: 'ranged' },
+    Commander:  { label: '統帥', skillFx: 'aura' },
+  },
+  skillDim: 0.45,               // 放技能時畫面變暗的程度。0 = 不變暗，1 = 全黑
+
   // ---------- 留言指令 ----------
   commands: {
     lockPrefix: '@',            // 「@對方名字」鎖定攻擊目標

@@ -7,7 +7,7 @@
   const hub = ML.createEventHub();
   const game = ML.createGame(config, heroes);
   const sprite = ML.createHeroSprite(heroes, config, 'assets/heroes');
-  const renderer = ML.createRenderer(document.getElementById('stage'), game, config, sprite);
+  const renderer = ML.createRenderer(document.getElementById('stage'), game, config, sprite, ML.createEffects());
 
   hub.on(ev => game.handleEvent(ev));
 
@@ -30,5 +30,5 @@
   }
   sprite.ready.then(() => requestAnimationFrame(loop));
 
-  ML.hub = hub; ML.game = game;   // 方便除錯與自動測試
+  ML.hub = hub; ML.game = game; ML.renderer = renderer;   // 方便除錯與自動測試
 })();

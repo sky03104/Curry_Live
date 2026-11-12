@@ -5,7 +5,7 @@
 // ============================================================
 window.ML = window.ML || {};
 
-ML.createRenderer = function (canvas, game, config, sprite) {
+ML.createRenderer = function (canvas, game, config, sprite, effects) {
   const ctx = canvas.getContext('2d');
   const FONT = '"Noto Sans TC","Microsoft JhengHei","PingFang TC","WenQuanYi Zen Hei",sans-serif';
   const views = new Map();   // 觀眾代號 → 畫面上這隻武將的顯示狀態
@@ -14,6 +14,8 @@ ML.createRenderer = function (canvas, game, config, sprite) {
   let timers = [];           // 「幾秒後做某事」（讓扣血剛好發生在撞到的那一刻）
   let toasts = [];           // 左下角訊息
   let time = 0, W = 0, H = 0;
+  let dim = null;            // 技能發動時畫面短暫變暗
+  let quake = 0;             // 整個畫面震動的強度（重擊時）
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const after = (sec, fn) => timers.push({ t: sec, fn });
@@ -29,6 +31,13 @@ ML.createRenderer = function (canvas, game, config, sprite) {
     ctx.fillStyle = color;
     ctx.fillText(str, x, y);
   }
+  // 把陣營色調亮，當特效的顏色
+  function bright(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return '#' + [n >> 16, (n >> 8) & 255, n & 255].map(c => Math.round(c + (255 - c) * 0.3).toString(16).padStart(2, '0')).join('');
+  }
+  const feet = v => v.y + v.size / 2;
+
   const short = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
   // ---------- 接收遊戲通知，排入動態 ----------
@@ -41,30 +50,96 @@ ML.createRenderer = function (canvas, game, config, sprite) {
     if (e.type === 'join') {
       const p = game.getPlayer(e.id);
       views.set(e.id, { id: e.id, x: null, y: null, size: 80, hp: p.hp, shownHp: p.hp, down: false,
-        flash: 0, shake: 0, hop: 1, hopH: 1.2, lunge: null, pending: 0, phase: Math.random() * 6 });
+        flash: 0, shake: 0, hop: 1, hopH: 1.2, lunge: null, pending: 0, kbx: 0, kby: 0, phase: Math.random() * 6 });
       return;
     }
     const v = views.get(e.id);
     if (!v) return;
     if (e.type === 'revive') {
       v.hop = 1; v.hopH = 1.4; v.flash = 1;
+      effects.pillar(v.x, feet(v), v.size * 0.9, v.size * 2.2, '#ffe27a');
+      effects.rise(v.x, v.y, '#ffe27a', 22, v.size * 0.4);
       floats.push({ v, text: '復活！', color: '#ffe27a', scale: 1.3, age: 0 });
     } else if (e.type === 'heal') {
       v.hop = 1; v.hopH = 0.5;
+      effects.rise(v.x, v.y + v.size * 0.2, '#7dffa0', 20, v.size * 0.4);
       rings.push({ v, age: 0, life: 0.5, color: '#7dffa0', max: 1.2 });
       floats.push({ v, text: '+' + e.amount, color: '#7dffa0', scale: 1, age: 0 });
     } else if (e.type === 'attack') {
+      const hero = game.getPlayer(e.id).hero;
+      const color = bright((config.factions[hero.faction] || { color: '#cccccc' }).color);
       const big = e.action === 'skill';
-      let delay;
-      if (e.action === 'aoe') {            // 全場攻擊：原地跳起，落地震波
+      const tv0 = views.get(e.hits[0].id);
+      let delay;       // 幾秒後「打中」
+      let onHit;       // 打中那一刻，在每個被打的人身上放的特效
+
+      if (e.action === 'aoe') {
+        // 全場攻擊：原地跳起，落地震波
         v.hop = 1; v.hopH = 1.6; delay = 0.3;
-        after(delay, () => rings.push({ v, age: 0, life: 0.6, color: '#ffd35c', max: 0 }));
-      } else {                              // 普攻／技能：衝過去撞
-        const dur = big ? 0.55 : 0.36;
-        v.lunge = { to: e.hits[0].id, t: 0, dur };
-        delay = dur / 2;
-        if (big) floats.push({ v, text: `「${e.skillName}」`, color: '#ffd35c', scale: 1.25, age: 0, life: 1.4 });
+        after(delay, () => {
+          rings.push({ v, age: 0, life: 0.6, color: '#ffd35c', max: 0 });
+          effects.crack(v.x, feet(v), v.size * 0.9, '#ffd35c');
+          effects.sparks(v.x, feet(v), '#ffd35c', 24, 420, 5, 0.6);
+          quake = 0.7;
+        });
+        onHit = tv => effects.sparks(tv.x, tv.y, '#ffd35c', 10, 300, 4);
+      } else if (!big) {
+        // 普攻：衝過去砍一刀
+        v.lunge = { to: e.hits[0].id, t: 0, dur: 0.36 };
+        delay = 0.18;
+        onHit = tv => {
+          effects.slash(tv.x, tv.y, Math.atan2(tv.y - v.y, tv.x - v.x), tv.size * 0.55, color);
+          effects.sparks(tv.x, tv.y, '#ffe9a8', 12, 380, 4);
+        };
+      } else {
+        // 技能：先集氣（畫面變暗、光點往身上收、跳出技能名），再依兵種演出
+        const charge = 0.5;
+        const style = (config.troops[hero.troop] || {}).skillFx || 'slam';
+        dim = { age: 0, life: charge + 0.7 };
+        v.shake = 0.5;
+        effects.converge(v.x, v.y, color, v.size * 1.1, charge);
+        floats.push({ v, text: `「${e.skillName}」`, color: '#ffd35c', scale: 1.25, age: 0, life: 1.5 });
+        if (!tv0) return;
+
+        if (style === 'slam') {            // 猛將：衝過去重擊，地面裂開
+          after(charge, () => { v.lunge = { to: tv0.id, t: 0, dur: 0.5 }; });
+          delay = charge + 0.25;
+          onHit = tv => {
+            effects.slash(tv.x, tv.y, Math.atan2(tv.y - v.y, tv.x - v.x), tv.size * 0.8, color);
+            effects.crack(tv.x, feet(tv), tv.size * 1.1, color);
+            effects.sparks(tv.x, tv.y, color, 30, 560, 6, 0.7);
+            quake = 1;
+          };
+        } else if (style === 'magic') {    // 謀士：對手腳下出現法陣，然後落雷
+          after(charge, () => { v.hop = 1; v.hopH = 0.5; effects.circle(tv0.x, feet(tv0), tv0.size * 0.8, color, 0.9); });
+          delay = charge + 0.45;
+          onHit = tv => {
+            effects.bolt(tv.x, tv.y, Math.max(tv.y + 20, tv.size * 3), color, Math.max(3, tv.size * 0.04));
+            effects.sparks(tv.x, tv.y, color, 24, 460, 5, 0.6);
+            quake = 0.6;
+          };
+        } else if (style === 'ranged') {   // 遊俠：射出光彈
+          after(charge, () => { v.hop = 1; v.hopH = 0.35; effects.orb(v.x, v.y, tv0.x, tv0.y, v.size * 0.22, color, 0.28); });
+          delay = charge + 0.28;
+          onHit = tv => {
+            effects.sparks(tv.x, tv.y, color, 30, 520, 5, 0.6);
+            rings.push({ v: tv, age: 0, life: 0.35, color, max: 1.3 });
+          };
+        } else {                            // 統帥：自身光環爆發，對手被光柱擊中
+          after(charge, () => {
+            v.hop = 1; v.hopH = 0.6;
+            rings.push({ v, age: 0, life: 0.5, color, max: 2.4 });
+            effects.sparks(v.x, v.y, color, 22, 420, 5, 0.6, 0);
+          });
+          delay = charge + 0.3;
+          onHit = tv => {
+            effects.pillar(tv.x, feet(tv), tv.size * 1.1, tv.size * 2.2, color);
+            effects.sparks(tv.x, feet(tv), color, 22, 420, 5, 0.6);
+            quake = 0.6;
+          };
+        }
       }
+
       for (const h of e.hits) {
         const tv = views.get(h.id);
         if (!tv) continue;
@@ -74,7 +149,12 @@ ML.createRenderer = function (canvas, game, config, sprite) {
           tv.hp -= h.dmg;
           if (h.down) tv.down = true;
           tv.flash = 1; tv.shake = big ? 1.8 : 1;
-          if (big) rings.push({ v: tv, age: 0, life: 0.4, color: '#ff6b5c', max: 1.6 });
+          // 被打的人往「遠離攻擊者」的方向退一下
+          const dx = tv.x - v.x, dy = tv.y - v.y, d = Math.hypot(dx, dy) || 1;
+          const push = tv.size * (big ? 0.45 : 0.22);
+          tv.kbx = dx / d * push; tv.kby = dy / d * push;
+          effects.sparks(tv.x, tv.y, '#ffffff', 6, 260, 3);   // 碎光
+          onHit(tv);
           floats.push({ v: tv, text: '-' + h.dmg, color: big ? '#ffb13c' : '#ff5c4d', scale: big ? 1.5 : 1, age: 0 });
         });
       }
@@ -122,6 +202,9 @@ ML.createRenderer = function (canvas, game, config, sprite) {
     const due = timers.filter(t => (t.t -= dt) <= 0);
     timers = timers.filter(t => t.t > 0);
     due.forEach(t => t.fn());
+    effects.update(dt);
+    quake = Math.max(0, quake - dt * 3);
+    if (dim && (dim.age += dt) >= dim.life) dim = null;
 
     for (const [id, v] of views) {
       const p = game.getPlayer(id);
@@ -133,6 +216,7 @@ ML.createRenderer = function (canvas, game, config, sprite) {
       v.flash = Math.max(0, v.flash - dt * 4);
       v.shake = Math.max(0, v.shake - dt * 4);
       v.hop = Math.max(0, v.hop - dt * 2.2);
+      const kd = Math.max(0, 1 - dt * 7); v.kbx *= kd; v.kby *= kd;   // 擊退慢慢彈回原位
       if (v.lunge && (v.lunge.t += dt) >= v.lunge.dur) v.lunge = null;
     }
     floats.forEach(f => f.age += dt); floats = floats.filter(f => f.age < (f.life || 1) && views.has(f.v.id));
@@ -149,6 +233,7 @@ ML.createRenderer = function (canvas, game, config, sprite) {
       const t = views.get(v.lunge.to);
       if (t) { const s = Math.sin(Math.PI * v.lunge.t / v.lunge.dur) * 0.6; x += (t.x - v.x) * s; y += (t.y - v.y) * s; }
     }
+    x += v.kbx; y += v.kby;                                                     // 擊退
     if (v.shake > 0) { x += (Math.random() - 0.5) * v.shake * v.size * 0.2; y += (Math.random() - 0.5) * v.shake * v.size * 0.1; }
     return { x, y };
   }
@@ -158,7 +243,11 @@ ML.createRenderer = function (canvas, game, config, sprite) {
     const { x, y } = pos(v);
     const size = v.size, r = size / 2, fs = clamp(size * 0.2, 12, 22);
     const pose = v.down ? 'down' : v.lunge ? 'attack' : v.flash > 0 ? 'hit' : 'idle';
-    sprite.draw(ctx, p.hero, x, y, size, { pose, poseTime: v.lunge ? v.lunge.t : time, flash: v.flash });
+    // 身體傾斜：衝撞時往前傾，被打時往後仰
+    let lean = 0;
+    if (v.lunge) { const t = views.get(v.lunge.to); if (t) lean = Math.sign(t.x - v.x || 1) * 0.22 * Math.sin(Math.PI * v.lunge.t / v.lunge.dur); }
+    else lean = clamp(v.kbx / size * 1.4, -0.35, 0.35);
+    sprite.draw(ctx, p.hero, x, y, size, { pose, poseTime: v.lunge ? v.lunge.t : time, flash: v.flash, lean });
 
     // 血條
     const bw = Math.max(54, size * 0.95), bh = Math.max(7, size * 0.09);
@@ -215,6 +304,14 @@ ML.createRenderer = function (canvas, game, config, sprite) {
 
     const { lb, arena } = layout();
 
+    if (dim) {   // 技能發動：畫面短暫變暗，讓特效更顯眼
+      ctx.fillStyle = `rgba(0,0,0,${config.skillDim * Math.sin(Math.PI * dim.age / dim.life)})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.save();
+    if (quake > 0) ctx.translate((Math.random() - 0.5) * quake * 14, (Math.random() - 0.5) * quake * 14);   // 重擊時整個畫面震一下
+    effects.draw(ctx, true);    // 貼在地上的特效（法陣、地裂）
+
     // 正在衝撞的畫在最上面，其餘照前後位置
     [...views.values()].filter(v => v.x !== null)
       .sort((a, b) => (a.lunge ? 1 : 0) - (b.lunge ? 1 : 0) || a.y - b.y).forEach(drawHero);
@@ -227,6 +324,9 @@ ML.createRenderer = function (canvas, game, config, sprite) {
       ctx.strokeStyle = r.color; ctx.globalAlpha = 1 - k; ctx.lineWidth = r.max ? 5 : 10;
       ctx.stroke(); ctx.globalAlpha = 1;
     }
+    effects.draw(ctx, false);   // 其他特效（刀光、火花、落雷…）
+    ctx.restore();
+
     for (const f of floats) {
       const life = f.life || 1, k = f.age / life;
       ctx.globalAlpha = k < 0.7 ? 1 : (1 - k) / 0.3;
@@ -252,6 +352,6 @@ ML.createRenderer = function (canvas, game, config, sprite) {
 
   return {
     frame(dt) { update(dt); draw(); },
-    reset() { views.clear(); floats = []; rings = []; timers = []; toasts = []; },
+    reset() { views.clear(); floats = []; rings = []; timers = []; toasts = []; dim = null; quake = 0; effects.clear(); },
   };
 };
