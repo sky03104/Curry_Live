@@ -67,6 +67,15 @@
   - OBS 網址：`https://sky03104.github.io/Curry_Live/?obs=1&tikfinity=1`
   - 轉換程式在 `js/events.js` 的 `createTikFinityReader`（攤平／包在 `user`、`giftDetails`、`gift` 裡的欄位擺法都認）。
   - **⚠️ 只用自製的「假 TikFinity」測過，沒接過真的 TikFinity**；咖哩截圖時 TikFinity 尚未登入完成 Setup。
+- **TikTok 禮物設定面板**（2026-11-12 咖哩要求）：面板的「TikTok 禮物設定」可指定哪個 TikTok 禮物觸發哪個動作
+  （手打禮物英文名稱，或從「最近收到的 TikTok 禮物」清單直接選），以及沒被指定的禮物要照價值分級還是忽略。
+  - 程式在 `js/gift-settings.js`。設定存在瀏覽器裡，**同時寫進「直播用網址」**（`&gifts=attack:Rose;skill:Lion&other=ignore`）：
+    直播軟體是另一個瀏覽器、讀不到面板存的設定，所以**每次改設定都要把新網址重貼進直播軟體**。
+  - 網址裡有設定時以網址為準；都沒有時用 `js/config.js` 的 `tiktok.giftByName`。
+  - 面板的事件紀錄會寫出每份 TikTok 禮物「對應到哪個動作／沒有對應已忽略」，名稱和價值都讀不到時會附上原始資料。
+- **2026-11-12 第一次真實開播的結果**：咖哩回報「沒偵測到送禮事件」（留言是否正常未說明）。
+  推測原因（**未用真資料證實**）：TikFinity 的禮物資料同時有攤在外層的 `giftName`／`diamondCount` 和一個只放編號的 `gift` 物件，
+  舊程式只讀 `gift` 那層，結果名稱和價值都是空的、被當成 0 鑽忽略。已改成每個欄位每一層都找。
 - **備案：本機橋接程式**（`bridge/`，2026-11-12）。在主播電腦上執行（需要 Node.js 20 以上），
   用 TikTok-Live-Connector（非官方套件，靠第三方 Euler Stream 服務簽章，免費但有次數限制）連直播，
   把留言／送禮整理成統一格式傳給網頁；同時在 `http://localhost:8081/` 提供遊戲網頁給 OBS 用。
@@ -101,6 +110,7 @@
 | `data/heroes.js` | 38 隻武將資料（自動產生） |
 | `assets/heroes/` | 38 張武將全身圖（已縮小） |
 | `js/events.js` | 事件來源層（假面板／之後的 TikTok） |
+| `js/gift-settings.js` | TikTok 禮物 → 動作的設定（存在瀏覽器與直播用網址裡） |
 | `js/game.js` | 遊戲規則：上場、攻擊、鎖定、倒地、復活、排行榜 |
 | `js/hero-sprite.js` | 畫角色層 |
 | `js/effects.js` | 特效層：每種特效長什麼樣子 |
@@ -120,7 +130,6 @@
 ## 還沒做（第一版範圍外）
 - 用真的 TikFinity 電腦版實測 `?tikfinity=1`（目前只用假的 TikFinity 測過）。
 - 橋接程式用真的 TikTok 直播實測（目前只跑過示範模式）；`bridge/啟動.bat` 也沒在真的 Windows 上跑過。
-- TikTok 禮物對應目前只照鑽石數分級，沒有逐一指定禮物名稱。
 - 簡體字武將名（例如「吕布」）目前不會認得；`js/config.js` 的 `heroAliases` 可以手動加別名。
 - 連續圖動畫（武將自己揮刀、後仰的逐格動作）：現在只有整張圖傾斜／衝撞／擊退。
   萌戰三國有 3D 動作檔，但要先在有 Unity 或 Blender 的電腦上轉成連續圖片才能用，雲端環境做不了。

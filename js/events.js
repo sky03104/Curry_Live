@@ -22,12 +22,17 @@ ML.createEventHub = function () {
   return hub;
 };
 
-// 把 TikTok 的禮物對應成遊戲裡的禮物（對應表在 js/config.js 的 tiktok）。
-// 先看禮物名稱有沒有指定；沒有的話照禮物價值（鑽石數）分級。對不到就回傳 null（忽略這份禮物）。
+// 把 TikTok 的禮物對應成遊戲裡的禮物。對應表在 config.tiktok（可在面板的「TikTok 禮物設定」調整）。
+// 順序：1. 有沒有指定這個禮物名稱（不分大小寫）→ 2. 有沒有指定這個禮物編號
+//       → 3. 沒指定的話，照禮物價值（鑽石數）分級；若設定成「沒指定的一律忽略」就不理它。
+// 對不到就回傳 null（這份禮物不會有任何效果）。
 ML.mapTikTokGift = function (config, gift) {
-  const t = config.tiktok || {};
-  const byName = (t.giftByName || {})[gift.name];
-  if (byName) return byName;
+  const t = config.tiktok || {}, table = t.giftByName || {};
+  const lower = {};
+  for (const k of Object.keys(table)) lower[k.trim().toLowerCase()] = table[k];
+  const hit = lower[String(gift.name || '').trim().toLowerCase()] || lower['#' + gift.id];
+  if (hit) return hit;
+  if (t.ignoreUnlisted) return null;
   const tier = (t.giftByDiamonds || []).slice().sort((a, b) => b.atLeast - a.atLeast).find(x => gift.diamonds >= x.atLeast);
   return tier ? tier.gift : null;
 };
@@ -51,19 +56,27 @@ ML.createTikFinityReader = function () {
       return text ? { type: 'chat', user: u, text } : null;
     }
     if (msg.event === 'gift') {
-      const g = d.giftDetails || d.gift || d;
-      const giftId = String(d.giftId || g.id || '');
-      const total = Number(d.repeatCount) || 1;
+      // 禮物的名稱、價值、類型，不同版本放的位置不一樣：有的直接攤在最外層，有的包在 giftDetails / gift /
+      // extendedGiftInfo 裡，而且同一筆資料可能同時有好幾層（例如外層有 giftName，裡面的 gift 只放編號）。
+      // 所以每個欄位都要「每一層都找一遍」，不能只挑其中一層。
+      const layers = [d, d.giftDetails, d.gift, d.extendedGiftInfo].filter(x => x && typeof x === 'object');
+      const pick = (...keys) => { for (const o of layers) for (const k of keys) if (o[k] !== undefined && o[k] !== null && o[k] !== '') return o[k]; };
+      const giftId = String(pick('giftId', 'gift_id', 'id') || '');
+      const total = Number(pick('repeatCount', 'repeat_count')) || 1;
       let count = total;
       // 連送：TikTok 會一直重複通知「目前累計幾個」，結束時再通知一次。只算比上次多出來的，才不會重複計算。
-      if ((g.giftType !== undefined ? g.giftType : g.type) === 1) {
+      if (Number(pick('giftType', 'gift_type', 'type')) === 1) {
         const key = `${u.id}|${giftId}|${d.groupId || ''}`;
+        const ended = pick('repeatEnd', 'repeat_end');
         count = total - (streaks.get(key) || 0);
-        if (d.repeatEnd) streaks.delete(key); else streaks.set(key, total);
+        if (ended && ended !== '0') streaks.delete(key); else streaks.set(key, total);
         if (streaks.size > 5000) streaks.clear();
       }
       if (count <= 0) return null;
-      return { type: 'gift', user: u, count, tiktokGift: { id: giftId, name: g.giftName || g.name || '', diamonds: Number(g.diamondCount) || 0 } };
+      const gift = { id: giftId, name: String(pick('giftName', 'name') || ''), diamonds: Number(pick('diamondCount', 'diamond_count')) || 0 };
+      // 名稱和價值都讀不到時，把原始資料留一小段，方便在面板的事件紀錄裡看出問題
+      if (!gift.name && !gift.diamonds) gift.raw = JSON.stringify(d).slice(0, 400);
+      return { type: 'gift', user: u, count, tiktokGift: gift };
     }
     return null;   // 按讚、追蹤、分享等其他事件目前不使用
   };
@@ -91,6 +104,8 @@ ML.connectWebSocket = function (hub, url, config, onStatus, sourceName) {
       if (ev.type === 'chat') hub.chat(ev.user, ev.text || '');
       else if (ev.type === 'gift') {
         const giftId = ev.giftId || (ev.tiktokGift && ML.mapTikTokGift(config, ev.tiktokGift));
+        // 先通知面板「收到了什麼 TikTok 禮物、對應到哪個動作」（沒對應到也通知，才看得出為什麼沒反應）
+        if (ev.tiktokGift) hub.emit({ type: 'tiktokGift', user: ev.user, gift: ev.tiktokGift, count: ev.count, mapped: giftId || null });
         if (giftId) hub.gift(ev.user, giftId, ev.count);
       }
     };

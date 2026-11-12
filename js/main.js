@@ -4,6 +4,9 @@
   const config = window.GAME_CONFIG;
   const heroes = window.HEROES_DATA;
 
+  // 禮物設定要最先載入：它會把「哪個 TikTok 禮物對應哪個動作」套進 config
+  const giftSettings = ML.createGiftSettings(config, params);
+
   const hub = ML.createEventHub();
   const game = ML.createGame(config, heroes);
   const sprite = ML.createHeroSprite(heroes, config, 'assets/heroes');
@@ -15,7 +18,7 @@
   if (params.get('obs') === '1') {
     document.body.classList.add('obs');
   } else {
-    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes);
+    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings);
   }
   // 接真的 TikTok，兩種方式擇一：
   //   A. TikFinity 電腦版（建議）：網址加 ?tikfinity=1
