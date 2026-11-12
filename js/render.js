@@ -98,7 +98,7 @@ ML.createRenderer = function (canvas, game, config, sprite) {
       for (let cols = 1; cols <= n; cols++) {
         const rows = Math.ceil(n / cols);
         const cw = arena.w / cols, ch = arena.h / rows;
-        const size = Math.min(cw * 0.6, ch * 0.5, 150);   // 留空間給名字、血條、腳下兩行字
+        const size = Math.min(cw * 0.6, ch * 0.5, 190);   // 留空間給名字、血條、腳下兩行字
         if (!best || size > best.size) best = { cols, rows, cw, ch, size };
       }
       const size = Math.max(36, best.size);
@@ -147,7 +147,7 @@ ML.createRenderer = function (canvas, game, config, sprite) {
     if (v.hop > 0) y -= Math.sin(Math.PI * (1 - v.hop)) * v.size * 0.5 * v.hopH; // 彈跳
     if (v.lunge) {                                                              // 衝撞（去了再回來）
       const t = views.get(v.lunge.to);
-      if (t) { const s = Math.sin(Math.PI * v.lunge.t / v.lunge.dur) * 0.78; x += (t.x - v.x) * s; y += (t.y - v.y) * s; }
+      if (t) { const s = Math.sin(Math.PI * v.lunge.t / v.lunge.dur) * 0.6; x += (t.x - v.x) * s; y += (t.y - v.y) * s; }
     }
     if (v.shake > 0) { x += (Math.random() - 0.5) * v.shake * v.size * 0.2; y += (Math.random() - 0.5) * v.shake * v.size * 0.1; }
     return { x, y };
@@ -162,7 +162,7 @@ ML.createRenderer = function (canvas, game, config, sprite) {
 
     // 血條
     const bw = Math.max(54, size * 0.95), bh = Math.max(7, size * 0.09);
-    const bx = x - bw / 2, by = y - r - bh - 6;
+    const bx = x - bw / 2, by = y - r - size * 0.05 - bh - 6;   // 全身圖比 size 高一點，血條跟著往上
     const ratio = clamp(v.shownHp / p.maxHp, 0, 1);
     ctx.fillStyle = 'rgba(0,0,0,0.75)';
     ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
