@@ -9,6 +9,7 @@ window.GAME_CONFIG = {
   hpMultiplier: 1,              // 血量倍率。武將血量 = heroes 資料的 baseHp × 這個數字
   reviveSeconds: 60,            // 倒地後要等幾秒，送禮才能復活
   removeDownedAfterSeconds: 300, // 倒地超過幾秒都沒復活，就自動離場（把位置讓出來）
+  idleRemoveSeconds: 180,       // 超過幾秒沒留言也沒送禮，就自動離場（TikTok 不會通知誰離開直播間，只能這樣判斷）
 
   // ---------- 換武將 ----------
   // 已在場上的觀眾，留言「剛好只有武將名」就會換成那隻武將，血量照比例帶過去。
@@ -18,17 +19,34 @@ window.GAME_CONFIG = {
   maxOnStage: 24,               // 場上最多幾隻武將
   leaderboardSize: 5,           // 排行榜顯示前幾名
 
+  // ---------- 等級 ----------
+  // 擊倒別人的武將拿經驗值，滿了就升級。等級跟著觀眾走，換武將、倒地、離場再回來都還在；
+  // 但重新整理網頁會全部歸零（遊戲沒有存檔）。
+  leveling: {
+    maxLevel: 99,               // 等級上限
+    xpPerKillBase: 50,          // 每擊倒一隻，固定拿到的經驗值
+    xpPerKillPerVictimLevel: 10, // 再加上「對手等級 × 這個數字」（打倒高等的拿比較多）
+    xpNeedBase: 40,             // 升到下一級需要的經驗值 = xpNeedBase + xpNeedPerLevel × 目前等級
+    xpNeedPerLevel: 10,         //   例如 1 級升 2 級要 50；30 級升 31 級要 340
+    hpPerLevel: 0.04,           // 每升一級，血量多「基礎值的 4%」（99 級約 4.9 倍）
+    atkPerLevel: 0.04,          // 每升一級，攻擊多「基礎值的 4%」
+    defPerLevel: 0.03,          // 每升一級，防禦多「基礎值的 3%」
+  },
+
   // ---------- 傷害 ----------
+  // 防禦怎麼減傷：實際傷害 = 原本傷害 × defenseFactor ÷（defenseFactor + 對方防禦）
+  //   對方防禦 50 → 傷害剩 67%；防禦 100 → 剩 50%；防禦 200 → 剩 33%
+  defenseFactor: 100,
   damageVariance: 0.1,          // 傷害浮動幅度。0.1 = 每次傷害上下浮動 10%
   maxGiftCombo: 10,             // 一次連送很多個同樣禮物時，最多算幾個
 
   // ---------- 四種動作 ----------
-  // 傷害 = 武將的 baseAtk × atkMultiplier × 禮物數量
+  // 傷害 = 武將的攻擊（含等級加成）× atkMultiplier × 禮物數量，再被對方防禦打折
   // 回血 = 武將最大血量 × healPercent × 禮物數量
   actions: {
-    attack: { label: '普攻',     atkMultiplier: 1.5 },   // 打一個對象
-    aoe:    { label: '全場攻擊', atkMultiplier: 1.0 },   // 打場上所有其他人
-    skill:  { label: '技能',     atkMultiplier: 4.0 },   // 打一個對象，很痛
+    attack: { label: '普攻',     atkMultiplier: 2.0 },   // 打一個對象
+    aoe:    { label: '全場攻擊', atkMultiplier: 1.4 },   // 打場上所有其他人
+    skill:  { label: '技能',     atkMultiplier: 5.5 },   // 打一個對象，很痛
     heal:   { label: '回血',     healPercent: 0.35 },    // 補自己
   },
 

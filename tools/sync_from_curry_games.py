@@ -18,7 +18,7 @@ HEROES_JSON = os.path.join(SRC, 'UnityProject/Assets/_Project/Data/heroes.json')
 ART_DIR = os.path.join(SRC, 'UnityProject/Assets/_Project/Resources/HeroPortraitsFullBody2D')
 OUT_DIR = os.path.join(ROOT, 'assets/heroes')
 OUT_SIZE = (312, 396)   # 原圖 520x660，縮到六成：畫面上夠清楚，檔案小很多
-KEEP = ['heroId', 'displayName', 'faction', 'troop', 'baseHp', 'baseAtk', 'skillName']
+KEEP = ['heroId', 'displayName', 'faction', 'troop', 'baseHp', 'baseAtk', 'baseArmor', 'skillName']
 
 with open(HEROES_JSON, encoding='utf8') as f:
     heroes = [{k: h[k] for k in KEEP} for h in json.load(f)['heroes']]

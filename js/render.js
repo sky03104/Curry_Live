@@ -56,7 +56,14 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
     }
     const v = views.get(e.id);
     if (!v) return;
-    if (e.type === 'switch') {            // 換武將：一陣光點、跳一下，血條直接對到新數值
+    if (e.type === 'levelup') {           // 升級：金色光柱、光點往上飄、跳出等級
+      const p = game.getPlayer(e.id);
+      v.hop = 1; v.hopH = 0.9;
+      if (v.pending === 0) { v.hp = p.hp; v.shownHp = p.hp; }
+      effects.pillar(v.x, feet(v), v.size * 0.9, v.size * 2.2, '#ffd35c');
+      effects.rise(v.x, v.y, '#ffd35c', 26, v.size * 0.45);
+      floats.push({ v, text: `升級！Lv.${e.level}`, color: '#ffd35c', scale: 1.2, age: 0, life: 1.6 });
+    } else if (e.type === 'switch') {            // 換武將：一陣光點、跳一下，血條直接對到新數值
       const p = game.getPlayer(e.id);
       v.hop = 1; v.hopH = 0.8; v.flash = 1;
       if (v.pending === 0) { v.hp = p.hp; v.shownHp = p.hp; }
@@ -322,9 +329,19 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
     ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
     ctx.fillStyle = ratio > 0.5 ? '#58d26a' : ratio > 0.25 ? '#f0c23c' : '#ee5544';
     ctx.fillRect(bx, by, bw * ratio, bh);
+    // 經驗條（血條下面細細一條藍色；滿級就不畫）
+    if (p.prof.level < config.leveling.maxLevel) {
+      ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(bx - 2, by + bh + 2, bw + 4, 5);
+      ctx.fillStyle = '#5cc8ff'; ctx.fillRect(bx, by + bh + 3, bw * clamp(p.prof.xp / game.xpNeed(p.prof.level), 0, 1), 3);
+    }
 
     // 觀眾名字（血條上方）、武將名（腳下）
-    text(short(p.name, 8), x, by - fs * 0.75, fs, v.down ? '#bbb' : '#fff');
+    // 名字前面加等級，例如「Lv.5 小明」
+    ctx.font = `bold ${fs}px ${FONT}`;
+    const lv = `Lv.${p.prof.level} `, nm = short(p.name, 8);
+    const lvW = ctx.measureText(lv).width * 0.8, nmW = ctx.measureText(nm).width, left = x - (lvW + nmW) / 2;
+    text(lv, left, by - fs * 0.7, fs * 0.8, v.down ? '#bbb' : '#ffd35c', 'left');
+    text(nm, left + lvW, by - fs * 0.75, fs, v.down ? '#bbb' : '#fff', 'left');
     const fac = config.factions[p.hero.faction] || { label: '', color: '#888' };
     text(`${fac.label}・${p.hero.displayName}`, x, y + r + fs * 0.85, fs * 0.8, fac.color);
 
@@ -350,7 +367,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
       const y = lb.y + 62 + i * 32;
       text(String(i + 1), lb.x + 22, y, 18, ['#ffd35c', '#dcdcdc', '#d99a6c'][i] || '#fff');
       text(short(s.name, 7), lb.x + 42, y, 16, '#fff', 'left');
-      text(s.heroName, lb.x + lb.w * 0.58, y, 13, '#b8c4cc', 'left', false);
+      text(`Lv.${s.level} ${s.heroName}`, lb.x + lb.w * 0.5, y, 13, '#b8c4cc', 'left', false);
       text(String(s.damage), lb.x + lb.w - 14, y, 17, '#ff8a7a', 'right');
     });
   }
