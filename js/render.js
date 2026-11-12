@@ -90,15 +90,30 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
       if (tv0 && e.action !== 'aoe' && tv0.x !== v.x) v.face = Math.sign(tv0.x - v.x);   // 轉身面向對手
 
       if (e.action === 'aoe') {
-        // 全場攻擊：原地跳起，落地震波
-        v.hop = 1; v.hopH = 1.6; delay = 0.3;
-        after(delay, () => {
-          rings.push({ v, age: 0, life: 0.6, color: '#ffd35c', max: 0 });
-          effects.crack(v.x, feet(v), v.size * 0.9, '#ffd35c');
-          effects.sparks(v.x, feet(v), '#ffd35c', 24, 420, 5, 0.6);
-          quake = 0.7;
+        // 全場攻擊（大招，刻意做得慢、做得大，讓觀眾看得出「每個人都被打到」）：
+        //   集氣（畫面變暗、跳出招式名）→ 高高跳起 → 落地：地裂＋兩道震波往外擴散
+        //   → 震波掃到誰，誰就被金色光柱打中、噴火花、被震退（離得越遠越晚被打到）
+        const charge = 0.5, land = charge + 0.38;
+        dim = { age: 0, life: land + 1.3 };
+        v.shake = 0.5; v.hold = 2.4;
+        effects.converge(v.x, v.y, '#ffd35c', v.size * 1.2, charge);
+        floats.push({ v, text: '全場攻擊！', color: '#ffd35c', scale: 1.4, age: 0, life: 2 });
+        after(charge, () => { v.hop = 1; v.hopH = 1.8; });
+        after(land, () => {
+          rings.push({ v, age: 0, life: 0.9, color: '#ffd35c', max: 0, width: 18 });
+          effects.crack(v.x, feet(v), v.size * 1.4, '#ffd35c');
+          effects.sparks(v.x, feet(v), '#ffd35c', 40, 560, 6, 0.8);
+          quake = 1.2;
         });
-        onHit = tv => effects.sparks(tv.x, tv.y, '#ffd35c', 10, 300, 4);
+        after(land + 0.18, () => rings.push({ v, age: 0, life: 0.9, color: '#fff3c0', max: 0, width: 8 }));
+        const far = Math.hypot(W, H) * 0.5;
+        delay = tv => land + 0.08 + Math.min(1, Math.hypot(tv.x - v.x, tv.y - v.y) / far) * 0.75;   // 震波掃到的時間
+        onHit = tv => {
+          effects.pillar(tv.x, feet(tv), tv.size * 0.9, tv.size * 2.2, '#ffd35c');
+          effects.crack(tv.x, feet(tv), tv.size * 0.7, '#ffd35c');
+          effects.sparks(tv.x, tv.y, '#ffd35c', 22, 460, 5, 0.7);
+          rings.push({ v: tv, age: 0, life: 0.45, color: '#ff6b5c', max: 1.5 });
+        };
       } else if (!big) {
         // 普攻：衝過去砍一刀
         v.lunge = { to: e.hits[0].id, t: 0, dur: 0.36 };
@@ -160,18 +175,19 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
         const tv = views.get(h.id);
         if (!tv) continue;
         tv.pending++;
-        after(delay, () => {
+        const strong = big || e.action === 'aoe';   // 技能與全場攻擊：震得大、退得遠、數字大
+        after(typeof delay === 'function' ? delay(tv) : delay, () => {
           tv.pending--;
           tv.hp -= h.dmg;
           if (h.down) tv.down = true;
-          tv.flash = 1; tv.shake = big ? 1.8 : 1;
+          tv.flash = 1; tv.shake = strong ? 1.8 : 1;
           // 被打的人往「遠離攻擊者」的方向退一下
           const dx = tv.x - v.x, dy = tv.y - v.y, d = Math.hypot(dx, dy) || 1;
-          const push = tv.size * (big ? 0.45 : 0.22);
+          const push = tv.size * (strong ? 0.45 : 0.22);
           tv.kbx = dx / d * push; tv.kby = dy / d * push;
           effects.sparks(tv.x, tv.y, '#ffffff', 6, 260, 3);   // 碎光
           onHit(tv);
-          floats.push({ v: tv, text: '-' + h.dmg, color: big ? '#ffb13c' : '#ff5c4d', scale: big ? 1.5 : 1, age: 0 });
+          floats.push({ v: tv, text: '-' + h.dmg, color: strong ? '#ffb13c' : '#ff5c4d', scale: strong ? 1.5 : 1, age: 0, life: strong ? 1.6 : 1.2 });
         });
       }
     }
@@ -451,7 +467,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
       const k = r.age / r.life;
       const radius = (r.max ? r.v.size * r.max : Math.hypot(W, H) * 0.5) * k;
       ctx.beginPath(); ctx.arc(r.v.x, r.v.y, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = r.color; ctx.globalAlpha = 1 - k; ctx.lineWidth = r.max ? 5 : 10;
+      ctx.strokeStyle = r.color; ctx.globalAlpha = 1 - k; ctx.lineWidth = r.width || (r.max ? 5 : 10);
       ctx.stroke(); ctx.globalAlpha = 1;
     }
     effects.draw(ctx, false);   // 其他特效（刀光、火花、落雷…）
