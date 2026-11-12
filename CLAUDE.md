@@ -109,6 +109,8 @@
 | `js/main.js` | 把以上接起來 |
 | `bridge/server.js` | TikTok 橋接程式（在主播電腦上跑，不是網頁的一部分） |
 | `bridge/啟動.bat` | Windows 一鍵啟動橋接程式 |
+| `tools/make_roster.js` | 產生武將名冊圖片（發給觀眾看有哪些武將可選），輸出到 `roster/` |
+| `roster/` | 武將名冊圖片：全武將長圖一張＋魏蜀吳群各一張。武將資料或圖有變就重跑 `node tools/make_roster.js` |
 | `tools/sync_from_curry_games.py` | 從 Curry_Games 同步資料與全身圖 |
 
 ## 工作方式
