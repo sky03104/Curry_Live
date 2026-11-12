@@ -45,7 +45,8 @@ ML.createGame = function (config, heroes) {
     }
 
     const hit = nameTable.find(([name]) => text.includes(name));
-    if (!hit || me) return;   // 沒提到武將，或已經在場上（不換角）
+    if (!hit) return;   // 沒提到武將
+    if (me) { switchHero(me, text, hit[1]); return; }
     if (players.size >= config.maxOnStage) { notice(`場上已滿，${user.name} 請稍候`); return; }
     const hero = hit[1];
     const maxHp = Math.round(hero.baseHp * config.hpMultiplier);
@@ -56,6 +57,24 @@ ML.createGame = function (config, heroes) {
     fx({ type: 'join', id: p.id });
     notice(`${p.name} 的 ${hero.displayName} 上場！`);
   }
+
+  // ---------- 換武將 ----------
+  // 已在場上的觀眾可以換武將，血量照比例帶過去（剩三成血，換過去也是三成），所以不能靠換角補血。
+  // 留言必須「剛好只有武將名」才算換角，避免聊天時提到別的武將（例如「呂布好強」）就被誤換。
+  function switchHero(me, text, hero) {
+    if (text !== hit_name(text) || hero === me.hero) return;
+    if (time < (me.switchReadyAt || 0)) { notice(`${me.name} 剛換過武將，請稍等`); return; }
+    const ratio = me.hp / me.maxHp;
+    me.hero = hero;
+    me.maxHp = Math.round(hero.baseHp * config.hpMultiplier);
+    me.hp = me.down ? 0 : Math.max(1, Math.round(me.maxHp * ratio));
+    me.switchReadyAt = time + config.switchCooldownSeconds;
+    scores.get(me.id).heroName = hero.displayName;
+    fx({ type: 'switch', id: me.id });
+    notice(`${me.name} 換成了 ${hero.displayName}`);
+  }
+  // 這段留言如果剛好等於某個武將名（或別名）就回傳它，否則回傳 null
+  function hit_name(text) { const m = nameTable.find(([name]) => name === text); return m ? m[0] : null; }
 
   // ---------- 送禮 ----------
   function handleGift(user, giftId, rawCount) {

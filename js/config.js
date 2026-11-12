@@ -10,6 +10,10 @@ window.GAME_CONFIG = {
   reviveSeconds: 60,            // 倒地後要等幾秒，送禮才能復活
   removeDownedAfterSeconds: 300, // 倒地超過幾秒都沒復活，就自動離場（把位置讓出來）
 
+  // ---------- 換武將 ----------
+  // 已在場上的觀眾，留言「剛好只有武將名」就會換成那隻武將，血量照比例帶過去。
+  switchCooldownSeconds: 5,     // 換過一次後，要等幾秒才能再換（避免有人狂換洗版）
+
   // ---------- 場地 ----------
   maxOnStage: 24,               // 場上最多幾隻武將
   leaderboardSize: 5,           // 排行榜顯示前幾名

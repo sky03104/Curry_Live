@@ -56,7 +56,13 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
     }
     const v = views.get(e.id);
     if (!v) return;
-    if (e.type === 'revive') {
+    if (e.type === 'switch') {            // 換武將：一陣光點、跳一下，血條直接對到新數值
+      const p = game.getPlayer(e.id);
+      v.hop = 1; v.hopH = 0.8; v.flash = 1;
+      if (v.pending === 0) { v.hp = p.hp; v.shownHp = p.hp; }
+      effects.sparks(v.x, v.y, '#ffffff', 18, 320, 5, 0.5, 0);
+      rings.push({ v, age: 0, life: 0.4, color: '#ffffff', max: 1.2 });
+    } else if (e.type === 'revive') {
       v.hop = 1; v.hopH = 1.4; v.flash = 1;
       effects.pillar(v.x, feet(v), v.size * 0.9, v.size * 2.2, '#ffe27a');
       effects.rise(v.x, v.y, '#ffe27a', 22, v.size * 0.4);
