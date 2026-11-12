@@ -67,8 +67,11 @@
   - OBS 網址：`https://sky03104.github.io/Curry_Live/?obs=1&tikfinity=1`
   - 轉換程式在 `js/events.js` 的 `createTikFinityReader`（攤平／包在 `user`、`giftDetails`、`gift` 裡的欄位擺法都認）。
   - **⚠️ 只用自製的「假 TikFinity」測過，沒接過真的 TikFinity**；咖哩截圖時 TikFinity 尚未登入完成 Setup。
-- **TikTok 禮物設定面板**（2026-11-12 咖哩要求）：面板的「TikTok 禮物設定」可指定哪個 TikTok 禮物觸發哪個動作
-  （手打禮物英文名稱，或從「最近收到的 TikTok 禮物」清單直接選），以及沒被指定的禮物要照價值分級還是忽略。
+- **TikTok 禮物設定面板**（2026-11-12 咖哩要求；同日改成「每個動作右邊一個下拉選單」）：
+  面板的「TikTok 禮物設定」裡，普攻／全場攻擊／技能／回血各有一個下拉選單，選一個 TikTok 禮物。**一個動作只對應一個禮物。**
+  選單內容依序是：不指定 → 最近收到的禮物 → 常見禮物 → 自己輸入名稱。也可設定沒被指定的禮物要照價值分級還是忽略。
+  - 「常見禮物」清單在 `js/config.js` 的 `tiktok.commonGifts`，**是 Claude 憑印象整理的，名稱與價格未經查證**，
+    以實際收到的禮物和 TikFinity 的 Gift Browser 為準。
   - 程式在 `js/gift-settings.js`。設定存在瀏覽器裡，**同時寫進「直播用網址」**（`&gifts=attack:Rose;skill:Lion&other=ignore`）：
     直播軟體是另一個瀏覽器、讀不到面板存的設定，所以**每次改設定都要把新網址重貼進直播軟體**。
   - 網址裡有設定時以網址為準；都沒有時用 `js/config.js` 的 `tiktok.giftByName`。
