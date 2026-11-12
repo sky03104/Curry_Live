@@ -17,18 +17,19 @@
   } else {
     ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes);
   }
-  // 接真的 TikTok：要連到電腦上的橋接程式（bridge/server.js）。
-  //   ・網頁本身就是橋接程式提供的（http://localhost:8081/）→ 自動連
-  //   ・網頁是 GitHub Pages 的 → 網址加 ?ws=ws://localhost:8081
+  // 接真的 TikTok，兩種方式擇一：
+  //   A. TikFinity 電腦版（建議）：網址加 ?tikfinity=1
+  //   B. 本專案的橋接程式：從它提供的 http://localhost:8081/ 開會自動連；或網址加 ?ws=ws://localhost:8081
   const local = location.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(location.hostname);
-  const wsUrl = params.get('ws') || (local ? `ws://${location.host}` : null);
+  const useTikFinity = params.has('tikfinity');
+  const wsUrl = useTikFinity ? config.tiktok.tikfinityUrl : (params.get('ws') || (local ? `ws://${location.host}` : null));
   if (wsUrl) {
     const badge = document.getElementById('link-status');
     ML.connectWebSocket(hub, wsUrl, config, st => {
       badge.textContent = (st.connected ? '🟢 ' : '🔴 ') + st.text;
       // OBS 模式下，連線正常就不顯示任何字；只有出問題時才顯示，提醒主播
       badge.style.display = document.body.classList.contains('obs') && st.connected ? 'none' : 'block';
-    });
+    }, useTikFinity ? ' TikFinity ' : ' 橋接程式 ');
   }
 
   let last = performance.now();

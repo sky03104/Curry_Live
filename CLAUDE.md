@@ -50,7 +50,14 @@
 - **事件來源是獨立一層**（`js/events.js`）：遊戲只認「留言」「送禮」兩種統一格式的事件，
   不管它是假面板按出來的還是真的 TikTok 傳來的。之後接 TikTok-Live-Connector 的本機 Node 程式時，
   只加新的來源，不改遊戲邏輯。
-- **接真的 TikTok：本機橋接程式**（`bridge/`，2026-11-12）。在主播電腦上執行（需要 Node.js 20 以上），
+- **接真的 TikTok：主要走 TikFinity**（2026-11-12 咖哩提供 TikFinity 的 Event API 頁面截圖後定案）。
+  TikFinity **電腦版**（Desktop App，網頁版沒有）在本機提供 `ws://localhost:21213/`，
+  訊息格式 `{ "event": "chat" | "gift" | "share" | "follow" | "like" | "roomUser" | "subscribe", "data": {...} }`，
+  `data` 照 TikTok-Live-Connector 的結構。網址加 `?tikfinity=1` 就會直接連它，不需要 Node.js 也不需要下面的橋接程式。
+  - OBS 網址：`https://sky03104.github.io/Curry_Live/?obs=1&tikfinity=1`
+  - 轉換程式在 `js/events.js` 的 `createTikFinityReader`（攤平／包在 `user`、`giftDetails`、`gift` 裡的欄位擺法都認）。
+  - **⚠️ 只用自製的「假 TikFinity」測過，沒接過真的 TikFinity**；咖哩截圖時 TikFinity 尚未登入完成 Setup。
+- **備案：本機橋接程式**（`bridge/`，2026-11-12）。在主播電腦上執行（需要 Node.js 20 以上），
   用 TikTok-Live-Connector（非官方套件，靠第三方 Euler Stream 服務簽章，免費但有次數限制）連直播，
   把留言／送禮整理成統一格式傳給網頁；同時在 `http://localhost:8081/` 提供遊戲網頁給 OBS 用。
   - 啟動：Windows 雙擊 `bridge/啟動.bat`；或 `cd bridge && npm install && node server.js <TikTok帳號>`。
@@ -98,6 +105,7 @@
 - 改完要用瀏覽器實際跑過（上場、攻擊、鎖定、倒地、復活）並截圖，回報時**誠實區分「測過」與「沒測過」**。
 
 ## 還沒做（第一版範圍外）
+- 用真的 TikFinity 電腦版實測 `?tikfinity=1`（目前只用假的 TikFinity 測過）。
 - 橋接程式用真的 TikTok 直播實測（目前只跑過示範模式）；`bridge/啟動.bat` 也沒在真的 Windows 上跑過。
 - TikTok 禮物對應目前只照鑽石數分級，沒有逐一指定禮物名稱。
 - 簡體字武將名（例如「吕布」）目前不會認得；`js/config.js` 的 `heroAliases` 可以手動加別名。
