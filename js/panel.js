@@ -55,6 +55,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
 
     <section>
       <h2>事件紀錄</h2>
+      <div class="row"><button id="p-copyraw">複製最後一份禮物的原始資料（除錯用）</button></div>
       <div id="p-log"></div>
     </section>`;
 
@@ -169,10 +170,19 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       seen.delete(key); seen.set(key, { label: `${g.name || '（沒有名稱）編號 ' + g.id}（${g.diamonds} 鑽）` });
       while (seen.size > 12) seen.delete(seen.keys().next().value);
       const to = ev.mapped ? actionLabel((config.gifts.find(x => x.id === ev.mapped) || {}).action) : '沒有對應，已忽略';
-      addLog(`📦 TikTok 禮物：${seen.get(key).label} ×${ev.count} → ${to}` + (g.raw ? `　原始資料：${g.raw}` : ''));
+      addLog(`📦 TikTok 禮物：${seen.get(key).label} ×${ev.count} → ${to}（${g.icon ? '有讀到圖片' : '沒讀到圖片'}）` + (g.raw ? `　原始資料：${g.raw}` : ''));
       renderGiftSettings();
     }
   });
+
+  // 除錯用：把最後收到的那份 TikTok 禮物資料原封不動複製出來，貼給工程人員看
+  $('#p-copyraw').onclick = () => {
+    const btn = $('#p-copyraw'), reset = () => setTimeout(() => { btn.textContent = '複製最後一份禮物的原始資料（除錯用）'; }, 2000);
+    if (!ML.lastGiftRaw) { btn.textContent = '還沒收到任何 TikTok 禮物'; reset(); return; }
+    const done = () => { btn.textContent = '已複製，可以貼上了'; reset(); };
+    const fallback = () => { const t = document.createElement('textarea'); t.value = ML.lastGiftRaw; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); done(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ML.lastGiftRaw).then(done, fallback); else fallback();
+  };
 
   $('#p-adduser').onclick = () => {
     const name = $('#p-newname').value.trim();
