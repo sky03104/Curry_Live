@@ -15,6 +15,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
   let toasts = [];           // 左下角訊息
   let time = 0, W = 0, H = 0;
   let dim = null;            // 技能發動時畫面短暫變暗
+  let bounds = null;         // 武將可以走動的範圍
   let quake = 0;             // 整個畫面震動的強度（重擊時）
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -72,6 +73,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
       const tv0 = views.get(e.hits[0].id);
       let delay;       // 幾秒後「打中」
       let onHit;       // 打中那一刻，在每個被打的人身上放的特效
+      v.hold = 1.4; v.goal = null;   // 出招期間站定不走動
 
       if (e.action === 'aoe') {
         // 全場攻擊：原地跳起，落地震波
@@ -172,13 +174,14 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
     const lb = { x: W - lbW - 16, y: 16, w: lbW, h: lbH };
     const arena = wide ? { x: 16, y: 16, w: W - lbW - 48, h: H - 32 }
                        : { x: 16, y: lbH + 32, w: W - 32, h: H - lbH - 48 - 100 };   // 直式：底下留 100 給訊息
+    const wander = config.wander && config.wander.enabled;
     if (n) {
       // 試每一種「一排幾隻」，挑角色能畫最大的那種
       let best = null;
       for (let cols = 1; cols <= n; cols++) {
         const rows = Math.ceil(n / cols);
         const cw = arena.w / cols, ch = arena.h / rows;
-        const size = Math.min(cw * 0.6, ch * 0.5, 190);   // 留空間給名字、血條、腳下兩行字
+        const size = Math.min(cw * 0.6, ch * 0.5, 190) * (wander ? 0.85 : 1);   // 留空間給名字、血條、腳下兩行字；會走動時再小一點才有路可走
         if (!best || size > best.size) best = { cols, rows, cw, ch, size };
       }
       const size = Math.max(36, best.size);
@@ -190,8 +193,12 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
         const tx = arena.x + arena.w / 2 + (col - (inRow - 1) / 2) * best.cw;
         const ty = arena.y + (row + 0.5) * best.ch + 8;
         if (v.x === null) { v.x = tx; v.y = ty; v.size = size; }
-        v.tx = tx; v.ty = ty; v.tsize = size;
+        v.tsize = size;
+        if (!wander) { v.tx = tx; v.ty = ty; }   // 不走動：固定站在格子上
       });
+      // 可走動範圍：四邊往內縮，確保名字、血條、腳下的字不會跑出畫面
+      bounds = { x0: arena.x + size * 0.6, x1: arena.x + arena.w - size * 0.6,
+                 y0: arena.y + size * 0.65 + 50, y1: arena.y + arena.h - size * 0.5 - 56 };
     }
     return { lb, arena };
   }
@@ -212,22 +219,71 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
       if (v.pending === 0) { v.hp = p.hp; v.down = p.down; }   // 沒有演到一半的攻擊時，跟規則層對齊
       const k = Math.min(1, dt * 8);
       v.shownHp += (v.hp - v.shownHp) * Math.min(1, dt * 12);
-      if (v.tx !== undefined) { v.x += (v.tx - v.x) * k; v.y += (v.ty - v.y) * k; v.size += (v.tsize - v.size) * k; }
+      if (v.tsize) v.size += (v.tsize - v.size) * k;
+      if (v.tx !== undefined) { v.x += (v.tx - v.x) * k; v.y += (v.ty - v.y) * k; }
+      v.hold = Math.max(0, (v.hold || 0) - dt);
       v.flash = Math.max(0, v.flash - dt * 4);
       v.shake = Math.max(0, v.shake - dt * 4);
       v.hop = Math.max(0, v.hop - dt * 2.2);
       const kd = Math.max(0, 1 - dt * 7); v.kbx *= kd; v.kby *= kd;   // 擊退慢慢彈回原位
       if (v.lunge && (v.lunge.t += dt) >= v.lunge.dur) v.lunge = null;
     }
+    if (config.wander && config.wander.enabled && bounds) roam(dt);
     floats.forEach(f => f.age += dt); floats = floats.filter(f => f.age < (f.life || 1) && views.has(f.v.id));
     rings.forEach(r => r.age += dt); rings = rings.filter(r => r.age < r.life);
     toasts.forEach(t => t.age += dt); toasts = toasts.filter(t => t.age < 5);
   }
 
+  // 待機時在場上隨意走動：走到一個隨機地點 → 停一下 → 再挑下一個地點
+  // 兩隻武將「隔多開」的算法：左右隔一個身寬即可，上下要隔更開（因為頭上有名字血條、腳下有字）。
+  // 回傳值小於 1 代表太近、會互相擋到。
+  function gap(ax, ay, bx, by, size) {
+    return Math.hypot((bx - ax) / (size * 1.05), (by - ay) / (size * 1.2 + 62));
+  }
+  function roam(dt) {
+    const cfg = config.wander, b = bounds;
+    const list = [...views.values()].filter(v => v.x !== null);
+    for (const v of list) {
+      v.moving = false;
+      // 倒地、正在出招或挨打時不走動
+      if (v.down || v.lunge || v.pending > 0 || v.hold > 0) continue;
+      if (!v.goal) {
+        if ((v.rest = (v.rest === undefined ? Math.random() * cfg.restMax : v.rest) - dt) > 0) continue;
+        // 隨機挑幾個候選地點，選離其他人最遠的那個，大家才會散開、不會擠成一團
+        const reach = cfg.stepMax * v.size;   // 一次最多走多遠
+        let best = null;
+        for (let c = 0; c < 8; c++) {
+          const x = clamp(v.x + (Math.random() * 2 - 1) * reach, b.x0, b.x1), y = clamp(v.y + (Math.random() * 2 - 1) * reach, b.y0, b.y1);
+          let room = 9;
+          for (const o of list) if (o !== v) room = Math.min(room, gap(x, y, (o.goal || o).x, (o.goal || o).y, v.size));
+          room = Math.min(room, 2) + Math.random() * 0.3;   // 夠空就好，不必永遠跑去最空的角落
+          if (!best || room > best.room) best = { x, y, room };
+        }
+        v.goal = best;
+      }
+      const dx = v.goal.x - v.x, dy = v.goal.y - v.y, d = Math.hypot(dx, dy), step = cfg.speed * v.size * dt;
+      if (d <= step) { v.goal = null; v.rest = cfg.restMin + Math.random() * (cfg.restMax - cfg.restMin); continue; }
+      v.x += dx / d * step; v.y += dy / d * step;
+      v.moving = true; v.dir = Math.sign(dx);
+    }
+    // 互相靠太近就輕輕推開，避免疊在一起；倒地的不會被推走
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const a = list[i], c = list[j];
+      const g = gap(a.x, a.y, c.x, c.y, (a.size + c.size) / 2);
+      if (g >= 1 || (a.down && c.down)) continue;
+      const dx = c.x - a.x || 0.01, dy = c.y - a.y, d = Math.hypot(dx, dy);
+      const push = (1 - g) * a.size * Math.min(1, dt * 5) / d;
+      const wa = a.down ? 0 : c.down ? 1 : 0.5;
+      a.x -= dx * push * wa; a.y -= dy * push * wa; c.x += dx * push * (1 - wa); c.y += dy * push * (1 - wa);
+    }
+    for (const v of list) { if (!v.down) { v.x = clamp(v.x, b.x0, b.x1); v.y = clamp(v.y, b.y0, b.y1); } }
+  }
+
   // 這隻武將此刻畫在哪（待機位置 + 各種動態造成的位移）
   function pos(v) {
     let x = v.x, y = v.y;
-    if (!v.down) y += Math.sin(time * 2.4 + v.phase) * v.size * 0.03;           // 待機輕輕浮動
+    if (v.moving) y -= Math.abs(Math.sin(time * 9 + v.phase)) * v.size * 0.05;    // 走路時一顛一顛
+    else if (!v.down) y += Math.sin(time * 2.4 + v.phase) * v.size * 0.03;      // 待機輕輕浮動
     if (v.hop > 0) y -= Math.sin(Math.PI * (1 - v.hop)) * v.size * 0.5 * v.hopH; // 彈跳
     if (v.lunge) {                                                              // 衝撞（去了再回來）
       const t = views.get(v.lunge.to);
@@ -246,7 +302,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
     // 身體傾斜：衝撞時往前傾，被打時往後仰
     let lean = 0;
     if (v.lunge) { const t = views.get(v.lunge.to); if (t) lean = Math.sign(t.x - v.x || 1) * 0.22 * Math.sin(Math.PI * v.lunge.t / v.lunge.dur); }
-    else lean = clamp(v.kbx / size * 1.4, -0.35, 0.35);
+    else lean = clamp(v.kbx / size * 1.4, -0.35, 0.35) + (v.moving ? v.dir * 0.06 : 0);   // 走路時微微往前進方向傾
     sprite.draw(ctx, p.hero, x, y, size, { pose, poseTime: v.lunge ? v.lunge.t : time, flash: v.flash, lean });
 
     // 血條
@@ -352,6 +408,9 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
 
   return {
     frame(dt) { update(dt); draw(); },
+    // 自動測試用：讀出每隻武將目前的位置
+    debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down })); },
+    debugBounds() { return bounds; },
     reset() { views.clear(); floats = []; rings = []; timers = []; toasts = []; dim = null; quake = 0; effects.clear(); },
   };
 };
