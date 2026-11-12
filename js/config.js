@@ -9,7 +9,7 @@ window.GAME_CONFIG = {
   hpMultiplier: 1,              // 血量倍率。武將血量 = heroes 資料的 baseHp × 這個數字
   reviveSeconds: 60,            // 倒地後要等幾秒，送禮才能復活
   removeDownedAfterSeconds: 300, // 倒地超過幾秒都沒復活，就自動離場（把位置讓出來）
-  idleRemoveSeconds: 180,       // 超過幾秒沒留言也沒送禮，就自動離場（TikTok 不會通知誰離開直播間，只能這樣判斷）
+  idleRemoveSeconds: 3600,      // 超過幾秒沒留言也沒送禮，就自動離場（TikTok 不會通知誰離開直播間，只能這樣判斷）
 
   // ---------- 換武將 ----------
   // 已在場上的觀眾，留言「剛好只有武將名」就會換成那隻武將，血量照比例帶過去。
