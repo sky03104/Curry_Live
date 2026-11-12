@@ -73,6 +73,41 @@ window.GAME_CONFIG = {
     giftByName: {
     },
     ignoreUnlisted: false,      // true = 沒被指定的禮物一律忽略；false = 照下面的價值分級處理
+    // 面板下拉選單裡的「常見禮物」清單（名稱、值幾顆鑽石）。
+    // ⚠️ 這份是憑印象整理的，TikTok 的禮物會因地區和時間不同，名稱或價格可能對不上。
+    //    以「最近收到的禮物」和 TikFinity 的 Gift Browser 為準；有出入就改這裡，或在面板選「自己輸入名稱」。
+    commonGifts: [
+      { name: 'Rose', diamonds: 1 },
+      { name: 'TikTok', diamonds: 1 },
+      { name: 'Heart Me', diamonds: 1 },
+      { name: 'GG', diamonds: 1 },
+      { name: 'Ice Cream Cone', diamonds: 1 },
+      { name: 'Finger Heart', diamonds: 5 },
+      { name: 'Rosa', diamonds: 10 },
+      { name: 'Perfume', diamonds: 20 },
+      { name: 'Doughnut', diamonds: 30 },
+      { name: 'Paper Crane', diamonds: 99 },
+      { name: 'Little Crown', diamonds: 99 },
+      { name: 'Cap', diamonds: 99 },
+      { name: 'Hat and Mustache', diamonds: 99 },
+      { name: 'Confetti', diamonds: 100 },
+      { name: 'Hand Hearts', diamonds: 100 },
+      { name: 'Sunglasses', diamonds: 199 },
+      { name: 'Hearts', diamonds: 199 },
+      { name: 'Corgi', diamonds: 299 },
+      { name: 'Money Gun', diamonds: 500 },
+      { name: 'Swan', diamonds: 699 },
+      { name: 'Train', diamonds: 899 },
+      { name: 'Galaxy', diamonds: 1000 },
+      { name: 'Fireworks', diamonds: 1088 },
+      { name: 'Drama Queen', diamonds: 5000 },
+      { name: 'Sports Car', diamonds: 7000 },
+      { name: 'Interstellar', diamonds: 10000 },
+      { name: 'Rocket', diamonds: 20000 },
+      { name: 'Lion', diamonds: 29999 },
+      { name: 'Universe', diamonds: 34999 },
+    ],
+
     // 二、照價值分級：沒被上面指定的禮物，看它值幾顆鑽石（TikTok 的禮物定價）。
     //     從最貴的往下比，第一個「大於等於 atLeast」的就採用。
     giftByDiamonds: [

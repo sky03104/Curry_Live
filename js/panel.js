@@ -33,10 +33,8 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
 
     <section>
       <h2>TikTok 禮物設定</h2>
-      <div class="hint">指定「哪個 TikTok 禮物」觸發「哪個動作」。禮物名稱請照 TikFinity 的 Gift Browser 抄英文名稱。</div>
+      <div class="hint">每個動作右邊選一個 TikTok 禮物。清單裡沒有的，選最下面的「自己輸入名稱…」，照 TikFinity 的 Gift Browser 抄英文名稱。</div>
       <div id="gs-actions"></div>
-      <div class="row"><input id="gs-name" placeholder="禮物英文名稱，例如 Rose"><select id="gs-action" style="flex:none;width:96px"></select></div>
-      <div class="row"><button id="gs-add">加入</button></div>
       <h2 style="margin-top:10px">最近收到的 TikTok 禮物</h2>
       <div class="hint">連上直播後，觀眾送的禮物會出現在這裡，可以直接選它要對應哪個動作。</div>
       <div id="gs-seen"><div class="hint">（還沒收到任何禮物）</div></div>
@@ -98,23 +96,53 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   const options = current => '<option value="">不指定</option>' +
     giftSettings.actions.map(a => `<option value="${a}"${a === current ? ' selected' : ''}>${actionLabel(a)}</option>`).join('');
 
+  const CUSTOM = '__custom__';
+  // 每個動作一個下拉選單。選項依序是：不指定 → 最近收到的禮物 → 常見禮物 → 自己輸入名稱
+  function giftOptions(current) {
+    const same = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+    const recent = [...seen.entries()].reverse().map(([key, g]) => ({ name: key, label: g.label }));
+    const common = (config.tiktok.commonGifts || []).filter(c => !recent.some(r => same(r.name, c.name)))
+      .map(c => ({ name: c.name, label: `${c.name}（${c.diamonds} 鑽）` }));
+    const known = [...recent, ...common];
+    const opt = o => `<option value="${esc(o.name)}"${current && same(o.name, current) ? ' selected' : ''}>${esc(o.label)}</option>`;
+    return `<option value="">不指定</option>` +
+      (current && !known.some(o => same(o.name, current)) ? `<option value="${esc(current)}" selected>${esc(current)}</option>` : '') +
+      (recent.length ? `<optgroup label="最近收到的禮物">${recent.map(opt).join('')}</optgroup>` : '') +
+      `<optgroup label="常見禮物">${common.map(opt).join('')}</optgroup>` +
+      `<option value="${CUSTOM}">自己輸入名稱…</option>`;
+  }
+  const giftOf = action => Object.keys(giftSettings.map).find(n => giftSettings.map[n] === action) || '';
+
   function renderGiftSettings() {
-    $('#gs-actions').innerHTML = giftSettings.actions.map(a => {
-      const names = Object.keys(giftSettings.map).filter(n => giftSettings.map[n] === a);
-      return `<div class="gs-row"><b>${actionLabel(a)}</b><div class="chips">` +
-        (names.map(n => `<span class="chip">${esc(n)}<button data-remove="${esc(n)}" title="取消指定">✕</button></span>`).join('') ||
-          '<span class="none">尚未指定</span>') + '</div></div>';
-    }).join('');
+    $('#gs-actions').innerHTML = giftSettings.actions.map(a =>
+      `<div class="gs-row"><b>${actionLabel(a)}</b><select data-action="${a}">${giftOptions(giftOf(a))}</select></div>`).join('');
     if (seen.size) $('#gs-seen').innerHTML = [...seen.entries()].reverse().map(([key, g]) =>
       `<div class="seen"><span title="${esc(g.label)}">${esc(g.label)}</span><select data-seen="${esc(key)}">${options(giftSettings.actionOf(key))}</select></div>`).join('');
     root.querySelector(`input[name="gs-other"][value="${giftSettings.ignoreUnlisted ? 'ignore' : 'tier'}"]`).checked = true;
     $('#gs-url').value = giftSettings.liveUrl();
   }
-  $('#gs-action').innerHTML = giftSettings.actions.map(a => `<option value="${a}">${actionLabel(a)}</option>`).join('');
-  $('#gs-add').onclick = () => { giftSettings.set($('#gs-name').value, $('#gs-action').value); $('#gs-name').value = ''; renderGiftSettings(); };
-  $('#gs-name').onkeydown = e => { if (e.key === 'Enter') $('#gs-add').click(); };
-  $('#gs-actions').onclick = e => { const b = e.target.closest('[data-remove]'); if (b) { giftSettings.set(b.dataset.remove, ''); renderGiftSettings(); } };
-  $('#gs-seen').onchange = e => { const sel = e.target.closest('[data-seen]'); if (sel) { giftSettings.set(sel.dataset.seen, sel.value); renderGiftSettings(); } };
+  // 一個動作只對應一個禮物：選了新的，就取代這個動作原本的
+  function setActionGift(action, name) {
+    Object.keys(giftSettings.map).filter(n => giftSettings.map[n] === action).forEach(n => giftSettings.set(n, ''));
+    if (name) giftSettings.set(name, action);
+  }
+  $('#gs-actions').onchange = e => {
+    const sel = e.target.closest('[data-action]');
+    if (!sel) return;
+    let name = sel.value;
+    if (name === CUSTOM) {
+      name = (window.prompt('請輸入 TikTok 禮物的英文名稱（照 TikFinity 的 Gift Browser 抄）：') || '').trim();
+      if (!name) { renderGiftSettings(); return; }   // 取消輸入：選單回到原本的選擇
+    }
+    setActionGift(sel.dataset.action, name);
+    renderGiftSettings();
+  };
+  $('#gs-seen').onchange = e => {
+    const sel = e.target.closest('[data-seen]');
+    if (!sel) return;
+    if (sel.value) setActionGift(sel.value, sel.dataset.seen); else giftSettings.set(sel.dataset.seen, '');
+    renderGiftSettings();
+  };
   root.querySelectorAll('input[name="gs-other"]').forEach(r => { r.onchange = () => { giftSettings.setIgnoreUnlisted(r.value === 'ignore'); renderGiftSettings(); }; });
   $('#gs-copy').onclick = () => {
     const box = $('#gs-url'); box.select();
