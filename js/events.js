@@ -40,6 +40,29 @@ ML.mapTikTokGift = function (config, gift) {
 // ---------- TikFinity 格式 → 統一格式 ----------
 // TikFinity 電腦版的 Event API 傳來的是 { event: 'chat' | 'gift' | ..., data: {...} }，
 // data 的欄位照 TikTok-Live-Connector。不同版本欄位擺法不一樣（有的攤平、有的包在 user / giftDetails 裡），這裡都認。
+// 在一包禮物資料裡找「禮物圖片的網址」。欄位名稱跟禮物／圖示有關的優先；
+// 跟送禮者本人有關的（大頭貼、徽章、粉絲團）一律跳過，免得把觀眾的頭像當成禮物圖。
+ML.findGiftImage = function (data) {
+  const isUrl = v => typeof v === 'string' && /^https?:\/\/\S+$/.test(v) && /\.(png|webp|jpe?g|image|awebp)(\b|~|\?|$)|tiktokcdn|ibyteimg|byteimg/i.test(v);
+  const skip = /profile|avatar|badge|fans|follow|userdetail|^user$|touser|anchor|author/i;
+  const prefer = /gift|icon|image|picture/i;
+  let fallback = '';
+  const walk = (node, path, depth) => {
+    if (!node || depth > 6) return '';
+    if (Array.isArray(node)) { for (const v of node) { const r = isUrl(v) ? (prefer.test(path) ? v : (fallback = fallback || v, '')) : walk(v, path, depth + 1); if (r) return r; } return ''; }
+    if (typeof node !== 'object') return '';
+    for (const [k, v] of Object.entries(node)) {
+      if (skip.test(k)) continue;
+      const p = path + '.' + k;
+      if (isUrl(v)) { if (prefer.test(p)) return v; fallback = fallback || v; }
+      else if (v && typeof v === 'object') { const r = walk(v, p, depth + 1); if (r) return r; }
+    }
+    return '';
+  };
+  return walk(data, '', 0) || fallback;
+};
+const findGiftImage = d => ML.findGiftImage(d);
+
 ML.createTikFinityReader = function () {
   const streaks = new Map();   // 連送中的禮物：記住上次累計到幾個
   function user(d) {
@@ -74,12 +97,13 @@ ML.createTikFinityReader = function () {
       }
       if (count <= 0) return null;
       const gift = { id: giftId, name: String(pick('giftName', 'name') || ''), diamonds: Number(pick('diamondCount', 'diamond_count')) || 0 };
-      // 禮物圖片的網址（同樣是各版本放的位置不同，找得到就帶上，給畫面上的「禮物提示列」用）
+      // 禮物圖片的網址（給畫面上的「禮物提示列」用）。先看幾個已知的位置；都沒有的話，
+      // 把整包禮物資料翻一遍，找出看起來像圖片網址的欄位（會避開送禮者的大頭貼、徽章那些圖）。
       const first = list => (Array.isArray(list) && list[0]) || '';
       const E = d.extendedGiftInfo || {};
       gift.icon = String(d.giftPictureUrl || ((d.giftDetails || {}).giftImage || {}).giftPictureUrl ||
         first(((d.gift || {}).icon || {}).urlList) || first(((d.gift || {}).image || {}).urlList) ||
-        first((E.icon || {}).url_list) || first((E.image || {}).url_list) || '');
+        first((E.icon || {}).url_list) || first((E.image || {}).url_list) || findGiftImage(d) || '');
       // 名稱和價值都讀不到時，把原始資料留一小段，方便在面板的事件紀錄裡看出問題
       if (!gift.name && !gift.diamonds) gift.raw = JSON.stringify(d).slice(0, 400);
       return { type: 'gift', user: u, count, tiktokGift: gift };
@@ -103,6 +127,7 @@ ML.connectWebSocket = function (hub, url, config, onStatus, sourceName) {
       let ev;
       try { ev = JSON.parse(m.data); } catch (e) { return; }   // 格式不對的訊息直接忽略
       if (!ev) return;
+      if (ev.event === 'gift') ML.lastGiftRaw = m.data;         // 留著最後一份禮物的原始資料，面板可以複製出來除錯
       if (ev.event) ev = readTikFinity(ev);                     // TikFinity 格式 → 先轉成統一格式
       if (!ev) return;
       if (ev.type === 'status') { report(ev.connected, ev.text); return; }
