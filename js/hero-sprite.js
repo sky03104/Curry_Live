@@ -1,6 +1,6 @@
 // ============================================================
 // 畫角色層
-// 現在的做法：一張全身圖 + 腳下陣營色圓盤。動態（彈跳、衝撞、震動）由 render.js 移動位置來做。
+// 現在的做法：一張全身圖（腳下不畫任何底圈；陣營靠腳下文字的顏色分辨）。動態（彈跳、衝撞、震動）由 render.js 移動位置來做。
 // 之後要換成連續圖動畫：只改這個檔。draw 會收到 pose（目前的動作）和 poseTime（這個動作
 // 已經播了幾秒），照這兩個值挑要畫哪一格即可，其他程式不用動。
 //
@@ -39,17 +39,6 @@ ML.createHeroSprite = function (heroes, config, basePath) {
       const down = state.pose === 'down';
       const h = size * 1.12, w = h * 312 / 396;   // 全身圖是直的（312x396），腳貼在圖的最底
       const footY = y + size / 2;
-
-      // 腳下的陣營色圓盤
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(x, footY - size * 0.04, size * 0.42, size * 0.12, 0, 0, Math.PI * 2);
-      ctx.fillStyle = color + 'cc';
-      ctx.fill();
-      ctx.lineWidth = Math.max(2, size * 0.025);
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-      ctx.stroke();
-      ctx.restore();
 
       ctx.save();
       if (down) {                       // 倒地：躺平、變灰、變淡
