@@ -1,5 +1,7 @@
 # CLAUDE.md — 萌戰三國・直播亂鬥（Curry_Live）專案規則
 
+> 線上網址（GitHub Pages，main 合併後自動更新）：https://sky03104.github.io/Curry_Live/ （OBS 用加 `?obs=1`）
+
 > TikTok 直播互動小遊戲。咖哩是保全主管不是工程師：**說明一律用白話、少用術語**。
 
 ## 這是什麼
@@ -48,6 +50,17 @@
 - **事件來源是獨立一層**（`js/events.js`）：遊戲只認「留言」「送禮」兩種統一格式的事件，
   不管它是假面板按出來的還是真的 TikTok 傳來的。之後接 TikTok-Live-Connector 的本機 Node 程式時，
   只加新的來源，不改遊戲邏輯。
+- **接真的 TikTok：本機橋接程式**（`bridge/`，2026-11-12）。在主播電腦上執行（需要 Node.js 20 以上），
+  用 TikTok-Live-Connector（非官方套件，靠第三方 Euler Stream 服務簽章，免費但有次數限制）連直播，
+  把留言／送禮整理成統一格式傳給網頁；同時在 `http://localhost:8081/` 提供遊戲網頁給 OBS 用。
+  - 啟動：Windows 雙擊 `bridge/啟動.bat`；或 `cd bridge && npm install && node server.js <TikTok帳號>`。
+  - `node server.js --demo` 是示範模式（不連 TikTok，自動產生假事件），用來測整條路有沒有通。
+  - 網頁端：從 `localhost:8081` 開會自動連橋接程式；從 GitHub Pages 開要加 `?ws=ws://localhost:8081`。
+  - TikTok 禮物 → 遊戲禮物的對應在 `js/config.js` 的 `tiktok`（可指定名稱，否則照鑽石數分級）。
+  - 連送（連擊）只算新增的數量，不重複計算。
+  - **⚠️ 只用示範模式測過整條路；從沒連上過真的 TikTok 直播**（雲端環境連不到 TikTok）。
+    套件 2.5.0 的說明文件與實際型別定義的欄位名稱不一致（`comment`/`content`、`giftDetails`/`gift`、`uniqueId`/`displayId`），
+    橋接程式兩種都認；第一次實測若留言或禮物沒反應，用 `node server.js <帳號> --raw` 看原始資料對欄位。
 - **畫角色是獨立一層**（`js/hero-sprite.js`）：現在是「全身圖＋程式做的動態」（彈跳、衝撞、閃白、震動），
   之後要換成連續圖動畫只改這個檔。
 - **特效是獨立一層**（`js/effects.js`）：刀光、火花、法陣、落雷、光彈、光柱、地裂、集氣，全部用程式畫、不用圖檔。
@@ -76,6 +89,8 @@
 | `js/render.js` | 畫面：排位、動態效果、血條、排行榜 |
 | `js/panel.js` | 假事件面板（試玩用） |
 | `js/main.js` | 把以上接起來 |
+| `bridge/server.js` | TikTok 橋接程式（在主播電腦上跑，不是網頁的一部分） |
+| `bridge/啟動.bat` | Windows 一鍵啟動橋接程式 |
 | `tools/sync_from_curry_games.py` | 從 Curry_Games 同步資料與全身圖 |
 
 ## 工作方式
@@ -83,8 +98,8 @@
 - 改完要用瀏覽器實際跑過（上場、攻擊、鎖定、倒地、復活）並截圖，回報時**誠實區分「測過」與「沒測過」**。
 
 ## 還沒做（第一版範圍外）
-- 接真的 TikTok（TikTok-Live-Connector 本機 Node 程式）。`js/events.js` 已留一個接本機程式的接口，但**從未實測**。
-- 真實 TikTok 禮物名稱與 `js/config.js` 禮物的對應表。
+- 橋接程式用真的 TikTok 直播實測（目前只跑過示範模式）；`bridge/啟動.bat` 也沒在真的 Windows 上跑過。
+- TikTok 禮物對應目前只照鑽石數分級，沒有逐一指定禮物名稱。
 - 簡體字武將名（例如「吕布」）目前不會認得；`js/config.js` 的 `heroAliases` 可以手動加別名。
 - 連續圖動畫（武將自己揮刀、後仰的逐格動作）：現在只有整張圖傾斜／衝撞／擊退。
   萌戰三國有 3D 動作檔，但要先在有 Unity 或 Blender 的電腦上轉成連續圖片才能用，雲端環境做不了。
