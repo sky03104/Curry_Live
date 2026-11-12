@@ -45,6 +45,8 @@ window.GAME_CONFIG = {
   // ---------- 真的 TikTok 禮物 → 遊戲裡的禮物 ----------
   // 右邊填的是上面 gifts 裡的 id（rose 普攻 / firework 全場攻擊 / crown 技能 / heart 回血）。
   tiktok: {
+    tikfinityUrl: 'ws://localhost:21213/',   // TikFinity 電腦版 Event API 的位址（照 TikFinity 的 Tools → Event API 頁面）
+
     // 一、指定名稱：TikTok 禮物的英文名稱剛好等於左邊時，就用右邊的動作（優先於下面的價值分級）。
     //     名稱會顯示在橋接程式的視窗裡（🎁 某某 送出 Rose…），照抄即可。例如： 'Rose': 'rose'
     giftByName: {
