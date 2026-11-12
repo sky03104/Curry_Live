@@ -44,21 +44,23 @@ export function mapChat(data) {
 const streaks = new Map();
 export function mapGift(data) {
   const user = toUser(data.user);
-  const detail = data.giftDetails || data.gift || {};
   if (!user) return null;
-  const giftId = String(data.giftId || detail.id || '');
-  const total = Number(data.repeatCount) || 1;
-  const streakable = (detail.giftType ?? detail.type) === 1;
+  // 每個欄位都要「每一層都找一遍」（見 js/events.js 同一段的說明）
+  const layers = [data, data.giftDetails, data.gift, data.extendedGiftInfo].filter(x => x && typeof x === 'object');
+  const pick = (...keys) => { for (const o of layers) for (const k of keys) if (o[k] !== undefined && o[k] !== null && o[k] !== '') return o[k]; };
+  const giftId = String(pick('giftId', 'gift_id', 'id') || '');
+  const total = Number(pick('repeatCount', 'repeat_count')) || 1;
   let count = total;
-  if (streakable) {
+  if (Number(pick('giftType', 'gift_type', 'type')) === 1) {
     const key = `${user.id}|${giftId}|${data.groupId || ''}`;
+    const ended = pick('repeatEnd', 'repeat_end');
     count = total - (streaks.get(key) || 0);
-    if (data.repeatEnd) streaks.delete(key); else streaks.set(key, total);
+    if (ended && ended !== '0') streaks.delete(key); else streaks.set(key, total);
     if (streaks.size > 5000) streaks.clear();
   }
   if (count <= 0) return null;
   return { type: 'gift', user, count,
-    tiktokGift: { id: giftId, name: detail.giftName || detail.name || '', diamonds: Number(detail.diamondCount) || 0 } };
+    tiktokGift: { id: giftId, name: String(pick('giftName', 'name') || ''), diamonds: Number(pick('diamondCount', 'diamond_count')) || 0 } };
 }
 
 // ---------- 本機網頁 + 傳事件給網頁的通道 ----------
