@@ -42,6 +42,23 @@ window.GAME_CONFIG = {
     { id: 'heart',    name: '愛心', icon: '💖', action: 'heal' },
   ],
 
+  // ---------- 真的 TikTok 禮物 → 遊戲裡的禮物 ----------
+  // 右邊填的是上面 gifts 裡的 id（rose 普攻 / firework 全場攻擊 / crown 技能 / heart 回血）。
+  tiktok: {
+    // 一、指定名稱：TikTok 禮物的英文名稱剛好等於左邊時，就用右邊的動作（優先於下面的價值分級）。
+    //     名稱會顯示在橋接程式的視窗裡（🎁 某某 送出 Rose…），照抄即可。例如： 'Rose': 'rose'
+    giftByName: {
+    },
+    // 二、照價值分級：沒被上面指定的禮物，看它值幾顆鑽石（TikTok 的禮物定價）。
+    //     從最貴的往下比，第一個「大於等於 atLeast」的就採用。
+    giftByDiamonds: [
+      { atLeast: 100, gift: 'crown' },      // 100 鑽以上 → 技能
+      { atLeast: 20,  gift: 'firework' },   // 20～99 鑽  → 全場攻擊
+      { atLeast: 5,   gift: 'heart' },      // 5～19 鑽   → 回血
+      { atLeast: 1,   gift: 'rose' },       // 1～4 鑽    → 普攻
+    ],
+  },
+
   // ---------- 技能演出 ----------
   // 每個兵種放技能時的演出方式（skillFx）：
   //   slam   衝過去重擊，地面裂開

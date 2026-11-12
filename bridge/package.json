@@ -1,0 +1,15 @@
+{
+  "name": "curry-live-bridge",
+  "private": true,
+  "type": "module",
+  "description": "萌戰三國・直播亂鬥：把 TikTok 直播的留言和送禮轉給遊戲網頁的本機小程式",
+  "scripts": {
+    "start": "node server.js",
+    "demo": "node server.js --demo"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "tiktok-live-connector": "^2.5.0",
+    "ws": "^8.18.0"
+  }
+}

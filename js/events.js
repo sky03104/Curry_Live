@@ -6,8 +6,8 @@
 //   送禮： { type: 'gift', user: { id, name }, giftId: 'rose', count: 1 }
 //
 // 現在的來源：假事件面板（js/panel.js 呼叫 hub.chat / hub.gift）
-// 之後的來源：本機 Node 程式（TikTok-Live-Connector）透過 WebSocket 傳同樣格式進來，
-//             用 connectWebSocket 接上即可，遊戲邏輯不用改。
+// 真實來源：本機的橋接程式（bridge/server.js，用 TikTok-Live-Connector 連 TikTok）
+//           透過 connectWebSocket 把同樣格式傳進來，遊戲邏輯不用改。
 // ============================================================
 window.ML = window.ML || {};
 
@@ -22,19 +22,35 @@ ML.createEventHub = function () {
   return hub;
 };
 
-// 預留：接本機 Node 程式用（網址加 ?ws=ws://localhost:8081 啟用）。
-// 本機程式只要把上面格式的事件用 JSON 文字傳過來即可。
-// ⚠️ 這段從未用真的 TikTok 實測過。
-ML.connectWebSocket = function (hub, url) {
+// 把 TikTok 的禮物對應成遊戲裡的禮物（對應表在 js/config.js 的 tiktok）。
+// 先看禮物名稱有沒有指定；沒有的話照禮物價值（鑽石數）分級。對不到就回傳 null（忽略這份禮物）。
+ML.mapTikTokGift = function (config, gift) {
+  const t = config.tiktok || {};
+  const byName = (t.giftByName || {})[gift.name];
+  if (byName) return byName;
+  const tier = (t.giftByDiamonds || []).slice().sort((a, b) => b.atLeast - a.atLeast).find(x => gift.diamonds >= x.atLeast);
+  return tier ? tier.gift : null;
+};
+
+// 接本機的橋接程式（bridge/server.js）。它會把真的 TikTok 留言和送禮用上面的統一格式傳過來。
+// onStatus 會收到 { connected: 是否已連上 TikTok, text: 白話說明 }。
+ML.connectWebSocket = function (hub, url, config, onStatus) {
+  const report = (connected, text) => onStatus && onStatus({ connected, text });
   function connect() {
     const ws = new WebSocket(url);
     ws.onmessage = (m) => {
-      try {
-        const ev = JSON.parse(m.data);
-        if (ev && ev.user && (ev.type === 'chat' || ev.type === 'gift')) hub.emit(ev);
-      } catch (e) { /* 格式不對的訊息直接忽略 */ }
+      let ev;
+      try { ev = JSON.parse(m.data); } catch (e) { return; }   // 格式不對的訊息直接忽略
+      if (!ev) return;
+      if (ev.type === 'status') { report(ev.connected, ev.text); return; }
+      if (!ev.user || !ev.user.id || !ev.user.name) return;
+      if (ev.type === 'chat') hub.chat(ev.user, ev.text || '');
+      else if (ev.type === 'gift') {
+        const giftId = ev.giftId || (ev.tiktokGift && ML.mapTikTokGift(config, ev.tiktokGift));
+        if (giftId) hub.gift(ev.user, giftId, ev.count);
+      }
     };
-    ws.onclose = () => setTimeout(connect, 3000); // 斷線 3 秒後自動重連
+    ws.onclose = () => { report(false, '連不到橋接程式，3 秒後重試（請確認電腦上的橋接程式有開著）'); setTimeout(connect, 3000); };
   }
   connect();
 };
