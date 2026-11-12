@@ -10,9 +10,11 @@
   const hub = ML.createEventHub();
   const game = ML.createGame(config, heroes);
   const sprite = ML.createHeroSprite(heroes, config, 'assets/heroes');
-  const renderer = ML.createRenderer(document.getElementById('stage'), game, config, sprite, ML.createEffects());
+  const renderer = ML.createRenderer(document.getElementById('stage'), game, config, sprite, ML.createEffects(), () => giftSettings.legend());
 
   hub.on(ev => game.handleEvent(ev));
+  // 收到真的 TikTok 禮物時，順便記住它的圖片（禮物提示列要用）
+  hub.on(ev => { if (ev.type === 'tiktokGift') giftSettings.rememberIcon(ev.gift.name || ('#' + ev.gift.id), ev.gift.icon); });
 
   // 網址加 ?obs=1 → 只有透明遊戲畫面（給 OBS）；沒加 → 顯示假事件面板
   if (params.get('obs') === '1') {
@@ -45,5 +47,5 @@
   }
   sprite.ready.then(() => requestAnimationFrame(loop));
 
-  ML.hub = hub; ML.game = game; ML.renderer = renderer;   // 方便除錯與自動測試
+  ML.hub = hub; ML.game = game; ML.renderer = renderer; ML.giftSettings = giftSettings;   // 方便除錯與自動測試
 })();

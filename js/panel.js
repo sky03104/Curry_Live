@@ -43,6 +43,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       <label class="opt"><input type="radio" name="gs-other" value="ignore">忽略（送了沒反應）</label>
       <h2 style="margin-top:10px">直播用網址</h2>
       <div class="hint">設定改完後，按「複製」，貼到直播軟體的「連結／瀏覽器來源」。<b>每次改設定都要重貼一次</b>，直播畫面才會照新設定。</div>
+      <div class="hint">有指定禮物的動作，會在直播畫面的排行榜旁邊顯示「禮物圖片＋動作名稱」。禮物圖片要等有人送過那個禮物才會出現。</div>
       <div class="row"><input id="gs-url" readonly><button id="gs-copy" style="flex:none">複製</button></div>
     </section>
 

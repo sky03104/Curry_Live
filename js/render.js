@@ -5,7 +5,7 @@
 // ============================================================
 window.ML = window.ML || {};
 
-ML.createRenderer = function (canvas, game, config, sprite, effects) {
+ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) {
   const ctx = canvas.getContext('2d');
   const FONT = '"Noto Sans TC","Microsoft JhengHei","PingFang TC","WenQuanYi Zen Hei",sans-serif';
   const views = new Map();   // 觀眾代號 → 畫面上這隻武將的顯示狀態
@@ -188,6 +188,18 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
     const lb = { x: W - lbW - 16, y: 16, w: lbW, h: lbH };
     const arena = wide ? { x: 16, y: 16, w: W - lbW - 48, h: H - 32 }
                        : { x: 16, y: lbH + 32, w: W - 32, h: H - lbH - 48 - 100 };   // 直式：底下留 100 給訊息
+    // 禮物提示列：告訴觀眾「送哪個禮物會觸發哪個動作」。橫式放在排行榜左邊，直式放在排行榜下面。
+    const items = getLegend ? getLegend() : [];
+    let legend = null;
+    if (items.length) {
+      const widths = items.map(it => 46 + 8 + it.label.length * 19 + 16);     // 圖片 + 間距 + 動作名稱 + 內距
+      const total = widths.reduce((a, b) => a + b, 0) + (items.length - 1) * 8;
+      const room = wide ? lb.x - 12 - 16 : W - 32;
+      const scale = Math.min(1, room / total);
+      const h = 58 * scale;
+      legend = { items, widths, scale, h, y: wide ? lb.y : lb.y + lb.h + 8, x: wide ? lb.x - 12 - total * scale : (W - total * scale) / 2 };
+      arena.y += h + 8; arena.h -= h + 8;                                     // 武將的活動範圍往下讓出這一列
+    }
     const wander = config.wander && config.wander.enabled;
     if (n) {
       // 試每一種「一排幾隻」，挑角色能畫最大的那種
@@ -214,7 +226,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
       bounds = { x0: arena.x + size * 0.6, x1: arena.x + arena.w - size * 0.6,
                  y0: arena.y + size * 0.65 + 50, y1: arena.y + arena.h - size * 0.5 - 56 };
     }
-    return { lb, arena };
+    return { lb, arena, legend };
   }
 
   // ---------- 每一格：更新 ----------
@@ -356,6 +368,42 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
     }
   }
 
+  // 禮物圖片：第一次用到時才去下載，下載好之前（或下載失敗）先不畫圖、只顯示禮物名稱
+  const iconCache = new Map();
+  function giftIcon(url) {
+    if (!url) return null;
+    if (!iconCache.has(url)) {
+      const img = new Image();
+      const entry = { img, ok: false };
+      img.onload = () => { entry.ok = true; };
+      img.src = url;
+      iconCache.set(url, entry);
+    }
+    const e = iconCache.get(url);
+    return e.ok ? e.img : null;
+  }
+
+  function drawLegend(lg) {
+    const k = lg.scale;
+    let x = lg.x;
+    lg.items.forEach((it, i) => {
+      const w = lg.widths[i] * k, h = lg.h;
+      ctx.fillStyle = 'rgba(22,26,30,0.78)';
+      ctx.beginPath(); ctx.roundRect(x, lg.y, w, h, 12 * k); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+      const size = 46 * k, ix = x + 8 * k, iy = lg.y + (h - size) / 2;
+      const img = giftIcon(it.icon);
+      if (img) ctx.drawImage(img, ix, iy, size, size);
+      else {   // 還沒有圖片：畫一個小方框，裡面寫禮物名稱的前兩個字
+        ctx.fillStyle = 'rgba(255,255,255,0.14)';
+        ctx.beginPath(); ctx.roundRect(ix, iy, size, size, 8 * k); ctx.fill();
+        text(it.name.replace(/^#/, '').slice(0, 2), ix + size / 2, iy + size / 2, 15 * k, '#fff', 'center', false);
+      }
+      text(it.label, ix + size + 8 * k, lg.y + h / 2, 19 * k, '#ffd35c', 'left');
+      x += w + 8 * k;
+    });
+  }
+
   function drawLeaderboard(lb) {
     const rows = game.getLeaderboard();
     ctx.fillStyle = 'rgba(22,26,30,0.78)';
@@ -384,7 +432,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
     ctx.clearRect(0, 0, W, H);   // 清成透明
     if (!W || !H) return;
 
-    const { lb, arena } = layout();
+    const { lb, arena, legend } = layout();
 
     if (dim) {   // 技能發動：畫面短暫變暗，讓特效更顯眼
       ctx.fillStyle = `rgba(0,0,0,${config.skillDim * Math.sin(Math.PI * dim.age / dim.life)})`;
@@ -419,6 +467,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects) {
     }
 
     drawLeaderboard(lb);
+    if (legend) drawLegend(legend);
 
     // 訊息：橫式放在排行榜下方，直式放在畫面最底下（都不會蓋到武將）
     const wide = W >= H;

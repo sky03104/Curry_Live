@@ -74,6 +74,12 @@ ML.createTikFinityReader = function () {
       }
       if (count <= 0) return null;
       const gift = { id: giftId, name: String(pick('giftName', 'name') || ''), diamonds: Number(pick('diamondCount', 'diamond_count')) || 0 };
+      // 禮物圖片的網址（同樣是各版本放的位置不同，找得到就帶上，給畫面上的「禮物提示列」用）
+      const first = list => (Array.isArray(list) && list[0]) || '';
+      const E = d.extendedGiftInfo || {};
+      gift.icon = String(d.giftPictureUrl || ((d.giftDetails || {}).giftImage || {}).giftPictureUrl ||
+        first(((d.gift || {}).icon || {}).urlList) || first(((d.gift || {}).image || {}).urlList) ||
+        first((E.icon || {}).url_list) || first((E.image || {}).url_list) || '');
       // 名稱和價值都讀不到時，把原始資料留一小段，方便在面板的事件紀錄裡看出問題
       if (!gift.name && !gift.diamonds) gift.raw = JSON.stringify(d).slice(0, 400);
       return { type: 'gift', user: u, count, tiktokGift: gift };
