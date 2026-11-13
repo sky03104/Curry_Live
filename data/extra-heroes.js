@@ -11,4 +11,6 @@ window.HEROES_DATA = window.HEROES_DATA.concat([
   { heroId: 'michelin', displayName: '米其林', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '汪汪衝鋒', extra: true },
   // 大寶：萌國的柴犬遊俠。能力值取遊俠平均（血少、攻高、防低），技能演出是射出光彈。
   { heroId: 'dabao', displayName: '大寶', faction: 'Meng', troop: 'Ranger', baseHp: 540, baseAtk: 72, baseArmor: 25, skillName: '疾風撲擊', extra: true },
+  // 布丁：萌國的黃金獵犬統帥。能力值取統帥平均（血、攻、防都在中間），技能演出是光環＋光柱。
+  { heroId: 'pudding', displayName: '布丁', faction: 'Meng', troop: 'Commander', baseHp: 746, baseAtk: 55, baseArmor: 34, skillName: '暖心號令', extra: true },
 ]);
