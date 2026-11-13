@@ -32,6 +32,13 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     </section>
 
     <section>
+      <h2>場地</h2>
+      <div class="hint">武將腳下的地面。「全場透明」就是現在的樣子（直接疊在直播畫面上）；選別的場地會鋪一張地面。選好後，記得把下面的「直播用網址」重貼進直播軟體。</div>
+      <div class="row"><select id="p-arena"></select></div>
+      <div class="hint" id="p-arena-hint"></div>
+    </section>
+
+    <section>
       <h2>TikTok 禮物設定</h2>
       <div class="hint">每個動作右邊選一個 TikTok 禮物。清單裡沒有的，選最下面的「自己輸入名稱…」，照 TikFinity 的 Gift Browser 抄英文名稱。</div>
       <div id="gs-actions"></div>
@@ -138,7 +145,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     if (seen.size) $('#gs-seen').innerHTML = [...seen.entries()].reverse().map(([key, g]) =>
       `<div class="seen"><span title="${esc(g.label)}">${esc(g.label)}</span><select data-seen="${esc(key)}">${options(giftSettings.actionOf(key))}</select></div>`).join('');
     root.querySelector(`input[name="gs-other"][value="${giftSettings.ignoreUnlisted ? 'ignore' : 'tier'}"]`).checked = true;
-    $('#gs-url').value = giftSettings.liveUrl({ save: $('#sv-slot').value.trim(), cloud: saving.cloud.enabled ? saving.cloud.token : '' });
+    $('#gs-url').value = giftSettings.liveUrl({ save: $('#sv-slot').value.trim(), cloud: saving.cloud.enabled ? saving.cloud.token : '', arena: renderer.arenas.get() === 'none' ? '' : renderer.arenas.get() });
   }
   // 一個動作只對應一個禮物：選了新的，就取代這個動作原本的
   function setActionGift(action, name) {
@@ -172,6 +179,17 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   // 存檔名稱：記在這個瀏覽器裡，並寫進直播用網址
   try { $('#sv-slot').value = localStorage.getItem('curryLive.liveSlot') || (saving.save.slot === 'default' ? '' : saving.save.slot); } catch (e) { /* 讀不到就留空 */ }
   $('#sv-slot').oninput = () => { try { localStorage.setItem('curryLive.liveSlot', $('#sv-slot').value.trim()); } catch (e) { /* 存不了不影響 */ } renderGiftSettings(); };
+  // 場地下拉選單：選了馬上在面板的預覽畫面換，並記在這個瀏覽器、寫進直播用網址
+  const arenaSel = $('#p-arena');
+  arenaSel.innerHTML = renderer.arenas.list.map(a => `<option value="${a.key}">${a.label}</option>`).join('');
+  arenaSel.value = renderer.arenas.get();
+  const arenaHint = () => { $('#p-arena-hint').textContent = renderer.arenas.get() === 'none' ? '' : '⚠ 直播畫面要重貼網址才會換場地。'; };
+  arenaSel.onchange = () => {
+    renderer.arenas.set(arenaSel.value);
+    try { localStorage.setItem('curryLive.arena', renderer.arenas.get()); } catch (e) { /* 存不了不影響 */ }
+    arenaHint(); renderGiftSettings();
+  };
+  arenaHint();
   renderGiftSettings();
 
   // ---------- 事件紀錄 ----------
