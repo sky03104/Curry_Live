@@ -4,6 +4,7 @@
 // 之後要換成連續圖動畫：只改這個檔。draw 會收到 pose（目前的動作）和 poseTime（這個動作
 // 已經播了幾秒），照這兩個值挑要畫哪一格即可，其他程式不用動。
 //
+//   idle 時圖片自己會呼吸、晃動（state.phase 讓每隻節奏不同、state.moving 走路時動作較大）
 //   pose： 'idle' 待機 ｜ 'attack' 攻擊中 ｜ 'hit' 被打 ｜ 'down' 倒地
 // ============================================================
 window.ML = window.ML || {};
@@ -55,6 +56,19 @@ ML.createHeroSprite = function (heroes, config, basePath) {
         const artDir = (config.artFacesRight || []).includes(hero.heroId) ? 1 : -1;
         const turn = (state.facing === undefined ? -1 : state.facing) * artDir;   // 1 = 照原圖畫，-1 = 左右相反
         ctx.scale(Math.sign(turn || 1) * Math.max(0.15, Math.abs(turn)), 1);
+        // 待機／走路時圖片自己也會動（以腳為軸心）：呼吸（一下高一下矮）＋身體左右輕晃（頭晃得比腳多）
+        if (state.pose === 'idle') {
+          const t = (state.poseTime || 0), ph = state.phase || 0;
+          if (state.moving) {                                   // 走路：隨腳步一壓一彈，身體左右搖
+            const step = Math.sin(t * 9 + ph);
+            ctx.transform(1, 0, step * 0.06, 1, 0, 0);
+            ctx.scale(1 - Math.abs(step) * 0.03, 1 + Math.abs(step) * 0.05);
+          } else {                                              // 站著：慢慢呼吸、輕輕晃
+            const br = Math.sin(t * 2.4 + ph);
+            ctx.transform(1, 0, Math.sin(t * 1.3 + ph * 1.7) * 0.035, 1, 0, 0);
+            ctx.scale(1 - br * 0.018, 1 + br * 0.035);
+          }
+        }
       }
       // 以下以「腳底中央」為原點往上畫
       if (img) {
