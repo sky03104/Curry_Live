@@ -1,51 +1,58 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
 <defs>
-  <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a45b0"/><stop offset="1" stop-color="#2c1658"/></linearGradient>
-  <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e3c2ff"/><stop offset="1" stop-color="#9a64d8"/></linearGradient>
-  <linearGradient id="wing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5fd8" stop-opacity=".95"/><stop offset="1" stop-color="#5a1f9e" stop-opacity=".95"/></linearGradient>
-  <linearGradient id="horn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4eaff"/><stop offset="1" stop-color="#b79ad8"/></linearGradient>
+  <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b3aa5"/><stop offset="1" stop-color="#21114a"/></linearGradient>
+  <linearGradient id="plate" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8e98d8"/><stop offset=".5" stop-color="#4f5798"/><stop offset="1" stop-color="#2b2f66"/></linearGradient>
+  <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8b4ff"/><stop offset="1" stop-color="#7e4cc4"/></linearGradient>
+  <linearGradient id="wing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5fd8" stop-opacity=".95"/><stop offset="1" stop-color="#4a1590" stop-opacity=".95"/></linearGradient>
+  <linearGradient id="horn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6efff"/><stop offset="1" stop-color="#a98cd0"/></linearGradient>
   <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
-<g stroke="#160a2b" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+<g stroke="#140a28" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
   <!-- 遠側翅膀 -->
-  <path d="M330 290 L420 70 C430 130 455 170 500 195 C470 205 458 225 455 250 C430 240 405 255 395 285 Z" fill="#4a1a82" opacity=".9"/>
-  <!-- 尾巴 -->
-  <path d="M455 395 C520 420 575 405 585 360 C590 335 565 322 545 330 C562 348 552 378 515 378 C492 378 478 366 466 350 Z" fill="url(#body)"/>
-  <path d="M545 330 L585 300 L575 345 Z" fill="url(#horn)"/>
-  <!-- 近側翅膀 -->
-  <path d="M290 285 L460 55 C478 125 515 175 580 205 C542 212 524 235 520 268 C494 252 466 268 452 298 C430 290 410 310 400 338 Z" fill="url(#wing)"/>
-  <path d="M290 285 L580 205 M290 285 L520 268 M290 285 L452 298" fill="none" stroke="#2a0f4d" stroke-width="5"/>
-  <path d="M460 55 L475 40 L480 70 Z" fill="url(#horn)"/>
-  <!-- 後腳 -->
-  <path d="M410 440 C440 430 470 445 468 480 C467 505 455 525 452 545 L420 548 L428 520 C410 515 395 490 400 465 Z" fill="url(#body)"/>
-  <path d="M420 548 L398 556 M436 548 L424 562 M452 545 L450 560" fill="none" stroke="#e8d8ff" stroke-width="7"/>
+  <path d="M340 295 L392 40 L420 118 L452 56 L468 150 L512 112 L502 215 L455 245 L400 300 Z" fill="#3b1470" opacity=".95"/>
+  <!-- 尾巴（一節一節的甲片，尖端是一把刃） -->
+  <path d="M452 392 C510 424 566 420 582 372 C592 342 574 318 548 322 C566 346 556 376 520 376 C496 376 478 366 466 346 Z" fill="url(#body)"/>
+  <path d="M488 398 L494 372 M512 408 L520 380 M536 408 L548 380 M558 396 L572 372" fill="none" stroke="#9aa2e0" stroke-width="6"/>
+  <path d="M548 322 L584 262 L596 330 L572 346 Z" fill="url(#horn)"/>
+  <!-- 近側翅膀（銳利的鋸齒邊） -->
+  <path d="M296 288 L432 26 L462 112 L516 60 L526 158 L590 140 L552 232 L498 254 L516 296 L444 300 L410 334 Z" fill="url(#wing)"/>
+  <path d="M296 288 L590 140 M296 288 L552 232 M296 288 L516 296 M296 288 L444 300" fill="none" stroke="#1d0a3d" stroke-width="5"/>
+  <path d="M432 26 L446 12 L452 40 Z M590 140 L598 124 L586 156 Z" fill="url(#horn)"/>
+  <!-- 後腳（有護甲） -->
+  <path d="M408 436 C446 424 482 444 478 486 C476 512 462 528 458 548 L424 550 L432 524 C410 518 392 492 398 462 Z" fill="url(#body)"/>
+  <path d="M410 446 L470 456 L462 486 L404 474 Z M418 490 L462 500 L456 520 L420 512 Z" fill="url(#plate)"/>
+  <path d="M424 550 L400 560 M441 550 L428 566 M458 548 L456 564" fill="none" stroke="#f0e6ff" stroke-width="8"/>
   <!-- 身體 -->
-  <path d="M215 330 C240 258 345 248 425 288 C480 315 492 385 452 432 C412 478 312 488 250 452 C212 428 200 370 215 330 Z" fill="url(#body)"/>
-  <path d="M232 385 C262 442 340 470 440 440 C420 472 330 492 262 462 C238 445 226 415 232 385 Z" fill="url(#belly)" stroke="none"/>
-  <path d="M255 410 L300 420 M280 435 L335 440 M310 452 L370 450" fill="none" stroke="#7d47b8" stroke-width="3"/>
-  <!-- 背上尖刺 -->
-  <path d="M262 262 L275 228 L292 262 M300 252 L318 214 L336 252 M344 256 L366 220 L382 262 M390 272 L414 242 L424 285" fill="url(#horn)"/>
-  <!-- 前腳 -->
-  <path d="M255 430 C262 470 252 505 238 538 L208 546 L214 520 C228 480 222 455 232 430 Z" fill="url(#body)"/>
-  <path d="M208 546 L188 556 M224 548 L212 564 M240 538 L238 556" fill="none" stroke="#e8d8ff" stroke-width="7"/>
-  <!-- 脖子 -->
-  <path d="M215 332 C186 296 160 258 150 218 L206 192 C218 236 250 272 282 292 Z" fill="url(#body)"/>
-  <path d="M168 238 C188 275 212 300 236 322" fill="none" stroke="url(#belly)" stroke-width="14"/>
-  <!-- 頭 -->
-  <path d="M150 218 C122 206 86 214 58 238 C52 252 76 258 92 256 C86 270 104 278 128 270 C156 266 184 252 208 236 C218 214 206 188 184 180 C164 174 148 194 150 218 Z" fill="url(#body)"/>
-  <!-- 下顎＋牙 -->
-  <path d="M92 256 C96 284 132 296 176 276 C160 270 128 272 112 262 Z" fill="#3a1d6c"/>
-  <path d="M70 252 L76 266 L84 254 M96 258 L102 274 L110 262 M124 266 L130 280 L138 266" fill="#fff" stroke="#160a2b" stroke-width="3"/>
-  <!-- 角 -->
-  <path d="M190 182 C218 140 256 118 296 108 C268 132 250 160 236 198 Z" fill="url(#horn)"/>
-  <path d="M170 176 C182 150 206 130 232 120 C216 142 206 160 200 184 Z" fill="url(#horn)"/>
+  <path d="M212 332 C236 256 346 244 428 284 C484 312 496 386 454 434 C412 480 310 492 246 454 C208 430 196 372 212 332 Z" fill="url(#body)"/>
+  <path d="M230 388 C260 446 340 474 442 442 C420 476 330 496 260 466 C236 448 224 418 230 388 Z" fill="url(#belly)" stroke="none"/>
+  <path d="M250 420 L310 432 M272 440 L342 448 M304 458 L380 454" fill="none" stroke="#6c3aa8" stroke-width="3"/>
+  <!-- 背甲：一片一片疊起來的鎧甲 -->
+  <path d="M244 280 L286 262 L292 296 L252 312 Z M290 262 L336 252 L338 290 L296 298 Z M340 252 L388 256 L386 296 L344 292 Z M392 258 L434 280 L426 316 L388 298 Z" fill="url(#plate)"/>
+  <path d="M262 262 L278 222 L296 258 M312 250 L330 206 L350 250 M362 252 L384 214 L402 258 M410 266 L436 236 L446 282" fill="url(#horn)"/>
+  <!-- 肩甲＋前腳 -->
+  <path d="M214 330 C214 296 262 288 290 304 L284 360 C250 372 216 358 214 330 Z" fill="url(#plate)"/>
+  <path d="M232 300 L216 262 L258 290 Z" fill="url(#horn)"/>
+  <path d="M256 430 C264 472 254 506 240 540 L210 548 L216 522 C230 482 224 458 234 432 Z" fill="url(#body)"/>
+  <path d="M232 440 L262 444 L258 470 L228 466 Z M226 486 L256 490 L250 512 L222 508 Z" fill="url(#plate)"/>
+  <path d="M210 548 L188 558 M226 550 L214 566 M242 540 L240 558" fill="none" stroke="#f0e6ff" stroke-width="8"/>
+  <!-- 脖子（甲片） -->
+  <path d="M214 336 C184 298 160 262 150 224 L206 198 C218 238 250 274 284 294 Z" fill="url(#body)"/>
+  <path d="M196 300 L226 282 L232 304 L204 322 Z M178 268 L210 250 L214 274 L186 292 Z M164 236 L196 222 L198 246 L170 258 Z" fill="url(#plate)"/>
+  <!-- 頭（低低地俯衝，嘴巴微張） -->
+  <path d="M152 224 C124 210 86 220 58 246 C54 260 78 264 94 262 C88 276 106 284 130 276 C158 270 188 256 210 240 C222 218 208 190 186 182 C164 176 150 198 152 224 Z" fill="url(#body)"/>
+  <path d="M98 262 C102 290 138 300 180 280 C162 274 132 276 116 268 Z" fill="#32195f"/>
+  <path d="M72 258 L78 272 L86 260 M100 264 L106 280 L114 268 M128 272 L134 286 L142 272" fill="#fff" stroke="#140a28" stroke-width="3"/>
+  <path d="M132 214 L180 200 L186 222 L146 236 Z" fill="url(#plate)"/>
+  <!-- 角（骨白色，裡面透出洋紅光） -->
+  <path d="M190 184 C220 140 260 116 304 104 C274 130 254 160 238 200 Z" fill="url(#horn)"/>
+  <path d="M206 178 C226 150 254 132 284 122 C262 144 246 166 234 194 Z" fill="#ff5fd8" opacity=".55" stroke="none"/>
+  <path d="M168 178 C180 150 206 130 234 120 C218 142 208 162 202 186 Z" fill="url(#horn)"/>
   <!-- 眼睛 -->
-  <g filter="url(#glow)"><ellipse cx="150" cy="212" rx="16" ry="10" fill="#ff4fd8" transform="rotate(-18 150 212)"/></g>
-  <ellipse cx="152" cy="212" rx="4" ry="9" fill="#2a0f4d" stroke="none" transform="rotate(-18 152 212)"/>
-  <path d="M66 244 C72 238 80 238 84 244" fill="none" stroke="#2a0f4d" stroke-width="4"/>
+  <g filter="url(#glow)"><ellipse cx="156" cy="214" rx="17" ry="10" fill="#ff4fd8" transform="rotate(-20 156 214)"/></g>
+  <ellipse cx="158" cy="214" rx="4" ry="9" fill="#2a0f4d" stroke="none" transform="rotate(-20 158 214)"/>
 </g>
 <!-- 身上發光紋路 -->
 <g fill="none" stroke="#ff5fd8" stroke-width="4" stroke-linecap="round" filter="url(#glow)" opacity=".85">
-  <path d="M290 300 C330 285 380 295 410 320"/><path d="M300 330 C340 318 385 328 415 355"/><path d="M180 240 C200 270 215 290 235 300"/>
+  <path d="M296 330 C336 316 386 326 418 352"/><path d="M286 358 C330 346 380 356 420 380"/><path d="M118 258 C136 266 150 266 168 258"/>
 </g>
 </svg>
