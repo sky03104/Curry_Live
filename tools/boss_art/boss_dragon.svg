@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+<defs>
+  <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a45b0"/><stop offset="1" stop-color="#2c1658"/></linearGradient>
+  <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e3c2ff"/><stop offset="1" stop-color="#9a64d8"/></linearGradient>
+  <linearGradient id="wing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5fd8" stop-opacity=".95"/><stop offset="1" stop-color="#5a1f9e" stop-opacity=".95"/></linearGradient>
+  <linearGradient id="horn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4eaff"/><stop offset="1" stop-color="#b79ad8"/></linearGradient>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<g stroke="#160a2b" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+  <!-- 遠側翅膀 -->
+  <path d="M330 290 L420 70 C430 130 455 170 500 195 C470 205 458 225 455 250 C430 240 405 255 395 285 Z" fill="#4a1a82" opacity=".9"/>
+  <!-- 尾巴 -->
+  <path d="M455 395 C520 420 575 405 585 360 C590 335 565 322 545 330 C562 348 552 378 515 378 C492 378 478 366 466 350 Z" fill="url(#body)"/>
+  <path d="M545 330 L585 300 L575 345 Z" fill="url(#horn)"/>
+  <!-- 近側翅膀 -->
+  <path d="M290 285 L460 55 C478 125 515 175 580 205 C542 212 524 235 520 268 C494 252 466 268 452 298 C430 290 410 310 400 338 Z" fill="url(#wing)"/>
+  <path d="M290 285 L580 205 M290 285 L520 268 M290 285 L452 298" fill="none" stroke="#2a0f4d" stroke-width="5"/>
+  <path d="M460 55 L475 40 L480 70 Z" fill="url(#horn)"/>
+  <!-- 後腳 -->
+  <path d="M410 440 C440 430 470 445 468 480 C467 505 455 525 452 545 L420 548 L428 520 C410 515 395 490 400 465 Z" fill="url(#body)"/>
+  <path d="M420 548 L398 556 M436 548 L424 562 M452 545 L450 560" fill="none" stroke="#e8d8ff" stroke-width="7"/>
+  <!-- 身體 -->
+  <path d="M215 330 C240 258 345 248 425 288 C480 315 492 385 452 432 C412 478 312 488 250 452 C212 428 200 370 215 330 Z" fill="url(#body)"/>
+  <path d="M232 385 C262 442 340 470 440 440 C420 472 330 492 262 462 C238 445 226 415 232 385 Z" fill="url(#belly)" stroke="none"/>
+  <path d="M255 410 L300 420 M280 435 L335 440 M310 452 L370 450" fill="none" stroke="#7d47b8" stroke-width="3"/>
+  <!-- 背上尖刺 -->
+  <path d="M262 262 L275 228 L292 262 M300 252 L318 214 L336 252 M344 256 L366 220 L382 262 M390 272 L414 242 L424 285" fill="url(#horn)"/>
+  <!-- 前腳 -->
+  <path d="M255 430 C262 470 252 505 238 538 L208 546 L214 520 C228 480 222 455 232 430 Z" fill="url(#body)"/>
+  <path d="M208 546 L188 556 M224 548 L212 564 M240 538 L238 556" fill="none" stroke="#e8d8ff" stroke-width="7"/>
+  <!-- 脖子 -->
+  <path d="M215 332 C186 296 160 258 150 218 L206 192 C218 236 250 272 282 292 Z" fill="url(#body)"/>
+  <path d="M168 238 C188 275 212 300 236 322" fill="none" stroke="url(#belly)" stroke-width="14"/>
+  <!-- 頭 -->
+  <path d="M150 218 C122 206 86 214 58 238 C52 252 76 258 92 256 C86 270 104 278 128 270 C156 266 184 252 208 236 C218 214 206 188 184 180 C164 174 148 194 150 218 Z" fill="url(#body)"/>
+  <!-- 下顎＋牙 -->
+  <path d="M92 256 C96 284 132 296 176 276 C160 270 128 272 112 262 Z" fill="#3a1d6c"/>
+  <path d="M70 252 L76 266 L84 254 M96 258 L102 274 L110 262 M124 266 L130 280 L138 266" fill="#fff" stroke="#160a2b" stroke-width="3"/>
+  <!-- 角 -->
+  <path d="M190 182 C218 140 256 118 296 108 C268 132 250 160 236 198 Z" fill="url(#horn)"/>
+  <path d="M170 176 C182 150 206 130 232 120 C216 142 206 160 200 184 Z" fill="url(#horn)"/>
+  <!-- 眼睛 -->
+  <g filter="url(#glow)"><ellipse cx="150" cy="212" rx="16" ry="10" fill="#ff4fd8" transform="rotate(-18 150 212)"/></g>
+  <ellipse cx="152" cy="212" rx="4" ry="9" fill="#2a0f4d" stroke="none" transform="rotate(-18 152 212)"/>
+  <path d="M66 244 C72 238 80 238 84 244" fill="none" stroke="#2a0f4d" stroke-width="4"/>
+</g>
+<!-- 身上發光紋路 -->
+<g fill="none" stroke="#ff5fd8" stroke-width="4" stroke-linecap="round" filter="url(#glow)" opacity=".85">
+  <path d="M290 300 C330 285 380 295 410 320"/><path d="M300 330 C340 318 385 328 415 355"/><path d="M180 240 C200 270 215 290 235 300"/>
+</g>
+</svg>

@@ -167,9 +167,9 @@ window.GAME_CONFIG = {
       // level：顯示的等級　hp／atk／def：血量／攻擊／防禦
       // hasArt：assets/heroes/<id>.png 已經放好圖了就改成 true（false 時畫面先用示意用的怪獸，也不會去載入不存在的圖檔）
       // xp：被打倒時要分給參戰玩家的經驗值總量　lastHitBonus：最後一擊的人額外多拿的經驗值
-      { id: 'boss_dragon', displayName: '深淵魔龍', level: 10, hasArt: false, hp: 6000,  atk: 80,  def: 40,  xp: 1500, lastHitBonus: 500,  skillName: '深淵吐息', aoeName: '深淵風暴', accent: '#ff4fd8' },
-      { id: 'boss_caesar', displayName: '深淵凱薩', level: 20, hasArt: false, hp: 15000, atk: 130, def: 70,  xp: 4000, lastHitBonus: 1200, skillName: '凱薩裁決', aoeName: '王權崩落', accent: '#9aa8ff' },
-      { id: 'boss_ape',    displayName: '太古巨猿', level: 30, hasArt: false, hp: 36000, atk: 190, def: 110, xp: 9000, lastHitBonus: 3000, skillName: '遠古重擊', aoeName: '地動山搖', accent: '#ffb04a' },
+      { id: 'boss_dragon', displayName: '深淵魔龍', level: 10, hasArt: true,  hp: 6000,  atk: 80,  def: 40,  xp: 1500, lastHitBonus: 500,  skillName: '深淵吐息', aoeName: '深淵風暴', accent: '#ff4fd8' },
+      { id: 'boss_caesar', displayName: '深淵凱薩', level: 20, hasArt: true,  hp: 15000, atk: 130, def: 70,  xp: 4000, lastHitBonus: 1200, skillName: '凱薩裁決', aoeName: '王權崩落', accent: '#9aa8ff' },
+      { id: 'boss_ape',    displayName: '太古巨猿', level: 30, hasArt: true,  hp: 36000, atk: 190, def: 110, xp: 9000, lastHitBonus: 3000, skillName: '遠古重擊', aoeName: '地動山搖', accent: '#ffb04a' },
     ],
   },
 
