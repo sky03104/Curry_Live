@@ -191,6 +191,63 @@ ML.createArenas = function () {
     g.strokeStyle = 'rgba(80,230,240,0.9)'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, top); g.lineTo(w, top); g.stroke();
   }
 
+  // ---------- 沙漠 ----------
+  function desert(g, w, h, rnd) {
+    const sky = h * 0.26;
+    g.fillStyle = lin(g, 0, 0, 0, sky, [[0, '#f7c978'], [1, '#fbe6b0']]); g.fillRect(0, 0, w, sky);
+    g.fillStyle = rad(g, w * 0.78, sky * 0.55, 0, sky * 1.1, [[0, 'rgba(255,250,215,1)'], [0.35, 'rgba(255,236,170,0.9)'], [1, 'rgba(255,220,140,0)']]); g.fillRect(0, 0, w, sky + 10);   // 大太陽
+    for (const [px, pw] of [[w * 0.18, 70], [w * 0.3, 46]]) {                      // 遠處金字塔
+      const py = sky + 2; g.fillStyle = '#d9a864'; g.beginPath(); g.moveTo(px - pw, py); g.lineTo(px, py - pw * 0.8); g.lineTo(px + pw, py); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(120,70,20,0.25)'; g.beginPath(); g.moveTo(px, py - pw * 0.8); g.lineTo(px + pw, py); g.lineTo(px + pw * 0.3, py); g.closePath(); g.fill();
+    }
+    g.fillStyle = lin(g, 0, sky, 0, h, [[0, '#ecc27a'], [0.5, '#e2ad62'], [1, '#c98f48']]); g.fillRect(0, sky, w, h - sky);   // 沙地
+    for (let i = 0; i < 6; i++) {                                                  // 沙丘（亮面＋暗面）
+      const cx = R(rnd, 0, w), cy = R(rnd, sky + 20, h), rx = R(rnd, 90, 220), ry = rx * 0.14;
+      g.fillStyle = 'rgba(120,70,20,0.16)'; g.beginPath(); g.ellipse(cx + rx * 0.15, cy + ry * 0.4, rx, ry, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(255,235,185,0.3)'; g.beginPath(); g.ellipse(cx - rx * 0.1, cy - ry * 0.2, rx * 0.8, ry * 0.7, 0, 0, Math.PI * 2); g.fill();
+    }
+    g.strokeStyle = 'rgba(130,80,25,0.2)'; g.lineWidth = 1.5;                       // 風吹出的沙紋
+    for (let i = 0; i < w * h / 4500; i++) { const x = R(rnd, 0, w), y = R(rnd, sky + 14, h), l = R(rnd, 30, 80); g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + l / 2, y - 5, x + l, y); g.stroke(); }
+    for (let i = 0; i < 5; i++) {                                                  // 仙人掌
+      const x = R(rnd, w * 0.03, w * 0.97), y = R(rnd, sky + 40, h * 0.97), ch = R(rnd, 26, 44);
+      g.fillStyle = 'rgba(100,60,20,0.25)'; g.beginPath(); g.ellipse(x, y + 2, 12, 4, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#4f9a58'; rrect(g, x - 5, y - ch, 10, ch, 5); g.fill();
+      rrect(g, x - 17, y - ch * 0.65, 8, ch * 0.4, 4); g.fill(); rrect(g, x - 17, y - ch * 0.35, 14, 7, 3); g.fill();
+      rrect(g, x + 9, y - ch * 0.8, 8, ch * 0.4, 4); g.fill(); rrect(g, x + 3, y - ch * 0.5, 14, 7, 3); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(x - 2, y - ch + 4, 2, ch - 8);
+    }
+    for (let i = 0; i < 16; i++) { g.fillStyle = `rgba(${130 + R(rnd, 0, 30)},${95 + R(rnd, 0, 20)},${60 + R(rnd, 0, 20)},0.95)`; g.beginPath(); g.ellipse(R(rnd, 0, w), R(rnd, sky + 20, h), R(rnd, 4, 11), R(rnd, 3, 6), 0, 0, Math.PI * 2); g.fill(); }   // 小石頭
+    g.fillStyle = rad(g, w / 2, h * 0.5, Math.min(w, h) * 0.3, Math.max(w, h) * 0.7, [[0, 'rgba(255,200,120,0)'], [1, 'rgba(150,80,20,0.25)']]); g.fillRect(0, 0, w, h);   // 四周微微壓暗
+  }
+
+  // ---------- 火山 ----------
+  function volcano(g, w, h, rnd) {
+    const top = h * 0.34;
+    g.fillStyle = lin(g, 0, 0, 0, top, [[0, '#2a0f16'], [0.6, '#7a2a16'], [1, '#d4581f']]); g.fillRect(0, 0, w, top + 4);   // 火紅的天
+    const vx = w * 0.72, vb = top + 4, vh = top * 0.95, vw = Math.min(w * 0.22, 260);                                // 火山
+    g.fillStyle = '#3a2420'; g.beginPath(); g.moveTo(vx - vw, vb); g.lineTo(vx - vw * 0.16, vb - vh); g.lineTo(vx + vw * 0.16, vb - vh); g.lineTo(vx + vw, vb); g.closePath(); g.fill();
+    g.fillStyle = rad(g, vx, vb - vh, 0, vw * 0.35, [[0, 'rgba(255,220,120,0.95)'], [0.4, 'rgba(255,120,30,0.7)'], [1, 'rgba(255,80,0,0)']]); g.fillRect(vx - vw, vb - vh - vw * 0.5, vw * 2, vw);   // 火山口的光
+    g.strokeStyle = '#ff7a22'; g.lineWidth = 4; g.lineJoin = 'round';
+    for (const o of [-0.08, 0.06]) { g.beginPath(); g.moveTo(vx + vw * o, vb - vh + 2); g.quadraticCurveTo(vx + vw * (o * 3), vb - vh * 0.5, vx + vw * (o * 6), vb); g.stroke(); }   // 岩漿流
+    for (let i = 0; i < 5; i++) { g.fillStyle = `rgba(60,40,40,${0.5 - i * 0.07})`; g.beginPath(); g.ellipse(vx + i * 14 - 20, vb - vh - 16 - i * 20, 22 + i * 10, 14 + i * 5, 0, 0, Math.PI * 2); g.fill(); }   // 濃煙
+    g.fillStyle = lin(g, 0, top, 0, h, [[0, '#4a3434'], [0.5, '#392828'], [1, '#2a1c1c']]); g.fillRect(0, top, w, h - top);    // 黑色岩地
+    for (let i = 0; i < w * h / 2200; i++) { g.fillStyle = rnd() > 0.5 ? 'rgba(0,0,0,0.18)' : 'rgba(255,170,120,0.06)'; g.beginPath(); g.ellipse(R(rnd, 0, w), R(rnd, top, h), R(rnd, 8, 36), R(rnd, 3, 12), 0, 0, Math.PI * 2); g.fill(); }
+    const river = (pts, wd) => {                                                    // 岩漿河（外暈＋橘＋亮芯）
+      for (const [lw, col] of [[wd * 2.4, 'rgba(255,90,20,0.22)'], [wd, '#e8480f'], [wd * 0.45, '#ffb43a'], [wd * 0.16, '#fff1b0']]) {
+        g.strokeStyle = col; g.lineWidth = lw; g.lineCap = 'round'; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
+      }
+    };
+    for (let r = 0; r < 3; r++) {
+      let x = R(rnd, 0, w * 0.3) + r * w * 0.3, y = top + 6; const pts = [[x, y]];
+      while (y < h + 10) { x += R(rnd, -40, 40); y += R(rnd, 22, 40); pts.push([x, y]); }
+      river(pts, R(rnd, 5, 8));
+    }
+    g.strokeStyle = 'rgba(255,120,40,0.55)'; g.lineWidth = 1.6;                      // 岩縫裡透出的光
+    for (let i = 0; i < 9; i++) { let x = R(rnd, 0, w), y = R(rnd, top + 10, h); g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 4; k++) { x += R(rnd, -16, 18); y += R(rnd, -8, 12); g.lineTo(x, y); } g.stroke(); }
+    for (let i = 0; i < 60; i++) { g.fillStyle = `rgba(255,${150 + R(rnd, 0, 90) | 0},60,${R(rnd, 0.4, 1)})`; g.beginPath(); g.arc(R(rnd, 0, w), R(rnd, 0, h), R(rnd, 0.8, 2.2), 0, Math.PI * 2); g.fill(); }   // 飄起來的火星
+    g.fillStyle = lin(g, 0, h * 0.6, 0, h, [[0, 'rgba(255,80,20,0)'], [1, 'rgba(255,80,20,0.18)']]); g.fillRect(0, h * 0.6, w, h * 0.4);
+  }
+
   const LIST = [
     { key: 'none', label: '全場透明（預設）', draw: null },
     { key: 'court', label: '籃球場', draw: court },
@@ -200,6 +257,8 @@ ML.createArenas = function () {
     { key: 'snow', label: '雪地', draw: snow },
     { key: 'night', label: '夜市', draw: night },
     { key: 'space', label: '太空', draw: space },
+    { key: 'desert', label: '沙漠', draw: desert },
+    { key: 'volcano', label: '火山', draw: volcano },
   ];
 
   let current = 'none', cache = null, cacheKey = '';
@@ -208,7 +267,7 @@ ML.createArenas = function () {
   return {
     list: LIST.map(a => ({ key: a.key, label: a.label })),
     get: () => current,
-    isDark: () => current === 'night' || current === 'space',   // 深色場地：陣營文字要調亮才看得到
+    isDark: () => current === 'night' || current === 'space' || current === 'volcano',   // 深色場地：陣營文字要調亮才看得到
     set(key) { current = find(key) ? key : 'none'; cacheKey = ''; return current; },
     // 在 rect（武將走動的範圍）鋪上場地。scale 是目前畫布的縮放倍率，圖按這個倍率存，貼上去才不會糊。
     draw(ctx, rect, scale) {
