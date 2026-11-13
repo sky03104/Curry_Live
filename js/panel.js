@@ -43,6 +43,9 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       <label class="opt"><input type="radio" name="gs-other" value="ignore">忽略（送了沒反應）</label>
       <h2 style="margin-top:10px">存檔（等級）</h2>
       <div class="hint">觀眾的等級、經驗值會自動存在「跑直播畫面的那個軟體」裡，下次開播還在。傷害排行榜每次開播重新計算。</div>
+      <div class="row"><button id="sv-now" class="main">立即儲存</button></div>
+      <div class="hint" id="sv-now-result"></div>
+      <div class="hint">按了會馬上把<b>這個視窗</b>目前的等級存起來（存在這個瀏覽器；雲端存檔有開的話也存到雲端）。直播軟體裡的畫面是另一個視窗，它每 30 秒會自己存，這顆按鈕管不到它。</div>
       <div class="row">存檔名稱 <input id="sv-slot" placeholder="不填＝預設那一份"></div>
       <div class="hint">想讓大家的等級全部重來：填一個新名稱（例如「第二季」），再重貼直播用網址。舊的存檔不會消失，把名稱改回來就回來了。</div>
       <h2 style="margin-top:10px">雲端存檔（Firebase）</h2>
@@ -247,6 +250,30 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   $('#cl-copy').onclick = () => { if (!cl.token) return; const b = $('#cl-token'); b.select(); try { navigator.clipboard.writeText(cl.token); } catch (e) { document.execCommand('copy'); } say('代號已複製', true); };
   $('#cl-off').onclick = () => { if (cl.enabled && !window.confirm('關閉雲端存檔？\n（雲端上的資料不會被刪除，之後貼回同一組代號就能接回來——請先把代號複製存好）')) return; cl.setToken(''); renderGiftSettings(); renderCloud(); say('已關閉。直播用網址不再帶雲端代號，記得重貼。'); };
   renderCloud();
+
+  // 立即儲存：存本機＋（有開雲端的話）存雲端，並用白話說明存了什麼、沒存什麼
+  $('#sv-now').onclick = async () => {
+    const btn = $('#sv-now'), out = $('#sv-now-result');
+    btn.disabled = true; btn.textContent = '儲存中…'; out.style.color = ''; out.textContent = '';
+    let res;
+    try { res = await saving.saveNow(); } catch (e) { res = null; }
+    btn.disabled = false; btn.textContent = '立即儲存';
+    if (!res) { out.style.color = '#B23F2B'; out.textContent = '❌ 儲存時發生錯誤，請再按一次'; return; }
+    const lines = []; let bad = false;
+    const t = res.time.toTimeString().slice(0, 8);
+    if (!res.local.enabled) lines.push('本機：存檔功能已關閉（js/config.js 的 save.enabled）');
+    else if (!res.local.ok) { bad = true; lines.push('❌ 本機：存不進這個瀏覽器（可能被瀏覽器擋住了）'); }
+    else lines.push(res.local.count ? `✅ 本機：已存（${res.local.count} 位觀眾有進度）` : '✅ 本機：已存。目前沒有人有進度（等級 1、沒擊倒過人），所以沒有東西要記');
+    const c = res.cloud;
+    if (c) {
+      if (c.state === 'ok') lines.push(`✅ 雲端：已存（這次 ${c.count} 位，雲端現在共 ${c.total} 位）`);
+      else if (c.state === 'empty') lines.push('雲端：這個視窗沒有真實觀眾的進度可存（面板測試用的假觀眾不會存到雲端）。直播畫面的進度會自動存到雲端');
+      else if (c.state === 'busy') lines.push('雲端：剛好在存檔中，幾秒後再按一次');
+      else { bad = true; lines.push('❌ ' + c.text.replace(/^雲端存檔：/, '雲端：')); }
+    } else lines.push('雲端：未開啟');
+    out.style.color = bad ? '#B23F2B' : '#2e7d4f';
+    out.innerHTML = `<b>${t}</b><br>` + lines.map(l => l.replace(/</g, '&lt;')).join('<br>');
+  };
 
   // 清空場上：武將和排行榜清掉，但等級保留
   $('#p-reset').onclick = () => { game.reset(true); renderer.reset(); log.innerHTML = ''; };

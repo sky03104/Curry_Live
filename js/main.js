@@ -56,6 +56,25 @@
     const merged = await cloud.store(realProfiles(), { keepalive: !!leaving });
     if (merged) { game.importProfiles(merged, true); cloudDirty = false; }   // 別的視窗賺到的等級也套進來
   }
+  // ---------- 手動儲存（面板的「立即儲存」按鈕）----------
+  // 不用等定時存檔，馬上把「這個視窗目前有的進度」存到本機，雲端有開的話也存到雲端。
+  // 注意：只存這個視窗自己的進度。直播軟體裡的畫面是另一個獨立的視窗，它自己每 30 秒會自動存。
+  async function saveNow() {
+    const res = { time: new Date(), local: null, cloud: null };
+    const withProgress = game.exportProfiles().filter(p => p.level > 1 || p.xp > 0 || p.kills > 0);
+    res.local = { ok: config.save.enabled && save.store(game.exportProfiles(), [...active]), count: withProgress.length, enabled: config.save.enabled };
+    if (res.local.ok) { dirty = false; active.clear(); }
+    if (cloud.enabled) {
+      const list = realProfiles();
+      if (!list.length) res.cloud = { state: 'empty' };
+      else {
+        const merged = await cloud.store(list, { force: true });
+        if (merged) { game.importProfiles(merged, true); cloudDirty = false; res.cloud = { state: 'ok', total: merged.length, count: list.length }; }
+        else res.cloud = { state: cloud.status.state === 'error' ? 'fail' : 'busy', text: cloud.status.text };
+      }
+    }
+    return res;
+  }
   setInterval(() => flushCloud(), config.save.cloud.intervalSeconds * 1000);
   window.addEventListener('pagehide', () => flushCloud(true));    // 關掉網頁前盡力再存一次（存不到也沒關係，下次開會從本機補上去）
   game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup') cloudDirty = true; });
@@ -69,7 +88,7 @@
   if (params.get('obs') === '1') {
     document.body.classList.add('obs');
   } else {
-    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { save, flushSave, count: saved.length, cloud, syncCloud });
+    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { save, flushSave, count: saved.length, cloud, syncCloud, saveNow });
   }
   // 接真的 TikTok，兩種方式擇一：
   //   A. TikFinity 電腦版（建議）：網址加 ?tikfinity=1

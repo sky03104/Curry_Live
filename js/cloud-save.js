@@ -146,8 +146,9 @@ ML.createCloudSave = function (config, params, slot, opts) {
 
   // ---------- 寫入（會先跟雲端上的合併，衝突時重試）----------
   async function store(current, o) {
-    if (!token || !canWrite) return null;
+    if (!token || (!canWrite && !(o && o.force))) return null;   // force：使用者在面板明確按了「立即儲存」，這次允許寫
     if (busy) { pending = current; return null; }   // 上一次還沒存完：先記下最新的進度，等它存完馬上再存一次
+    if (o && o.force) remote.known = false;           // 手動儲存：先重新讀一次雲端最新的，再合併（才會學到別的視窗剛存的等級）
     busy = true;
     try {
       for (let attempt = 0; attempt < 4; attempt++) {
