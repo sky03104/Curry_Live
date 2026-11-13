@@ -390,7 +390,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
   function pos(v) {
     let x = v.x, y = v.y;
     if (v.moving) y -= Math.abs(Math.sin(time * 9 + v.phase)) * v.size * 0.05;    // 走路時一顛一顛
-    else if (!v.down) y += Math.sin(time * 2.4 + v.phase) * v.size * 0.03;      // 待機輕輕浮動
+    else if (!v.down) y += Math.sin(time * 2.4 + v.phase) * v.size * 0.01;      // 待機：整張圖只留一點點浮動，主要靠圖片本身呼吸（hero-sprite.js）
     if (v.hop > 0) y -= Math.sin(Math.PI * (1 - v.hop)) * v.size * 0.5 * v.hopH; // 彈跳
     if (v.lunge) {                                                              // 衝撞（去了再回來）
       const t = views.get(v.lunge.to);
@@ -410,7 +410,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
     let lean = 0;
     if (v.lunge) { const t = views.get(v.lunge.to); if (t) lean = Math.sign(t.x - v.x || 1) * 0.22 * Math.sin(Math.PI * v.lunge.t / v.lunge.dur); }
     else lean = clamp(v.kbx / size * 1.4, -0.35, 0.35) + (v.moving ? v.dir * 0.06 : 0);   // 走路時微微往前進方向傾
-    sprite.draw(ctx, p.hero, x, y, size, { pose, poseTime: v.lunge ? v.lunge.t : time, flash: v.flash, lean, facing: v.faceShown });
+    sprite.draw(ctx, p.hero, x, y, size, { pose, poseTime: v.lunge ? v.lunge.t : time, flash: v.flash, lean, facing: v.faceShown, phase: v.phase, moving: v.moving });
 
     // 血條
     const bw = Math.max(54, size * 0.95), bh = Math.max(7, size * 0.09);
@@ -431,11 +431,13 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
       ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(bx, by + bh * 0.12, fw, bh * 0.3);   // 亮光
     }
     ctx.restore();
-    // 小愛心（壓在血條左端）
-    const hx = bx - 1, hy = by + bh / 2, hs = Math.max(5, bh * 0.75);
+    // 愛心（壓在血條左端，大小跟名字一樣；跟著心跳輕輕一縮一放）
+    const beat = v.down ? 1 : 1 + Math.max(0, Math.sin(time * 5 + v.phase)) ** 6 * 0.18;
+    const hx = bx + fs * 0.35, hy = by + bh / 2 - fs * 0.05, hs = fs * 1.15 * beat;
     ctx.save(); ctx.translate(hx, hy); ctx.scale(hs / 10, hs / 10);
-    ctx.beginPath(); ctx.moveTo(0, 4); ctx.bezierCurveTo(-9, -2, -4, -8, 0, -3); ctx.bezierCurveTo(4, -8, 9, -2, 0, 4); ctx.closePath();
-    ctx.fillStyle = v.down ? '#c9c9c9' : '#ff5c8a'; ctx.fill(); ctx.lineWidth = 1.4; ctx.strokeStyle = '#fff'; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, 5); ctx.bezierCurveTo(-11, -2, -5, -9, 0, -3.5); ctx.bezierCurveTo(5, -9, 11, -2, 0, 5); ctx.closePath();
+    ctx.fillStyle = v.down ? '#c9c9c9' : '#ff5c8a'; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#fff'; ctx.lineJoin = 'round'; ctx.stroke();
+    if (!v.down) { ctx.beginPath(); ctx.ellipse(-3.6, -3.2, 1.7, 1.1, -0.6, 0, 7); ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fill(); }   // 愛心上的小亮點
     ctx.restore();
     // 經驗條（血條下面細細一條淡藍；滿級就不畫）
     if (p.prof.level < config.leveling.maxLevel) {
