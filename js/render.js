@@ -237,7 +237,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
         const size = Math.min(cw * 0.6, ch * 0.5, 190) * (wander ? 0.85 : 1);   // 留空間給名字、血條、腳下兩行字；會走動時再小一點才有路可走
         if (!best || size > best.size) best = { cols, rows, cw, ch, size };
       }
-      const size = Math.max(36, best.size);
+      // 會走動時，武將高度最多佔場地高度的 36%，上下才留得出走動的空間（扁長的畫面特別需要）
+      const size = Math.max(36, wander ? Math.min(best.size, arena.h * 0.36) : best.size);
       list.forEach((p, i) => {
         const v = views.get(p.id);
         if (!v) return;
@@ -252,6 +253,9 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
       // 可走動範圍：四邊往內縮，確保名字、血條、腳下的字不會跑出畫面
       bounds = { x0: arena.x + size * 0.6, x1: arena.x + arena.w - size * 0.6,
                  y0: arena.y + size * 0.65 + 50, y1: arena.y + arena.h - size * 0.5 - 56 };
+      // 畫面很小時上下可能擠到沒有空間（下限比上限還高）：這時就讓大家排在同一條水平線上、只左右走
+      if (bounds.y0 > bounds.y1) bounds.y0 = bounds.y1 = (bounds.y0 + bounds.y1) / 2;
+      if (bounds.x0 > bounds.x1) bounds.x0 = bounds.x1 = (bounds.x0 + bounds.x1) / 2;
     }
     return { lb, arena, legend };
   }
@@ -292,33 +296,37 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
   // 兩隻武將「隔多開」的算法：左右隔一個身寬即可，上下要隔更開（因為頭上有名字血條、腳下有字）。
   // 回傳值小於 1 代表太近、會互相擋到。
   function gap(ax, ay, bx, by, size) {
-    return Math.hypot((bx - ax) / (size * 1.05), (by - ay) / (size * 1.2 + 62));
+    return Math.hypot((bx - ax) / (size * 1.05), (by - ay) / (size * 1.2 + Math.min(62, size * 0.8)));   // 武將小的時候，上下需要的間隔也跟著小
   }
   function roam(dt) {
     const cfg = config.wander, b = bounds;
     const list = [...views.values()].filter(v => v.x !== null);
     for (const v of list) {
-      v.moving = false;
+      v.moving = false; v.want = 0; v.px = v.x; v.py = v.y;
       // 倒地、正在出招或挨打時不走動
       if (v.down || v.lunge || v.pending > 0 || v.hold > 0) continue;
       if (!v.goal) {
         if ((v.rest = (v.rest === undefined ? Math.random() * cfg.restMax : v.rest) - dt) > 0) continue;
-        // 隨機挑幾個候選地點，選離其他人最遠的那個，大家才會散開、不會擠成一團
+        // 隨機挑幾個候選地點，只考慮「走過去不會擠到別人」的，從中選最空的；
+        // 都會擠到別人就先不走，等一下再找（硬走過去只會被推回來、卡在原地）
         const reach = cfg.stepMax * v.size;   // 一次最多走多遠
         let best = null;
-        for (let c = 0; c < 8; c++) {
+        for (let c = 0; c < 10; c++) {
           const x = clamp(v.x + (Math.random() * 2 - 1) * reach, b.x0, b.x1), y = clamp(v.y + (Math.random() * 2 - 1) * reach, b.y0, b.y1);
+          if (Math.hypot(x - v.x, y - v.y) < v.size * 0.4) continue;       // 太近了，等於沒走
           let room = 9;
           for (const o of list) if (o !== v) room = Math.min(room, gap(x, y, (o.goal || o).x, (o.goal || o).y, v.size));
+          if (room < 1.05) continue;
           room = Math.min(room, 2) + Math.random() * 0.3;   // 夠空就好，不必永遠跑去最空的角落
           if (!best || room > best.room) best = { x, y, room };
         }
-        v.goal = best;
+        if (!best) { v.rest = 0.5 + Math.random(); continue; }
+        v.goal = best; v.stall = 0;
       }
       const dx = v.goal.x - v.x, dy = v.goal.y - v.y, d = Math.hypot(dx, dy), step = cfg.speed * v.size * dt;
       if (d <= step) { v.goal = null; v.rest = cfg.restMin + Math.random() * (cfg.restMax - cfg.restMin); continue; }
       v.x += dx / d * step; v.y += dy / d * step;
-      v.moving = true; v.dir = Math.sign(dx);
+      v.want = step; v.dir = Math.sign(dx);
       if (Math.abs(v.goal.x - v.x) > v.size * 0.2) v.face = v.dir;   // 面向前進方向（幾乎直上直下時不轉身）
     }
     // 互相靠太近就輕輕推開，避免疊在一起；倒地的不會被推走
@@ -331,7 +339,15 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
       const wa = a.down ? 0 : c.down ? 1 : 0.5;
       a.x -= dx * push * wa; a.y -= dy * push * wa; c.x += dx * push * (1 - wa); c.y += dy * push * (1 - wa);
     }
-    for (const v of list) { if (!v.down) { v.x = clamp(v.x, b.x0, b.x1); v.y = clamp(v.y, b.y0, b.y1); } }
+    for (const v of list) {
+      if (!v.down) { v.x = clamp(v.x, b.x0, b.x1); v.y = clamp(v.y, b.y0, b.y1); }
+      if (!v.want) continue;
+      // 這一格實際有沒有前進？有前進才算「走路中」（才會一顛一顛）。
+      // 一直被擋住走不動超過半秒，就放棄這個目的地、休息一下再換地方，不會卡在原地踏步。
+      const moved = Math.hypot(v.x - v.px, v.y - v.py);
+      if (moved >= v.want * 0.5) { v.moving = true; v.stall = Math.max(0, (v.stall || 0) - dt); }
+      else if ((v.stall = (v.stall || 0) + dt) > 0.5) { v.goal = null; v.stall = 0; v.rest = 0.8 + Math.random() * 1.5; }
+    }
   }
 
   // 這隻武將此刻畫在哪（待機位置 + 各種動態造成的位移）
@@ -454,10 +470,13 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
     if (canvas.width !== Math.round(cw * dpr) || canvas.height !== Math.round(ch * dpr)) {
       canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
     }
-    W = cw; H = ch;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!cw || !ch) return;
+    // 畫面很小時（例如直播軟體裡把來源縮得很小），排行榜和文字的固定大小會把武將擠到沒地方站。
+    // 所以小於「橫式 900x480／直式 480x760」時，整個畫面等比例縮小來畫，版面比例維持不變。
+    const k = cw >= ch ? Math.min(1, cw / 900, ch / 480) : Math.min(1, cw / 480, ch / 760);
+    W = cw / k; H = ch / k;
+    ctx.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
     ctx.clearRect(0, 0, W, H);   // 清成透明
-    if (!W || !H) return;
 
     const { lb, arena, legend } = layout();
 

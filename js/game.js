@@ -56,6 +56,31 @@ ML.createGame = function (config, heroes) {
 
   function others(p) { return [...players.values()].filter(o => o !== p && !o.down); }
 
+  // ---------- 鎖定對象的比對 ----------
+  // 觀眾很難把別人的名字打得一模一樣（名字裡有表情符號、特殊符號，畫面上太長的名字還會被截短），
+  // 所以由嚴到寬一關一關比，前面的關卡有人符合就不往下：
+  //   1. 名字完全一樣　2.「@名字 後面還有別的字」　3. 去掉表情符號／空白／標點、不分大小寫後一樣
+  //   4. 同 3 但後面還有別的字　5. 只打了名字開頭幾個字　6. 打的字出現在名字中間　7. 打的是武將名（例如 @呂布）
+  const plain = t => String(t).toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');   // 只留文字和數字
+  function findLockTarget(me, rest) {
+    const cands = [...players.values()].filter(o => o !== me);
+    const r = plain(rest);
+    const longest = list => list.sort((a, b) => b.name.length - a.name.length)[0];    // 「名字後面還有字」：挑名字最長的
+    const closest = list => list.sort((a, b) => plain(a.name).length - plain(b.name).length)[0];   // 「只打一部分」：挑最接近的
+    const hero = nameTable.find(([name]) => name === rest || (r && plain(name) === r));
+    const steps = [
+      () => cands.filter(o => o.name === rest)[0],
+      () => longest(cands.filter(o => rest.startsWith(o.name))),
+      () => r && cands.filter(o => plain(o.name) === r)[0],
+      () => r && longest(cands.filter(o => plain(o.name) && r.startsWith(plain(o.name)))),
+      () => r && closest(cands.filter(o => plain(o.name).startsWith(r))),
+      () => r && closest(cands.filter(o => plain(o.name).includes(r))),
+      () => hero && (cands.filter(o => o.hero === hero[1] && !o.down)[0] || cands.filter(o => o.hero === hero[1])[0]),
+    ];
+    for (const step of steps) { const t = step(); if (t) return t; }
+    return null;
+  }
+
   // ---------- 留言 ----------
   function handleChat(user, rawText) {
     const text = rawText.trim();
@@ -66,15 +91,13 @@ ML.createGame = function (config, heroes) {
       return;
     }
 
-    if (text.startsWith(config.commands.lockPrefix)) {
+    if (text.startsWith(config.commands.lockPrefix) || text.startsWith('＠')) {   // 半形 @ 和全形 ＠ 都認
       if (!me) return;
-      const rest = text.slice(config.commands.lockPrefix.length).trim();
+      const rest = text.slice(1).trim();
       if (!rest) return;
-      // 先找名字完全一樣的；沒有的話，找「@名字 後面還有別的字」的情況（挑名字最長的）
-      const cands = [...players.values()].filter(o => o !== me);
-      const target = cands.find(o => o.name === rest) ||
-        cands.filter(o => rest.startsWith(o.name)).sort((a, b) => b.name.length - a.name.length)[0];
+      const target = findLockTarget(me, rest);
       if (target) { me.lockId = target.id; notice(`${me.name} 鎖定了 ${target.name}`); }
+      else notice(`${me.name} 找不到「${rest.length > 10 ? rest.slice(0, 10) + '…' : rest}」`);
       return;
     }
 
