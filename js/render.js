@@ -108,6 +108,15 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       effects.pillar(v.x, feet(v), v.size * 0.9, v.size * 2.2, '#ffe27a');
       effects.rise(v.x, v.y, '#ffe27a', 22, v.size * 0.4);
       floats.push({ v, text: '復活！', color: '#ffe27a', scale: 1.3, age: 0 });
+    } else if (e.type === 'buffGain') {      // 獲得 BUFF：藍／紅色光柱＋字樣
+      const c = e.kind === 'regen' ? '#4db8ff' : '#ff5c4d';
+      v.hop = 1; v.hopH = 1;
+      effects.pillar(v.x, feet(v), v.size * 0.9, v.size * 2.4, c);
+      effects.rise(v.x, v.y, c, 24, v.size * 0.5);
+      rings.push({ v, age: 0, life: 0.7, color: c, max: 1.8, width: 8 });
+      floats.push({ v, text: e.text, color: c, scale: 1.3, age: 0, life: 1.8 });
+    } else if (e.type === 'heal' && e.quiet) {   // 藍BUFF 的持續回血：只跳一個小小的綠色字
+      floats.push({ v, text: '+' + e.amount, color: '#7dffa0', scale: 0.7, age: 0, life: 1 });
     } else if (e.type === 'heal') {
       v.hop = 1; v.hopH = 0.5;
       effects.rise(v.x, v.y + v.size * 0.2, '#7dffa0', 20, v.size * 0.4);
@@ -565,6 +574,19 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       ctx.save(); pill(bx, ey, bw, eh); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = '#bfe6ff'; ctx.stroke();
       if (er > 0) { pill(bx, ey, Math.max(eh, bw * er), eh); ctx.fillStyle = '#6cc8ff'; ctx.fill(); }
       ctx.restore();
+    }
+
+    // BUFF 標示：血條右邊的小圓章。藍＝每秒回血（回），紅＝攻擊力加倍（攻）
+    const bf = game.getBuffs(p.id);
+    if (bf.regen || bf.atk) {
+      const rr = Math.max(8, fs * 0.55); let bxx = bx + bw + 6 + rr;
+      for (const [on, col, ch] of [[bf.regen, '#3aa8ff', '回'], [bf.atk, '#ff5c4d', '攻']]) {
+        if (!on) continue;
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(bxx, by + bh / 2, rr, 0, Math.PI * 2); ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+        text(ch, bxx, by + bh / 2 + 1, rr * 1.15, '#fff');
+        bxx += rr * 2 + 4;
+      }
     }
 
     // 觀眾名字（血條上方）、武將名（腳下）

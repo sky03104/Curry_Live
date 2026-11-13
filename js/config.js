@@ -68,6 +68,9 @@ window.GAME_CONFIG = {
     boss1:  { label: '招換魔龍', summon: 'boss_dragon' },
     boss2:  { label: '招換凱薩', summon: 'boss_caesar' },
     boss3:  { label: '招換巨猿', summon: 'boss_ape' },
+    buff:   { label: '招換BUFF', summon: ['boss_blue', 'boss_red'] },   // 藍BUFF 或紅BUFF（隨機一隻）
+    boss4:  { label: '招換藍BUFF', summon: 'boss_blue' },
+    boss5:  { label: '招換紅BUFF', summon: 'boss_red' },
   },
 
   // ---------- 禮物對應 ----------
@@ -81,6 +84,9 @@ window.GAME_CONFIG = {
     { id: 'boss1',    name: '招換深淵魔龍', icon: '🐉', action: 'boss1' },
     { id: 'boss2',    name: '招換深淵凱薩', icon: '👹', action: 'boss2' },
     { id: 'boss3',    name: '招換太古巨猿', icon: '🦍', action: 'boss3' },
+    { id: 'buff',     name: '招換BUFF（藍紅隨機）', icon: '🎲', action: 'buff' },
+    { id: 'boss4',    name: '招換藍BUFF', icon: '💧', action: 'boss4' },
+    { id: 'boss5',    name: '招換紅BUFF', icon: '🔥', action: 'boss5' },
   ],
 
   // ---------- 真的 TikTok 禮物 → 遊戲裡的禮物 ----------
@@ -139,7 +145,8 @@ window.GAME_CONFIG = {
       { atLeast: 1500, gift: 'boss3' },
       { atLeast: 1000, gift: 'boss2' },
       { atLeast: 500,  gift: 'boss1' },
-      { atLeast: 100, gift: 'crown' },      // 100 鑽以上 → 技能
+      { atLeast: 200, gift: 'crown' },      // 200 鑽以上 → 技能（原本 100 鑽以上，100～199 鑽改成招換 BUFF）
+      { atLeast: 100, gift: 'buff' },       // 100～199 鑽 → 招換藍BUFF／紅BUFF（隨機一隻）      // 100 鑽以上 → 技能
       { atLeast: 20,  gift: 'firework' },   // 20～99 鑽  → 全場攻擊
       { atLeast: 5,   gift: 'heart' },      // 5～19 鑽   → 回血
       { atLeast: 1,   gift: 'rose' },       // 1～4 鑽    → 普攻
@@ -169,6 +176,12 @@ window.GAME_CONFIG = {
       // xp：被打倒時要分給參戰玩家的經驗值總量　lastHitBonus：最後一擊的人額外多拿的經驗值
       { id: 'boss_dragon', displayName: '深淵魔龍', level: 10, hasArt: true,  hp: 6000,  atk: 80,  def: 40,  xp: 1500, lastHitBonus: 500,  skillName: '深淵吐息', aoeName: '深淵風暴', accent: '#ff4fd8' },
       { id: 'boss_caesar', displayName: '深淵凱薩', level: 20, hasArt: true,  hp: 15000, atk: 130, def: 70,  xp: 4000, lastHitBonus: 1200, skillName: '凱薩裁決', aoeName: '王權崩落', accent: '#9aa8ff' },
+      // 藍BUFF／紅BUFF：等級 5 的小 BOSS。reward 是「最後一擊的玩家」獲得的效果（持續 seconds 秒，重複獲得會重新計時，不會疊加）：
+      //   regenPerSecond 每秒回復多少血　atkMultiplier 攻擊力幾倍
+      { id: 'boss_blue',   displayName: '藍BUFF',   level: 5,  hasArt: true,  hp: 2500,  atk: 45,  def: 20,  xp: 600,  lastHitBonus: 200,  skillName: '水晶震盪', aoeName: '藍光爆裂', accent: '#4db8ff',
+        reward: { regenPerSecond: 10, seconds: 3600, label: '藍BUFF 效果：每秒回復 10 血' } },
+      { id: 'boss_red',    displayName: '紅BUFF',   level: 5,  hasArt: true,  hp: 2500,  atk: 55,  def: 20,  xp: 600,  lastHitBonus: 200,  skillName: '烈焰荊棘', aoeName: '熔岩爆發', accent: '#ff5c4d',
+        reward: { atkMultiplier: 2, seconds: 3600, label: '紅BUFF 效果：攻擊力加倍' } },
       { id: 'boss_ape',    displayName: '太古巨猿', level: 30, hasArt: true,  hp: 36000, atk: 190, def: 110, xp: 9000, lastHitBonus: 3000, skillName: '遠古重擊', aoeName: '地動山搖', accent: '#ffb04a' },
     ],
   },

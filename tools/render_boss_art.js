@@ -6,7 +6,7 @@ const ROOT = path.join(__dirname, '..'), SRC = path.join(__dirname, 'boss_art'),
 (async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage();
-  for (const f of fs.readdirSync(SRC).filter(n => n.endsWith('.svg') && !n.startsWith('_'))   // 底線開頭的是備用檔，不轉) {
+  for (const f of fs.readdirSync(SRC).filter(n => n.endsWith('.svg') && !n.startsWith('_'))) {   // 底線開頭的是備用檔，不轉
     const svg = fs.readFileSync(path.join(SRC, f), 'utf8');
     const dataUrl = await page.evaluate(async ({ svg }) => {
       const img = new Image();

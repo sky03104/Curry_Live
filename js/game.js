@@ -37,9 +37,10 @@ ML.createGame = function (config, heroes) {
   function stats(p) {
     if (p.isBoss) return { maxHp: p.maxHp, atk: p.def.atk, def: p.def.def };
     const g = config.leveling, up = p.prof.level - 1;
+    const bf = p.prof.buffs, atkBuff = bf && bf.atk && bf.atk.until > time ? bf.atk.mult : 1;   // 紅BUFF：攻擊力加倍
     return {
       maxHp: Math.round(p.hero.baseHp * config.hpMultiplier * (1 + g.hpPerLevel * up)),
-      atk: p.hero.baseAtk * (1 + g.atkPerLevel * up),
+      atk: p.hero.baseAtk * (1 + g.atkPerLevel * up) * atkBuff,
       def: p.hero.baseArmor * (1 + g.defPerLevel * up),
     };
   }
@@ -240,6 +241,7 @@ ML.createGame = function (config, heroes) {
   // ---------- BOSS ----------
   // 招換：場上沒有 BOSS 就直接叫出來；已經有一隻（含正在倒下的），就排隊，前一隻消失後自動換上。
   function summonBoss(user, bossId) {
+    if (Array.isArray(bossId)) bossId = bossId[Math.floor(Math.random() * bossId.length)];   // 例如藍BUFF／紅BUFF 隨機一隻
     const def = bossById.get(bossId);
     if (!def) return;
     const entry = { def, by: user.name };
@@ -273,9 +275,33 @@ ML.createGame = function (config, heroes) {
       if (prof) grantXp(prof, share + (id === b.lastHitId ? bonus : 0));
     }
     fx({ type: 'bossDefeated', id: b.id, share, bonus, killer: killer.name });
+    if (b.def.reward) grantBuff(killer, b.def.reward);
     notice(`${killer.name} 打倒了 ${b.name}！`);
     notice(`${ids.length} 位參戰者各 +${share} 經驗，尾刀獎勵 +${bonus}`);
   }
+  // 擊殺藍BUFF／紅BUFF 的玩家獲得的效果（只有「最後一擊」的人拿得到）。同一種效果再拿到會重新計時，不會疊加。
+  function grantBuff(p, r) {
+    const prof = p.prof, until = time + (r.seconds || 3600);
+    prof.buffs = prof.buffs || {};
+    if (r.regenPerSecond) prof.buffs.regen = { until, amount: r.regenPerSecond };
+    if (r.atkMultiplier) prof.buffs.atk = { until, mult: r.atkMultiplier };
+    fx({ type: 'buffGain', id: p.id, kind: r.regenPerSecond ? 'regen' : 'atk', text: r.regenPerSecond ? '藍BUFF！' : '紅BUFF！' });
+    notice(`${p.name} 獲得${r.label || 'BUFF'}（${Math.round((r.seconds || 3600) / 60)} 分鐘）`);
+  }
+  // 每秒回血（藍BUFF）：每滿 1 秒補一次，畫面上每 2 秒跳一次小小的綠色加號
+  function tickBuffs(p, dt) {
+    const rg = p.prof.buffs && p.prof.buffs.regen;
+    if (!rg || rg.until <= time || p.down) { p.regenAcc = 0; p.regenShown = 0; return; }
+    p.regenAcc = (p.regenAcc || 0) + dt;
+    while (p.regenAcc >= 1 - 1e-6) {   // 留一點浮點誤差的空間（0.1 加十次會是 0.9999999）
+      p.regenAcc -= 1;
+      const add = Math.min(p.maxHp - p.hp, rg.amount);
+      p.hp += add; p.regenShown = (p.regenShown || 0) + add;
+    }
+    p.regenFxAcc = (p.regenFxAcc || 0) + dt;
+    if (p.regenFxAcc >= 2) { p.regenFxAcc = 0; if (p.regenShown > 0) { fx({ type: 'heal', id: p.id, amount: p.regenShown, quiet: true }); p.regenShown = 0; } }
+  }
+
   // BOSS 出招：aoe = false 隨機打一位玩家；aoe = true 全場攻擊（每位玩家都吃）
   function bossStrike(b, aoe) {
     const pool = [...players.values()].filter(o => !o.isBoss && !o.down);
@@ -323,6 +349,7 @@ ML.createGame = function (config, heroes) {
       time += dt;
       for (const p of [...players.values()]) {
         if (p.isBoss) { bossUpdate(p); continue; }
+        tickBuffs(p, dt);
         if (p.down && time - p.downAt >= config.removeDownedAfterSeconds) {
           players.delete(p.id);
           notice(`${p.name} 倒地太久，離場了`);
@@ -335,6 +362,7 @@ ML.createGame = function (config, heroes) {
     // 清空場上。keepProgress = true 時保留每位觀眾的等級、經驗值、擊倒數（只把場上武將和傷害排行榜清掉）
     reset(keepProgress) {
       players.clear(); left.clear(); bossQueue.length = 0; time = 0;
+      scores.forEach(s => { s.buffs = null; });   // 遊戲時間歸零，BUFF 也一併清掉
       if (keepProgress) scores.forEach(s => { s.damage = 0; }); else scores.clear();
     },
     // 存檔用：交出每位觀眾目前的進度
@@ -370,6 +398,12 @@ ML.createGame = function (config, heroes) {
       const b = players.get(BOSS_ID);
       return b ? { name: b.name, level: b.def.level, hp: b.hp, maxHp: b.maxHp, down: b.down, summoner: b.summoner,
         attackIn: Math.max(0, b.nextAttackAt - time), aoeIn: Math.max(0, b.nextAoeAt - time) } : null;
+    },
+    // 某位玩家身上的 BUFF：還剩幾秒（沒有就是 0）
+    getBuffs(id) {
+      const s = scores.get(id), b = s && s.buffs;
+      if (!b) return { regen: 0, atk: 0 };
+      return { regen: b.regen && b.regen.until > time ? b.regen.until - time : 0, atk: b.atk && b.atk.until > time ? b.atk.until - time : 0 };
     },
     getBossQueue() { return bossQueue.map(e => ({ name: e.def.displayName, level: e.def.level, by: e.by })); },
     bossHeroes() { return (bossCfg.list || []).map(bossHero); },
