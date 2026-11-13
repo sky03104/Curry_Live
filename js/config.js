@@ -38,6 +38,14 @@ window.GAME_CONFIG = {
   save: {
     enabled: true,              // false = 不存檔，每次開播等級都從 1 開始
     intervalSeconds: 5,         // 每隔幾秒存一次（有變動才存）
+    // 雲端存檔（Firebase）：要在面板按「開啟雲端存檔」產生代號後才會真的使用，詳見 js/cloud-save.js
+    cloud: {
+      enabled: true,            // false = 完全不使用雲端存檔
+      projectId: 'mengzhan-sanguo',
+      apiKey: 'AIzaSyBzJytVzlJv2E6_6bSgs42WHG-2YFmhSuY',   // Firebase 網頁用金鑰，本來就是公開的，不是密碼
+      baseUrl: 'https://firestore.googleapis.com',
+      intervalSeconds: 30,      // 每隔幾秒存一次雲端（有變動才存）。Firebase 免費額度每天 2 萬次寫入，這個數字很夠用
+    },
   },
 
   // ---------- 傷害 ----------

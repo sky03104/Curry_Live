@@ -28,6 +28,39 @@
   window.addEventListener('pagehide', flushSave);       // 關掉或重新整理網頁前再存一次
   window.addEventListener('beforeunload', flushSave);
 
+  // ---------- 雲端存檔（Firebase）：只有直播畫面（obs=1）會寫入，面板視窗只讀取 ----------
+  const cloud = ML.createCloudSave(config, params, save.slot, { canWrite: params.get('obs') === '1' });
+  // 只存真實觀眾（面板測試用的假觀眾 fake: 不進雲端），而且只存有進度的（1 級、0 經驗、沒擊倒過人的不用存）
+  const realProfiles = () => game.exportProfiles().filter(p => p.id.startsWith('tt:') && (p.level > 1 || p.xp > 0 || p.kills > 0));
+  let cloudDirty = false, lastCloudState = '';
+  cloud.onStatus(st => {
+    // 狀態變成「出錯」或「從出錯恢復」時，在畫面訊息區提醒一次（不要一直洗版）
+    if (st.state === 'error' && lastCloudState !== 'error') game.announce('⚠ ' + st.text + '（等級先存在本機）');
+    else if (st.state === 'ok' && lastCloudState === 'error') game.announce('雲端存檔恢復正常');
+    lastCloudState = st.state;
+  });
+  // 讀雲端 → 跟本機目前的進度合併 → 套用到遊戲；有本機的進度雲端沒有時，也一併存上去
+  async function syncCloud() {
+    if (!cloud.enabled || !config.save.enabled) return 0;
+    try {
+      const remote = await cloud.load();
+      game.importProfiles(remote, true);
+      if (remote.length) game.announce(`已讀取雲端存檔：${remote.length} 位觀眾的等級`);
+      if (cloud.canWrite && realProfiles().length) cloudDirty = true;
+      await flushCloud();
+      return remote.length;
+    } catch (e) { return -1; }
+  }
+  async function flushCloud(leaving) {
+    if (!cloud.enabled || !cloud.canWrite || !cloudDirty) return;
+    const merged = await cloud.store(realProfiles(), { keepalive: !!leaving });
+    if (merged) { game.importProfiles(merged, true); cloudDirty = false; }   // 別的視窗賺到的等級也套進來
+  }
+  setInterval(() => flushCloud(), config.save.cloud.intervalSeconds * 1000);
+  window.addEventListener('pagehide', () => flushCloud(true));    // 關掉網頁前盡力再存一次（存不到也沒關係，下次開會從本機補上去）
+  game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup') cloudDirty = true; });
+  syncCloud();
+
   hub.on(ev => game.handleEvent(ev));
   // 收到真的 TikTok 禮物時，順便記住它的圖片（禮物提示列要用）
   hub.on(ev => { if (ev.type === 'tiktokGift') giftSettings.rememberIcon(ev.gift.name || ('#' + ev.gift.id), ev.gift.icon); });
@@ -36,7 +69,7 @@
   if (params.get('obs') === '1') {
     document.body.classList.add('obs');
   } else {
-    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { save, flushSave, count: saved.length });
+    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { save, flushSave, count: saved.length, cloud, syncCloud });
   }
   // 接真的 TikTok，兩種方式擇一：
   //   A. TikFinity 電腦版（建議）：網址加 ?tikfinity=1
@@ -67,5 +100,5 @@
     if (saved.length) game.announce(`已讀取存檔：${saved.length} 位觀眾的等級`);
   });
 
-  ML.hub = hub; ML.game = game; ML.renderer = renderer; ML.giftSettings = giftSettings; ML.flushSave = () => { dirty = true; flushSave(); };   // 方便除錯與自動測試
+  ML.hub = hub; ML.game = game; ML.renderer = renderer; ML.giftSettings = giftSettings; ML.flushSave = () => { dirty = true; flushSave(); }; ML.cloud = cloud; ML.flushCloud = () => { cloudDirty = true; return flushCloud(); };   // 方便除錯與自動測試
 })();
