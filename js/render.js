@@ -5,7 +5,7 @@
 // ============================================================
 window.ML = window.ML || {};
 
-ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) {
+ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, arenas) {
   const ctx = canvas.getContext('2d');
   const FONT = '"Noto Sans TC","Microsoft JhengHei","PingFang TC","WenQuanYi Zen Hei",sans-serif';
   const views = new Map();   // 觀眾代號 → 畫面上這隻武將的顯示狀態
@@ -455,7 +455,12 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
     text(lv, left, by - fs * 0.7, fs * 0.8, v.down ? '#bbb' : '#ffd35c', 'left');
     text(nm, left + lvW, by - fs * 0.75, fs, v.down ? '#bbb' : '#fff', 'left');
     const fac = config.factions[p.hero.faction] || { label: '', color: '#888' };
-    text(`${fac.label}・${p.hero.displayName}`, x, y + r + fs * 0.85, fs * 0.8, fac.color);
+    let facColor = fac.color;
+    if (arenas && arenas.isDark()) {   // 深色場地：把陣營色往白色調亮，不然深紫、深藍在黑底上看不清楚
+      const n = parseInt(String(fac.color).slice(1), 16), mix = c => Math.round(c + (255 - c) * 0.6);
+      if (!isNaN(n)) facColor = `rgb(${mix(n >> 16 & 255)},${mix(n >> 8 & 255)},${mix(n & 255)})`;
+    }
+    text(`${fac.label}・${p.hero.displayName}`, x, y + r + fs * 0.85, fs * 0.8, facColor);
 
     // 最下面一行：倒地倒數 或 鎖定對象
     const ly = y + r + fs * 1.85;
@@ -536,6 +541,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
     ctx.clearRect(0, 0, W, H);   // 清成透明
 
     const { lb, arena, legend } = layout();
+    if (arenas) arenas.draw(ctx, { x: 4, y: 4, w: W - 8, h: H - 8 }, dpr * k);   // 場地地面：鋪滿整個畫面（排行榜、禮物提示列畫在它上面）；預設全場透明＝什麼都不畫
 
     if (dim) {   // 技能發動：畫面短暫變暗，讓特效更顯眼
       ctx.fillStyle = `rgba(0,0,0,${config.skillDim * Math.sin(Math.PI * dim.age / dim.life)})`;
@@ -586,6 +592,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
   }
 
   return {
+    arenas,
     frame(dt) { update(dt); draw(); },
     // 自動測試用：讀出每隻武將目前的位置
     debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down, face: v.face, moving: v.moving })); },
