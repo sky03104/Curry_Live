@@ -1,51 +1,63 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
 <defs>
-  <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7a5236"/><stop offset="1" stop-color="#2f1d13"/></linearGradient>
-  <linearGradient id="fur2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5e3d28"/><stop offset="1" stop-color="#24150d"/></linearGradient>
-  <linearGradient id="chest" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b98b62"/><stop offset="1" stop-color="#6e4a30"/></linearGradient>
-  <linearGradient id="rock" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8a8f9c"/><stop offset="1" stop-color="#3d414c"/></linearGradient>
-  <linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a47a58"/><stop offset="1" stop-color="#6b4630"/></linearGradient>
+  <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6b625e"/><stop offset="1" stop-color="#26201d"/></linearGradient>
+  <linearGradient id="fur2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4c4440"/><stop offset="1" stop-color="#1c1714"/></linearGradient>
+  <linearGradient id="mane" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbf5e8"/><stop offset="1" stop-color="#b9ae9a"/></linearGradient>
+  <linearGradient id="chest" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a7c70"/><stop offset="1" stop-color="#4b4039"/></linearGradient>
+  <linearGradient id="rock" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9aa0ac"/><stop offset="1" stop-color="#3a3e48"/></linearGradient>
+  <linearGradient id="bone" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#c8b99a"/></linearGradient>
+  <linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6e5f56"/><stop offset="1" stop-color="#3b312c"/></linearGradient>
   <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
+<!-- 地面裂開的碎石 -->
+<g fill="#4a4e58" stroke="#1a0d07" stroke-width="4" stroke-linejoin="round">
+  <path d="M60 560 L84 530 L110 562 Z M500 562 L522 524 L548 560 Z M30 590 L50 566 L70 592 Z M540 592 L562 568 L584 592 Z"/>
+</g>
 <g stroke="#1a0d07" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
   <!-- 腿 -->
-  <path d="M200 430 C176 470 170 520 180 556 L292 556 C292 520 286 470 280 430 Z" fill="url(#fur2)"/>
-  <path d="M320 430 C314 470 308 520 308 556 L420 556 C430 520 424 470 400 430 Z" fill="url(#fur2)"/>
-  <path d="M184 556 L174 570 M214 556 L208 572 M246 556 L244 572 M330 556 L328 572 M364 556 L366 572 M396 556 L406 570" stroke="#e8dcc8" stroke-width="7" fill="none"/>
-  <!-- 手臂（粗壯，拳頭撐地） -->
-  <path d="M158 210 C90 250 70 360 96 470 L100 520 C102 548 190 548 192 520 C204 450 214 360 244 270 Z" fill="url(#fur)"/>
-  <path d="M442 210 C510 250 530 360 504 470 L500 520 C498 548 410 548 408 520 C396 450 386 360 356 270 Z" fill="url(#fur)"/>
-  <path d="M104 500 L112 540 M134 506 L138 546 M164 504 L166 544 M496 500 L488 540 M466 506 L462 546 M436 504 L434 544" stroke="#e8dcc8" stroke-width="6" fill="none"/>
+  <path d="M196 430 C170 470 164 520 176 556 L292 556 C292 520 286 470 280 430 Z" fill="url(#fur2)"/>
+  <path d="M320 430 C314 470 308 520 308 556 L424 556 C436 520 430 470 404 430 Z" fill="url(#fur2)"/>
+  <path d="M184 470 L284 486 M322 486 L418 470" stroke="#ffb04a" stroke-width="4" fill="none" filter="url(#glow)"/>
+  <path d="M180 556 L168 572 M212 556 L204 574 M246 556 L244 574 M330 556 L328 574 M364 556 L368 574 M400 556 L412 572" stroke="url(#bone)" stroke-width="8" fill="none"/>
+  <!-- 手臂（石甲護腕＋裂紋拳頭） -->
+  <path d="M158 210 C86 250 66 360 92 470 L96 520 C98 550 190 550 192 520 C204 450 214 360 244 270 Z" fill="url(#fur)"/>
+  <path d="M442 210 C514 250 534 360 508 470 L504 520 C502 550 410 550 408 520 C396 450 386 360 356 270 Z" fill="url(#fur)"/>
+  <path d="M94 410 L196 420 L194 470 L98 462 Z M404 420 L506 410 L502 462 L406 470 Z" fill="url(#rock)"/>
+  <path d="M112 420 L120 458 M150 424 L154 466 M450 424 L446 466 M488 420 L480 458" fill="none" stroke="#ffb04a" stroke-width="4" filter="url(#glow)"/>
+  <path d="M100 500 L108 542 M130 506 L134 546 M160 504 L162 544 M500 500 L492 542 M470 506 L466 546 M440 504 L438 544" stroke="url(#bone)" stroke-width="7" fill="none"/>
   <!-- 軀幹 -->
   <path d="M170 200 C190 150 410 150 430 200 C470 270 450 400 410 440 C370 470 230 470 190 440 C150 400 130 270 170 200 Z" fill="url(#fur)"/>
-  <!-- 胸口淺色區＋發光符文 -->
-  <path d="M230 230 C250 210 350 210 370 230 C390 290 380 380 340 420 C310 440 290 440 260 420 C220 380 210 290 230 230 Z" fill="url(#chest)" stroke="none"/>
+  <!-- 胸口淺色區＋發光大符文＋石胸甲 -->
+  <path d="M228 230 C250 208 350 208 372 230 C392 290 382 380 342 422 C312 444 288 444 258 422 C218 380 208 290 228 230 Z" fill="url(#chest)" stroke="none"/>
+  <path d="M244 244 L300 226 L356 244 L348 288 L300 304 L252 288 Z" fill="url(#rock)"/>
   <g fill="none" stroke="#ffb04a" stroke-width="5" stroke-linecap="round" filter="url(#glow)">
-    <path d="M300 250 L300 400 M262 290 L338 290 M270 335 L330 335 M282 375 L318 375"/>
-    <path d="M300 250 L276 272 M300 250 L324 272"/>
+    <path d="M300 238 L300 296 M276 262 L324 262"/>
+    <path d="M300 320 L300 410 M266 346 L334 346 M276 380 L324 380 M288 404 L312 404"/>
+    <path d="M300 320 L278 340 M300 320 L322 340"/>
   </g>
   <!-- 手臂符文 -->
   <g fill="none" stroke="#ffb04a" stroke-width="4" stroke-linecap="round" filter="url(#glow)">
-    <path d="M110 330 L150 345 M104 380 L148 392 M112 430 L152 436"/>
-    <path d="M490 330 L450 345 M496 380 L452 392 M488 430 L448 436"/>
+    <path d="M108 330 L150 346 M104 372 L150 386 M490 330 L450 346 M496 372 L450 386"/>
   </g>
-  <!-- 石頭肩甲 -->
-  <path d="M120 200 C110 150 190 110 250 150 L240 232 C190 250 128 242 120 200 Z" fill="url(#rock)"/>
-  <path d="M480 200 C490 150 410 110 350 150 L360 232 C410 250 472 242 480 200 Z" fill="url(#rock)"/>
-  <path d="M150 170 L186 214 L172 246 M214 150 L204 206 M450 170 L414 214 L428 246 M386 150 L396 206" fill="none" stroke="#ffb04a" stroke-width="4" filter="url(#glow)"/>
-  <path d="M138 140 L128 100 L170 126 M462 140 L472 100 L430 126" fill="url(#rock)"/>
+  <!-- 石頭肩甲（帶尖刺、裂紋發光）-->
+  <path d="M112 204 C100 150 186 104 252 148 L242 236 C190 256 120 248 112 204 Z" fill="url(#rock)"/>
+  <path d="M488 204 C500 150 414 104 348 148 L358 236 C410 256 480 248 488 204 Z" fill="url(#rock)"/>
+  <path d="M146 176 L186 218 L172 252 M210 146 L200 210 M454 176 L414 218 L428 252 M390 146 L400 210" fill="none" stroke="#ffb04a" stroke-width="4" filter="url(#glow)"/>
+  <path d="M128 146 L112 92 L166 126 M172 126 L186 70 L216 132 M472 146 L488 92 L434 126 M428 126 L414 70 L384 132" fill="url(#rock)"/>
+  <!-- 白色鬃毛（尖尖的一圈）-->
+  <path d="M206 172 L166 96 L224 128 L212 48 L262 110 L282 26 L300 106 L318 26 L338 110 L388 48 L376 128 L434 96 L394 172 C384 204 216 204 206 172 Z" fill="url(#mane)"/>
   <!-- 頭 -->
-  <path d="M236 150 C226 96 262 66 300 66 C338 66 374 96 364 150 C378 190 344 226 300 226 C256 226 222 190 236 150 Z" fill="url(#fur)"/>
-  <path d="M258 108 C270 90 330 90 342 108 C346 130 332 140 300 140 C268 140 254 130 258 108 Z" fill="url(#fur2)"/>
-  <path d="M262 150 C262 130 338 130 338 150 C346 192 322 216 300 216 C278 216 254 192 262 150 Z" fill="url(#face)"/>
+  <path d="M236 152 C226 100 262 74 300 74 C338 74 374 100 364 152 C378 192 344 228 300 228 C256 228 222 192 236 152 Z" fill="url(#fur)"/>
+  <path d="M258 108 C270 92 330 92 342 108 C346 130 332 142 300 142 C268 142 254 130 258 108 Z" fill="url(#fur2)"/>
+  <path d="M262 152 C262 132 338 132 338 152 C346 194 322 218 300 218 C278 218 254 194 262 152 Z" fill="url(#face)"/>
   <!-- 眼睛 -->
-  <g filter="url(#glow)"><ellipse cx="276" cy="140" rx="11" ry="7" fill="#ffd34a"/><ellipse cx="324" cy="140" rx="11" ry="7" fill="#ffd34a"/></g>
-  <path d="M262 128 L292 138 M338 128 L308 138" stroke="#1a0d07" stroke-width="7" fill="none"/>
-  <path d="M290 156 L286 170 M310 156 L314 170" stroke="#1a0d07" stroke-width="5" fill="none"/>
+  <g filter="url(#glow)"><ellipse cx="276" cy="142" rx="12" ry="7" fill="#ffd34a"/><ellipse cx="324" cy="142" rx="12" ry="7" fill="#ffd34a"/></g>
+  <path d="M260 128 L292 140 M340 128 L308 140" stroke="#1a0d07" stroke-width="7" fill="none"/>
+  <path d="M290 158 L286 172 M310 158 L314 172" stroke="#1a0d07" stroke-width="5" fill="none"/>
   <!-- 嘴和獠牙 -->
-  <path d="M270 190 C285 202 315 202 330 190" fill="#2a0f0a"/>
-  <path d="M274 190 L268 210 L284 196 M326 190 L332 210 L316 196" fill="#fff6e4"/>
-  <!-- 頭上的鬃毛尖 -->
-  <path d="M250 80 L238 40 L272 70 M282 68 L296 26 L314 68 M328 70 L362 40 L350 82" fill="url(#fur)"/>
+  <path d="M268 192 C284 206 316 206 332 192" fill="#2a0f0a"/>
+  <path d="M272 192 L262 224 L286 198 M328 192 L338 224 L314 198" fill="url(#bone)"/>
+  <!-- 額頭的發光印記 -->
+  <path d="M300 96 L300 120 M290 108 L310 108" stroke="#ffb04a" stroke-width="4" fill="none" filter="url(#glow)"/>
 </g>
 </svg>

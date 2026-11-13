@@ -1,54 +1,76 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
 <defs>
-  <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5a608e"/><stop offset="1" stop-color="#23264a"/></linearGradient>
-  <linearGradient id="steel2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4b5180"/><stop offset="1" stop-color="#1b1d3a"/></linearGradient>
-  <linearGradient id="cape" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a2fb8"/><stop offset="1" stop-color="#241046"/></linearGradient>
-  <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d9defa"/><stop offset=".5" stop-color="#8d96d6"/><stop offset="1" stop-color="#4d54a0"/></linearGradient>
-  <radialGradient id="gem"><stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="#c58bff"/><stop offset="1" stop-color="#7a2fe0"/></radialGradient>
+  <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a7098"/><stop offset=".5" stop-color="#3a3f6c"/><stop offset="1" stop-color="#1c1e3d"/></linearGradient>
+  <linearGradient id="steel2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4d5384"/><stop offset="1" stop-color="#17192f"/></linearGradient>
+  <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe9a0"/><stop offset=".5" stop-color="#d9a93e"/><stop offset="1" stop-color="#8a5a16"/></linearGradient>
+  <linearGradient id="cape" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7a2fd0"/><stop offset=".6" stop-color="#3b1676"/><stop offset="1" stop-color="#1a0a38"/></linearGradient>
+  <linearGradient id="capein" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a0f55"/><stop offset="1" stop-color="#0d0520"/></linearGradient>
+  <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f1f3ff"/><stop offset=".5" stop-color="#9aa2e0"/><stop offset="1" stop-color="#454c9c"/></linearGradient>
+  <radialGradient id="gem"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#d6a0ff"/><stop offset="1" stop-color="#7a2fe0"/></radialGradient>
   <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
+<!-- 飄浮的紫色碎片 -->
+<g fill="#c58bff" opacity=".85" filter="url(#glow)" stroke="none">
+  <path d="M90 200 L104 170 L116 204 Z M60 330 L72 304 L84 336 Z M520 120 L534 92 L546 126 Z M548 300 L560 272 L572 306 Z M120 450 L130 424 L142 454 Z"/>
+</g>
 <g stroke="#12122a" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
-  <!-- 披風 -->
-  <path d="M190 175 C150 280 120 400 100 540 L150 520 L190 548 L240 520 L300 552 L360 520 L410 548 L450 520 L500 540 C480 400 450 280 410 175 Z" fill="url(#cape)"/>
-  <path d="M230 200 C215 300 205 410 200 520 M300 210 L300 540 M370 200 C385 300 395 410 400 520" fill="none" stroke="#1a0b36" stroke-width="4" opacity=".6"/>
-  <!-- 大劍（右手拿著，劍尖朝上） -->
-  <path d="M452 36 L474 70 L474 322 L430 322 L430 70 Z" fill="url(#blade)"/>
-  <path d="M452 50 L452 320" stroke="#fff" stroke-width="3" opacity=".7" fill="none"/>
-  <path d="M430 76 L430 318" stroke="#b86bff" stroke-width="5" filter="url(#glow)" fill="none"/>
-  <path d="M400 322 L504 322 L498 346 L406 346 Z" fill="url(#steel)"/>
-  <rect x="440" y="346" width="24" height="64" rx="6" fill="#3a1d6c"/>
-  <circle cx="452" cy="418" r="14" fill="url(#gem)"/>
+  <!-- 披風（內裡深紫、外緣鋸齒） -->
+  <path d="M184 170 C140 270 104 400 84 548 L132 528 L166 556 L214 528 L262 558 L300 530 L338 558 L386 528 L434 556 L468 528 L516 548 C496 400 460 270 416 170 Z" fill="url(#cape)"/>
+  <path d="M214 190 C190 290 170 410 160 526 L214 528 C220 420 230 300 252 196 Z M386 190 C410 290 430 410 440 526 L386 528 C380 420 370 300 348 196 Z" fill="url(#capein)" stroke-width="4" opacity=".9"/>
+  <path d="M96 520 L132 528 M468 528 L504 520" fill="none" stroke="url(#gold)" stroke-width="5"/>
+  <!-- 大劍（劍尖朝上，劍身發紫光） -->
+  <path d="M470 20 L496 62 L496 320 L444 320 L444 62 Z" fill="url(#blade)"/>
+  <path d="M470 34 L470 318" stroke="#fff" stroke-width="3" opacity=".8" fill="none"/>
+  <path d="M446 70 L446 316 M494 70 L494 316" stroke="#c58bff" stroke-width="5" filter="url(#glow)" fill="none"/>
+  <path d="M452 120 L488 140 M452 170 L488 190 M452 220 L488 240" stroke="#7a2fe0" stroke-width="4" fill="none" opacity=".8"/>
+  <path d="M412 320 L528 320 L520 348 L420 348 Z" fill="url(#gold)"/>
+  <path d="M412 320 L398 304 L420 308 M528 320 L542 304 L520 308" fill="url(#gold)"/>
+  <rect x="456" y="348" width="28" height="60" rx="6" fill="#3a1d6c"/>
+  <path d="M456 362 L484 362 M456 380 L484 380 M456 396 L484 396" stroke="url(#gold)" stroke-width="3" fill="none"/>
+  <circle cx="470" cy="418" r="16" fill="url(#gem)" filter="url(#glow)"/>
   <!-- 腿 -->
-  <path d="M238 372 L292 372 L286 520 L228 520 Z" fill="url(#steel2)"/>
-  <path d="M308 372 L362 372 L372 520 L314 520 Z" fill="url(#steel2)"/>
-  <path d="M216 520 L292 520 L296 552 L204 552 Z" fill="url(#steel)"/>
-  <path d="M308 520 L384 520 L396 552 L304 552 Z" fill="url(#steel)"/>
-  <ellipse cx="262" cy="440" rx="30" ry="18" fill="url(#steel)"/><ellipse cx="338" cy="440" rx="30" ry="18" fill="url(#steel)"/>
-  <!-- 腰甲 -->
-  <path d="M226 326 L374 326 L388 404 L300 424 L212 404 Z" fill="url(#steel)"/>
-  <path d="M258 340 L252 412 M300 344 L300 420 M342 340 L348 412" fill="none" stroke="#12122a" stroke-width="4"/>
-  <!-- 左手（身側）-->
-  <path d="M176 220 C150 270 146 320 150 352 L196 352 C196 320 202 270 220 230 Z" fill="url(#steel2)"/>
-  <rect x="140" y="346" width="64" height="56" rx="18" fill="url(#steel)"/>
-  <!-- 軀幹 -->
-  <path d="M222 176 C248 158 352 158 378 176 L372 332 L228 332 Z" fill="url(#steel)"/>
-  <path d="M236 200 L364 200 M232 268 L368 268" fill="none" stroke="#12122a" stroke-width="4"/>
-  <circle cx="300" cy="238" r="26" fill="url(#gem)" filter="url(#glow)"/>
-  <circle cx="300" cy="238" r="26" fill="none"/>
-  <rect x="222" y="318" width="156" height="22" rx="6" fill="#3a1d6c"/>
+  <path d="M236 372 L292 372 L286 520 L226 520 Z" fill="url(#steel2)"/>
+  <path d="M308 372 L364 372 L374 520 L314 520 Z" fill="url(#steel2)"/>
+  <path d="M242 400 L288 400 M238 440 L286 440 M234 480 L284 480 M312 400 L358 400 M314 440 L364 440 M316 480 L370 480" stroke="#12122a" stroke-width="4" fill="none"/>
+  <path d="M212 520 L292 520 L298 554 L202 554 Z M308 520 L388 520 L398 554 L302 554 Z" fill="url(#steel)"/>
+  <path d="M212 520 L292 520 M308 520 L388 520" stroke="url(#gold)" stroke-width="6" fill="none"/>
+  <path d="M236 420 C228 392 292 392 288 424 C280 446 244 446 236 420 Z M312 424 C308 392 372 392 364 420 C356 446 320 446 312 424 Z" fill="url(#steel)"/>
+  <path d="M244 410 L252 392 L262 410 M318 410 L326 392 L336 410" fill="url(#gold)" stroke-width="3"/>
+  <!-- 腰甲＋戰裙 -->
+  <path d="M224 326 L376 326 L392 410 L300 436 L208 410 Z" fill="url(#steel)"/>
+  <path d="M256 340 L246 420 M300 344 L300 430 M344 340 L354 420" fill="none" stroke="#12122a" stroke-width="4"/>
+  <path d="M224 326 L376 326" stroke="url(#gold)" stroke-width="6" fill="none"/>
+  <rect x="270" y="322" width="60" height="30" rx="8" fill="url(#gold)"/>
+  <circle cx="300" cy="337" r="9" fill="url(#gem)" filter="url(#glow)"/>
+  <!-- 左手（垂在身側，帶護手刺）-->
+  <path d="M176 220 C148 270 144 320 148 352 L198 352 C198 318 204 270 224 232 Z" fill="url(#steel2)"/>
+  <path d="M150 300 L124 290 L152 322 M156 330 L130 330 L158 348" fill="url(#steel)"/>
+  <rect x="136" y="346" width="70" height="60" rx="20" fill="url(#steel)"/>
+  <path d="M136 366 L206 366" stroke="url(#gold)" stroke-width="5" fill="none"/>
+  <!-- 軀幹（胸甲＋金邊） -->
+  <path d="M220 176 C248 156 352 156 380 176 L374 334 L226 334 Z" fill="url(#steel)"/>
+  <path d="M236 196 L300 244 L364 196 M232 262 L300 296 L368 262" fill="none" stroke="url(#gold)" stroke-width="6"/>
+  <path d="M244 214 L244 322 M356 214 L356 322" stroke="#12122a" stroke-width="4" fill="none" opacity=".7"/>
+  <circle cx="300" cy="244" r="30" fill="url(#gem)" filter="url(#glow)"/>
+  <circle cx="300" cy="244" r="30" fill="none" stroke="url(#gold)" stroke-width="6"/>
   <!-- 右手握劍 -->
-  <path d="M380 220 C412 262 430 300 442 340 L474 330 C462 280 436 236 408 200 Z" fill="url(#steel2)"/>
-  <rect x="424" y="336" width="62" height="54" rx="18" fill="url(#steel)"/>
-  <!-- 肩甲（帶刺） -->
-  <path d="M146 186 C140 138 214 124 246 164 L236 224 C190 236 150 226 146 186 Z" fill="url(#steel)"/>
-  <path d="M154 150 L142 100 L184 138 M190 136 L190 82 L218 140 M222 140 L242 92 L246 152" fill="#b9c0f0"/>
-  <path d="M454 186 C460 138 386 124 354 164 L364 224 C410 236 450 226 454 186 Z" fill="url(#steel)"/>
-  <path d="M446 150 L458 100 L416 138 M410 136 L410 82 L382 140 M378 140 L358 92 L354 152" fill="#b9c0f0"/>
-  <!-- 頭盔 -->
-  <path d="M252 150 C244 90 272 58 300 56 C328 58 356 90 348 150 C348 172 326 182 300 182 C274 182 252 172 252 150 Z" fill="url(#steel)"/>
-  <path d="M258 128 L342 128 L342 150 C330 160 270 160 258 150 Z" fill="#0d0d22"/>
-  <g filter="url(#glow)"><path d="M268 138 L292 142 L292 148 L268 146 Z M332 138 L308 142 L308 148 L332 146 Z" fill="#d79cff" stroke="none"/></g>
-  <path d="M300 56 L300 20 M274 66 L252 28 M326 66 L348 28 M252 90 L222 56 M348 90 L378 56" fill="none" stroke="#b9c0f0" stroke-width="12"/>
-  <path d="M246 118 C216 96 200 108 206 134 C214 120 228 118 244 130 Z M354 118 C384 96 400 108 394 134 C386 120 372 118 356 130 Z" fill="#b9c0f0"/>
+  <path d="M380 220 C412 262 430 300 444 340 L478 330 C464 280 438 236 410 200 Z" fill="url(#steel2)"/>
+  <rect x="428" y="340" width="68" height="58" rx="20" fill="url(#steel)"/>
+  <path d="M428 360 L496 360" stroke="url(#gold)" stroke-width="5" fill="none"/>
+  <!-- 肩甲（層層疊起＋長刺＋金邊） -->
+  <path d="M138 190 C130 134 214 118 250 162 L240 226 C190 240 142 230 138 190 Z" fill="url(#steel)"/>
+  <path d="M148 206 C190 220 226 216 240 206" fill="none" stroke="url(#gold)" stroke-width="6"/>
+  <path d="M152 156 L138 96 L184 134 M190 132 L190 70 L220 138 M224 138 L248 84 L250 150" fill="#c9cdf5"/>
+  <path d="M462 190 C470 134 386 118 350 162 L360 226 C410 240 458 230 462 190 Z" fill="url(#steel)"/>
+  <path d="M452 206 C410 220 374 216 360 206" fill="none" stroke="url(#gold)" stroke-width="6"/>
+  <path d="M448 156 L462 96 L416 134 M410 132 L410 70 L380 138 M376 138 L352 84 L350 150" fill="#c9cdf5"/>
+  <!-- 頭盔＋王冠 -->
+  <path d="M252 152 C244 92 272 60 300 58 C328 60 356 92 348 152 C348 174 326 184 300 184 C274 184 252 174 252 152 Z" fill="url(#steel)"/>
+  <path d="M258 128 L342 128 L342 152 C330 162 270 162 258 152 Z" fill="#0b0b1e" stroke="none"/>
+  <g filter="url(#glow)"><path d="M266 138 L294 142 L294 150 L266 148 Z M334 138 L306 142 L306 150 L334 148 Z" fill="#e0a8ff" stroke="none"/></g>
+  <path d="M300 58 L300 22 M276 66 L254 26 M324 66 L346 26 M254 88 L222 54 M346 88 L378 54" fill="none" stroke="url(#gold)" stroke-width="12"/>
+  <path d="M250 80 C260 64 340 64 350 80 L346 96 C330 86 270 86 254 96 Z" fill="url(#gold)"/>
+  <circle cx="300" cy="82" r="8" fill="url(#gem)"/>
+  <path d="M246 118 C214 96 196 110 202 138 C212 122 228 120 246 132 Z M354 118 C386 96 404 110 398 138 C388 122 372 120 354 132 Z" fill="#c9cdf5"/>
 </g>
 </svg>
