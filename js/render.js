@@ -416,14 +416,33 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
     const bw = Math.max(54, size * 0.95), bh = Math.max(7, size * 0.09);
     const bx = x - bw / 2, by = y - r - size * 0.05 - bh - 6;   // 全身圖比 size 高一點，血條跟著往上
     const ratio = clamp(v.shownHp / p.maxHp, 0, 1);
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
-    ctx.fillStyle = ratio > 0.5 ? '#58d26a' : ratio > 0.25 ? '#f0c23c' : '#ee5544';
-    ctx.fillRect(bx, by, bw * ratio, bh);
-    // 經驗條（血條下面細細一條藍色；滿級就不畫）
+    // 圓角膠囊：白底、粉色細邊，裡面是柔和的彩色血量，上面一道亮光；左端一顆小愛心
+    const pill = (px, py, w, h) => { const rr = h / 2; ctx.beginPath(); ctx.moveTo(px + rr, py); ctx.arcTo(px + w, py, px + w, py + h, rr); ctx.arcTo(px + w, py + h, px, py + h, rr); ctx.arcTo(px, py + h, px, py, rr); ctx.arcTo(px, py, px + w, py, rr); ctx.closePath(); };
+    ctx.save();
+    pill(bx - 2, by - 2, bw + 4, bh + 4);
+    ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = '#ffb8cf'; ctx.stroke();
+    if (ratio > 0.01 && !v.down) {
+      const fw = Math.max(bh, bw * ratio);   // 血很少時也留一小顆圓，才看得到
+      pill(bx, by, fw, bh);
+      ctx.fillStyle = ratio > 0.5 ? '#6fdc8c' : ratio > 0.25 ? '#ffd24d' : '#ff6b81';
+      ctx.fill();
+      ctx.clip();
+      ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(bx, by + bh * 0.12, fw, bh * 0.3);   // 亮光
+    }
+    ctx.restore();
+    // 小愛心（壓在血條左端）
+    const hx = bx - 1, hy = by + bh / 2, hs = Math.max(5, bh * 0.75);
+    ctx.save(); ctx.translate(hx, hy); ctx.scale(hs / 10, hs / 10);
+    ctx.beginPath(); ctx.moveTo(0, 4); ctx.bezierCurveTo(-9, -2, -4, -8, 0, -3); ctx.bezierCurveTo(4, -8, 9, -2, 0, 4); ctx.closePath();
+    ctx.fillStyle = v.down ? '#c9c9c9' : '#ff5c8a'; ctx.fill(); ctx.lineWidth = 1.4; ctx.strokeStyle = '#fff'; ctx.stroke();
+    ctx.restore();
+    // 經驗條（血條下面細細一條淡藍；滿級就不畫）
     if (p.prof.level < config.leveling.maxLevel) {
-      ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(bx - 2, by + bh + 2, bw + 4, 5);
-      ctx.fillStyle = '#5cc8ff'; ctx.fillRect(bx, by + bh + 3, bw * clamp(p.prof.xp / game.xpNeed(p.prof.level), 0, 1), 3);
+      const ey = by + bh + 3, eh = 4, er = clamp(p.prof.xp / game.xpNeed(p.prof.level), 0, 1);
+      ctx.save(); pill(bx, ey, bw, eh); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = '#bfe6ff'; ctx.stroke();
+      if (er > 0) { pill(bx, ey, Math.max(eh, bw * er), eh); ctx.fillStyle = '#6cc8ff'; ctx.fill(); }
+      ctx.restore();
     }
 
     // 觀眾名字（血條上方）、武將名（腳下）
