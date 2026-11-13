@@ -21,7 +21,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       <h2>② 留言</h2>
       <div class="row"><select id="p-hero"></select><button id="p-join" class="main">留言武將名（上場）</button></div>
       <div class="row"><select id="p-target"></select><button id="p-lock">留言 @名字（鎖定）</button></div>
-      <div class="row"><button id="p-unlock">留言「解除鎖定」</button></div>
+      <div class="row"><button id="p-unlock">留言「解除鎖定」</button><button id="p-leave">留言「烙跑」</button></div>
       <div class="row"><input id="p-text" placeholder="自己打留言內容"><button id="p-say">送出留言</button></div>
     </section>
 
@@ -211,6 +211,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   $('#p-join').onclick = () => hub.chat(me(), heroSel.value);
   $('#p-lock').onclick = () => { if (targetSel.value) hub.chat(me(), '@' + targetSel.value); };
   $('#p-unlock').onclick = () => hub.chat(me(), config.commands.unlock[0]);
+  $('#p-leave').onclick = () => hub.chat(me(), config.commands.leave[0]);
   $('#p-say').onclick = () => { const t = $('#p-text').value; if (t.trim()) { hub.chat(me(), t); $('#p-text').value = ''; } };
   $('#p-text').onkeydown = e => { if (e.key === 'Enter') $('#p-say').click(); };
   $('#p-gifts').onclick = e => {

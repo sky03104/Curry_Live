@@ -57,7 +57,7 @@ function page(keys, title) {
   </style>
   <header><h1>萌戰三國・直播亂鬥</h1><div class="sub">${title}</div><div class="how">在直播間留言武將名字，就能上場！</div></header>
   ${keys.map(section).join('')}
-  <footer>送禮可以攻擊、放技能、回血　｜　留言「@對方名字」鎖定目標<br>想換武將？直接留言新的武將名字</footer>`;
+  <footer>送禮可以攻擊、放技能、回血　｜　留言「@對方名字」鎖定目標<br>想換武將？直接留言新的武將名字　｜　想下場？留言「烙跑」</footer>`;
 }
 
 (async () => {

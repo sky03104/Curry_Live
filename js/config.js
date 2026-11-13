@@ -9,6 +9,7 @@ window.GAME_CONFIG = {
   hpMultiplier: 1,              // 血量倍率。武將血量 = heroes 資料的 baseHp × 這個數字
   reviveSeconds: 60,            // 倒地後要等幾秒，送禮才能復活
   removeDownedAfterSeconds: 300, // 倒地超過幾秒都沒復活，就自動離場（把位置讓出來）
+  leaveRejoinSeconds: 60,       // 留言「烙跑」下場後，要等幾秒才能再上場（不然血快沒了就烙跑、馬上回來又是滿血）。設 0 = 不用等
   idleRemoveSeconds: 3600,      // 超過幾秒沒留言也沒送禮，就自動離場（TikTok 不會通知誰離開直播間，只能這樣判斷）
 
   // ---------- 換武將 ----------
@@ -166,6 +167,7 @@ window.GAME_CONFIG = {
   commands: {
     lockPrefix: '@',            // 「@對方名字」鎖定攻擊目標
     unlock: ['解除鎖定'],       // 留言這些字就解除鎖定（可以多加幾種說法）
+    leave: ['烙跑', '落跑'],    // 留言「整句剛好就是這些字」（後面加標點、空白沒關係）→ 自己的武將下場。可以多加幾種說法
   },
 
   // ---------- 武將別名 ----------
