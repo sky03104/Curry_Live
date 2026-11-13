@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+<defs>
+  <linearGradient id="rock" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a4650"/><stop offset="1" stop-color="#1f1519"/></linearGradient>
+  <linearGradient id="rock2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#74565c"/><stop offset="1" stop-color="#2a1b20"/></linearGradient>
+  <linearGradient id="thorn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb28a"/><stop offset=".5" stop-color="#e8402a"/><stop offset="1" stop-color="#7a1410"/></linearGradient>
+  <linearGradient id="vine" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6b4a2a"/><stop offset="1" stop-color="#3a2514"/></linearGradient>
+  <radialGradient id="lava"><stop offset="0" stop-color="#fff2b0"/><stop offset=".4" stop-color="#ff9a2e"/><stop offset="1" stop-color="#d82a14"/></radialGradient>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<g stroke="#1a0c0c" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+  <!-- 背上的火焰荊棘 -->
+  <path d="M250 270 C230 200 270 150 290 100 C300 150 330 170 320 250 Z" fill="url(#thorn)"/>
+  <path d="M320 262 C310 190 360 150 392 108 C396 160 420 190 400 270 Z" fill="url(#thorn)"/>
+  <path d="M396 280 C390 220 430 190 470 168 C464 216 480 250 452 296 Z" fill="url(#thorn)"/>
+  <path d="M250 262 C220 230 190 232 168 244 C196 252 216 270 232 290 Z" fill="url(#thorn)"/>
+  <!-- 尾巴（荊棘鞭） -->
+  <path d="M452 350 C520 360 566 330 580 270 C592 240 574 220 552 226 C566 252 548 296 508 308 C484 314 466 308 452 296 Z" fill="url(#vine)"/>
+  <path d="M552 226 L586 190 L584 244 Z M520 320 L546 350 L506 334 Z" fill="url(#thorn)"/>
+  <!-- 後腿 -->
+  <path d="M390 380 C430 372 466 396 462 440 C460 480 448 520 446 548 L394 548 L400 506 C378 498 364 464 370 432 Z" fill="url(#rock2)"/>
+  <path d="M394 548 L370 560 M416 550 L404 566 M440 548 L440 566" fill="none" stroke="#ffb28a" stroke-width="8"/>
+  <!-- 身體（岩石＋裂縫熔岩） -->
+  <path d="M196 330 C206 262 360 238 440 290 C490 330 480 410 430 440 C370 470 260 466 216 420 C188 392 188 358 196 330 Z" fill="url(#rock)"/>
+  <path d="M236 330 L300 316 L290 366 L244 372 Z M310 318 L380 310 L394 360 L322 372 Z M240 386 L304 380 L318 428 L262 432 Z M334 384 L404 374 L420 420 L350 434 Z" fill="url(#rock2)" stroke-width="4" opacity=".75"/>
+  <path d="M232 380 L260 352 L296 372 L318 340 L350 362 L388 336 L424 360 M290 440 L312 400 L350 420" fill="none" stroke="url(#lava)" stroke-width="7" filter="url(#glow)"/>
+  <ellipse cx="318" cy="372" rx="30" ry="26" fill="url(#lava)" filter="url(#glow)"/>
+  <!-- 前腿 -->
+  <path d="M214 400 C230 440 224 496 206 540 L162 546 L176 516 C186 480 176 450 184 416 Z" fill="url(#rock2)"/>
+  <path d="M290 410 C300 450 296 500 284 542 L240 548 L254 516 C266 482 256 452 262 420 Z" fill="url(#rock)"/>
+  <path d="M162 546 L140 556 M180 548 L170 566 M284 542 L262 556 M258 548 L252 566" fill="none" stroke="#ffb28a" stroke-width="8"/>
+  <!-- 頭（獸型，低頭向左）-->
+  <path d="M196 326 C168 300 120 304 86 332 C76 350 100 360 122 358 C116 376 136 388 164 380 C196 372 222 352 232 322 Z" fill="url(#rock)"/>
+  <path d="M104 352 C108 380 140 392 176 376 C156 372 130 370 118 360 Z" fill="#2a0f0f"/>
+  <path d="M96 346 L102 366 L112 352 M126 362 L132 380 L142 366" fill="#ffe6c8" stroke="#1a0c0c" stroke-width="3"/>
+  <path d="M170 312 C168 270 214 250 246 262 C240 286 226 304 214 326 Z" fill="url(#rock2)"/>
+  <path d="M184 288 C176 250 200 218 232 204 C230 236 232 258 226 282 Z" fill="url(#thorn)"/>
+  <path d="M148 308 C140 278 156 252 182 238 C182 262 184 282 178 302 Z" fill="url(#thorn)"/>
+  <g filter="url(#glow)"><ellipse cx="170" cy="324" rx="15" ry="8" fill="#ffd45a" transform="rotate(-16 170 324)"/></g>
+  <ellipse cx="172" cy="324" rx="3.5" ry="7" fill="#7a1410" stroke="none" transform="rotate(-16 172 324)"/>
+</g>
+</svg>

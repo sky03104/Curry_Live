@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+<defs>
+  <linearGradient id="stone" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c88a6"/><stop offset="1" stop-color="#2c3550"/></linearGradient>
+  <linearGradient id="stone2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d6988"/><stop offset="1" stop-color="#232b44"/></linearGradient>
+  <linearGradient id="crystal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#bff2ff"/><stop offset=".45" stop-color="#4dc2ff"/><stop offset="1" stop-color="#1a62d0"/></linearGradient>
+  <linearGradient id="crystal2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8fe0ff"/><stop offset="1" stop-color="#1e4fb8"/></linearGradient>
+  <radialGradient id="core"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#7fe0ff"/><stop offset="1" stop-color="#2a7be8"/></radialGradient>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<g stroke="#101728" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+  <!-- 背後水晶叢 -->
+  <path d="M300 200 L330 60 L372 190 Z" fill="url(#crystal)"/>
+  <path d="M360 214 L430 92 L452 232 Z" fill="url(#crystal2)"/>
+  <path d="M410 250 L520 170 L492 300 Z" fill="url(#crystal)"/>
+  <path d="M250 214 L236 96 L296 200 Z" fill="url(#crystal2)"/>
+  <path d="M330 60 L342 190 M430 92 L430 230 M520 170 L470 270" fill="none" stroke="#e8fbff" stroke-width="3" opacity=".7"/>
+  <!-- 腿 -->
+  <path d="M236 400 L318 400 L328 536 L226 536 Z" fill="url(#stone2)"/>
+  <path d="M338 400 L420 400 L430 536 L346 536 Z" fill="url(#stone2)"/>
+  <path d="M212 536 L336 536 L342 560 L204 560 Z M338 536 L440 536 L448 560 L330 560 Z" fill="url(#stone)"/>
+  <!-- 身體 -->
+  <path d="M208 262 C216 196 410 190 448 262 C470 330 450 412 400 428 C340 446 280 446 232 424 C190 400 190 322 208 262 Z" fill="url(#stone)"/>
+  <path d="M250 270 L350 262 L330 318 L262 322 Z M360 268 L426 290 L400 346 L346 330 Z M244 340 L314 338 L296 396 L250 392 Z" fill="url(#stone2)" opacity=".7" stroke-width="4"/>
+  <!-- 胸口核心 -->
+  <circle cx="312" cy="330" r="34" fill="url(#core)" filter="url(#glow)"/>
+  <circle cx="312" cy="330" r="34" fill="none"/>
+  <path d="M312 296 L312 250 M280 330 L236 330 M344 330 L388 330 M288 306 L254 282 M336 306 L370 282" fill="none" stroke="#7fe0ff" stroke-width="4" filter="url(#glow)"/>
+  <!-- 手臂（石頭＋水晶拳）-->
+  <path d="M200 280 C150 300 120 360 118 430 L196 440 C196 380 216 330 246 300 Z" fill="url(#stone)"/>
+  <path d="M100 430 L212 430 L216 500 L96 500 Z" fill="url(#stone2)"/>
+  <path d="M104 500 L96 556 L134 530 L156 566 L184 530 L212 556 L214 500 Z" fill="url(#crystal2)"/>
+  <path d="M432 276 C480 300 506 360 506 430 L430 440 C430 380 412 330 384 300 Z" fill="url(#stone)"/>
+  <path d="M410 430 L520 430 L526 500 L408 500 Z" fill="url(#stone2)"/>
+  <path d="M414 500 L408 556 L446 530 L468 566 L496 530 L526 556 L524 500 Z" fill="url(#crystal2)"/>
+  <!-- 肩上水晶 -->
+  <path d="M196 270 L170 188 L238 238 Z" fill="url(#crystal)"/>
+  <path d="M440 270 L470 188 L400 238 Z" fill="url(#crystal)"/>
+  <!-- 頭 -->
+  <path d="M254 232 C246 176 284 148 324 148 C364 148 396 176 388 232 C386 262 360 274 320 274 C282 274 256 262 254 232 Z" fill="url(#stone)"/>
+  <path d="M262 206 L382 206 L376 232 C350 240 290 240 268 232 Z" fill="#101728" stroke="none"/>
+  <g filter="url(#glow)"><path d="M280 214 L312 218 L312 228 L282 226 Z M364 214 L332 218 L332 228 L362 226 Z" fill="#8fe8ff" stroke="none"/></g>
+  <path d="M290 150 L276 100 L314 142 M352 150 L368 100 L330 142" fill="url(#crystal)"/>
+</g>
+<g fill="none" stroke="#7fe0ff" stroke-width="3" stroke-linecap="round" filter="url(#glow)" opacity=".8">
+  <path d="M226 430 L260 400 L246 372 M410 436 L380 404 L398 376"/>
+</g>
+</svg>
