@@ -1,0 +1,7 @@
+{
+  "name": "curry-live-rules-test",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test curry-live-rules.test.mjs" },
+  "devDependencies": { "@firebase/rules-unit-testing": "^3.0.4", "firebase": "^10.14.1" }
+}

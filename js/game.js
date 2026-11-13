@@ -216,13 +216,27 @@ ML.createGame = function (config, heroes) {
     // 存檔用：交出每位觀眾目前的進度
     exportProfiles() { return [...scores.values()].map(s => ({ id: s.id, name: s.name, level: s.level, xp: s.xp, kills: s.kills })); },
     // 讀檔用：把之前存的進度放回來（傷害從 0 開始，所以不會出現在排行榜上，要重新上場才算）
-    importProfiles(list) {
+    // merge = true（接上雲端存檔時用）：跟目前已有的進度合併，每位觀眾取比較高的那份，
+    //   而且直接改現有的紀錄（場上正在打的武將也會立刻吃到新等級）；不是整個換掉。
+    importProfiles(list, merge) {
       const max = config.leveling.maxLevel;
       for (const p of list || []) {
         if (!p || !p.id) continue;
         const level = Math.max(1, Math.min(max, Math.floor(p.level) || 1));
-        scores.set(p.id, { id: p.id, name: p.name || '', heroName: '', damage: 0, kills: Math.max(0, Math.floor(p.kills) || 0),
-          level, xp: level >= max ? 0 : Math.max(0, Math.floor(p.xp) || 0) });
+        const xp = level >= max ? 0 : Math.max(0, Math.floor(p.xp) || 0), kills = Math.max(0, Math.floor(p.kills) || 0);
+        const cur = scores.get(p.id);
+        if (!cur || !merge) {
+          scores.set(p.id, { id: p.id, name: p.name || '', heroName: '', damage: 0, kills, level, xp });
+          continue;
+        }
+        if (level > cur.level || (level === cur.level && xp > cur.xp)) {
+          const leveled = level !== cur.level;
+          cur.level = level; cur.xp = xp;
+          const onStage = players.get(p.id);
+          if (leveled && onStage) refreshHp(onStage);
+        }
+        cur.kills = Math.max(cur.kills, kills);
+        if (!cur.name && p.name) cur.name = p.name;
       }
     },
     announce(text) { notice(text); },

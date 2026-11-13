@@ -45,6 +45,14 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       <div class="hint">觀眾的等級、經驗值會自動存在「跑直播畫面的那個軟體」裡，下次開播還在。傷害排行榜每次開播重新計算。</div>
       <div class="row">存檔名稱 <input id="sv-slot" placeholder="不填＝預設那一份"></div>
       <div class="hint">想讓大家的等級全部重來：填一個新名稱（例如「第二季」），再重貼直播用網址。舊的存檔不會消失，把名稱改回來就回來了。</div>
+      <h2 style="margin-top:10px">雲端存檔（Firebase）</h2>
+      <div class="hint">把等級備份到 Firebase：換電腦、重灌、換直播軟體都還在。<b>只有直播畫面會寫入雲端</b>，這個面板視窗只讀取（免得測試用的假觀眾污染真的存檔）。</div>
+      <div class="hint" id="cl-status"></div>
+      <div class="row"><input id="cl-token" placeholder="雲端代號（按「開啟」自動產生）"><button id="cl-copy" style="flex:none">複製</button></div>
+      <div class="row"><button id="cl-on">開啟雲端存檔</button><button id="cl-test">測試連線</button></div>
+      <div class="row"><button id="cl-off">關閉雲端存檔</button></div>
+      <div class="hint" id="cl-result"></div>
+      <div class="hint">⚠ <b>雲端代號就是鑰匙</b>：知道它的人可以讀寫你的存檔。直播用網址裡有它，不要把網址貼到公開的地方。想在另一台電腦用同一份存檔：把代號貼進上面的欄位，按「開啟」。</div>
       <h2 style="margin-top:10px">直播用網址</h2>
       <div class="hint">設定改完後，按「複製」，貼到直播軟體的「連結／瀏覽器來源」。<b>每次改設定都要重貼一次</b>，直播畫面才會照新設定。</div>
       <div class="hint">有指定禮物的動作，會在直播畫面的排行榜旁邊顯示「禮物圖片＋動作名稱」。禮物圖片要等有人送過那個禮物才會出現。</div>
@@ -127,7 +135,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     if (seen.size) $('#gs-seen').innerHTML = [...seen.entries()].reverse().map(([key, g]) =>
       `<div class="seen"><span title="${esc(g.label)}">${esc(g.label)}</span><select data-seen="${esc(key)}">${options(giftSettings.actionOf(key))}</select></div>`).join('');
     root.querySelector(`input[name="gs-other"][value="${giftSettings.ignoreUnlisted ? 'ignore' : 'tier'}"]`).checked = true;
-    $('#gs-url').value = giftSettings.liveUrl({ save: $('#sv-slot').value.trim() });
+    $('#gs-url').value = giftSettings.liveUrl({ save: $('#sv-slot').value.trim(), cloud: saving.cloud.enabled ? saving.cloud.token : '' });
   }
   // 一個動作只對應一個禮物：選了新的，就取代這個動作原本的
   function setActionGift(action, name) {
@@ -214,6 +222,31 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     fakeNames.slice(0, 6).forEach((n, i) => hub.chat({ id: 'fake:' + n, name: n }, picks[i].displayName));
   };
   $('#p-skip').onclick = () => game.update(60);
+  // ---------- 雲端存檔 ----------
+  const cl = saving.cloud;
+  const renderCloud = () => {
+    const st = cl.status;
+    $('#cl-status').textContent = (st.state === 'ok' ? '🟢 ' : st.state === 'error' ? '🔴 ' : st.state === 'syncing' ? '🟡 ' : '⚪ ') + st.text;
+    $('#cl-token').value = cl.token;
+    $('#cl-on').textContent = cl.enabled ? '重新連線並讀取' : '開啟雲端存檔';
+  };
+  cl.onStatus(renderCloud);
+  const say = (text, good) => { $('#cl-result').textContent = text; $('#cl-result').style.color = good === undefined ? '' : good ? '#2e7d4f' : '#B23F2B'; };
+  $('#cl-on').onclick = async () => {
+    const typed = $('#cl-token').value.trim();
+    if (typed && typed !== cl.token && !cl.setToken(typed)) { say('這個代號格式不對（要 24～64 個英文字母、數字、- 或 _）', false); return; }
+    if (!cl.enabled) cl.setToken(cl.newToken());
+    renderGiftSettings(); renderCloud();
+    say('測試連線中…');
+    const r = await cl.test();
+    say(r.text, r.ok);
+    if (r.ok) { const n = await saving.syncCloud(); if (n >= 0) say(`${r.text}。雲端目前有 ${n} 位觀眾的等級。記得把新的「直播用網址」重貼進直播軟體。`, true); }
+  };
+  $('#cl-test').onclick = async () => { say('測試連線中…'); const r = await cl.test(); say(r.text, r.ok); };
+  $('#cl-copy').onclick = () => { if (!cl.token) return; const b = $('#cl-token'); b.select(); try { navigator.clipboard.writeText(cl.token); } catch (e) { document.execCommand('copy'); } say('代號已複製', true); };
+  $('#cl-off').onclick = () => { if (cl.enabled && !window.confirm('關閉雲端存檔？\n（雲端上的資料不會被刪除，之後貼回同一組代號就能接回來——請先把代號複製存好）')) return; cl.setToken(''); renderGiftSettings(); renderCloud(); say('已關閉。直播用網址不再帶雲端代號，記得重貼。'); };
+  renderCloud();
+
   // 清空場上：武將和排行榜清掉，但等級保留
   $('#p-reset').onclick = () => { game.reset(true); renderer.reset(); log.innerHTML = ''; };
   // 清除存檔：只清「這個瀏覽器」的這一份，不會動到直播軟體裡的存檔

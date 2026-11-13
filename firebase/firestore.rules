@@ -1,0 +1,256 @@
+// ============================================================
+// 這份檔案是自動產生的，請不要手動修改。產生方式：python3 tools/make_firestore_rules.py
+// 內容 = 萌戰三國（Curry_Games）原本的 Firestore 規則  +  直播亂鬥（Curry_Live）的存檔規則
+// 部署：整份複製，貼進 Firebase Console → Firestore Database → 規則 → 發布。
+// ============================================================
+
+// 檔案位置：firebase/firestore.rules
+// 用途：Firestore Security Rules 初版草案（2026-08-13新增）。
+//
+// 為什麼現在才有這份檔案：CLAUDE.md「帳號系統與後端」／「平台可攜性硬規則」第2點
+// 早就記錄「Firestore Security Rules未設定」是已知缺口，FirebasePlayerProfileRepository.cs
+// 開頭一直誠實標注「本檔假設Rules允許已登入使用者讀寫自己的playerProfiles/{uid}文件，
+// Rules本身不在這次交付範圍內」。2026-08-13新增武將收藏系統（OwnedHeroIds，同日稍晚改名為
+// OwnedMascotSkinIds，收藏單位從武將改成造型）跟棋靈系統（MascotHeroId，同日稍晚改名為
+// MascotSkinId）之後，security-auditor審查明確指出：client端目前可以直接呼叫
+// window.FirebaseBridge_SaveOwnedMascotSkins / FirebaseBridge_SaveMascotSkin，把任意uid的
+// 文件內容改成任意值（FAIL 2🔴 + 2🟡），必須靠Security Rules把關「誰能寫哪個uid的文件」
+// 才補得起來——這份檔案就是那個補丁。
+//
+// ✅ 驗證與部署狀態（2026-09-13 更新，取代原本「完全沒有實際測試過」的警告）
+//   - Firestore Emulator 實跑 11/11 全過（`firebase/test/firestore.rules.test.mjs`），
+//     涵蓋下列 1~4 全部情境，外加 experiencePoints 遞增上限與時間欄位型別/長度限制。
+//   - **已部署到正式專案 `mengzhan-sanguo`**（用 Firebase Console 的規則編輯器貼上發布，
+//     沒走 CLI——雲端開發環境連不到 `auth.firebase.tools`，`firebase login` 跑不起來）。
+//   - 咖哩用 Console 規則測試區實測 `get /playerProfiles/testuid`（已驗證、UID=testuid）
+//     回「模擬讀取作業已獲准」，確認線上跑的確實是這份而不是預設鎖定模式
+//     （這是唯一能區分兩者的情境：未登入讀取在新舊規則下都會被拒，測不出差別）。
+//
+// 這份規則保證的四件事：
+//   1. 已登入使用者可以讀/寫自己的 playerProfiles/{自己的uid} 文件（nickname/mascotSkinId）
+//   2. 已登入使用者不能讀/寫別人的 playerProfiles/{別人的uid} 文件
+//   3. 已登入使用者不能透過 client SDK 寫入自己文件的鎖定欄位（ownedMascotSkinIds，以及
+//      2026-08-26新增的copperCoins/legendaryPityCounter/rareOrAbovePityCounter/
+//      commonEssence/eliteEssence/rareEssence/legendaryEssence，見lockedFieldNames()）
+//   4. 未登入（request.auth == null）完全不能讀寫任何 playerProfiles 文件
+//
+// ⚠️ 這份檔案是唯一真相，不要直接在 Console 線上編輯器改規則——改了這裡不會知道，
+// 下次任何人跑一次 CLI 部署就會靜靜蓋掉且毫無警告（官方文件明載「專案目錄中定義的
+// 規則會覆寫控制台中的所有現有規則」）。要改就改這份，再重新部署或重貼一次。
+//
+// 部署方式：`firebase deploy --only firestore:rules`（`.firebaserc` 已綁定專案，
+// 不用帶 --project），或直接把這份檔案內容貼進
+// Firebase Console → Firestore Database → 規則 分頁 → 發布。
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /playerProfiles/{uid} {
+
+      // 讀取：只能讀自己的文件。棋靈/暱稱/擁有清單都是「這個玩家自己的」資料，
+      // 沒有任何一項需要被其他玩家讀取（打影子系統之後如果要顯示對手棋靈，
+      // 走的是伺服器端邏輯查詢，不是client直接讀別人的playerProfiles文件）。
+      allow read: if isOwner(uid);
+
+      // 建立：只能建立自己的文件，且首次建立不可以帶任何鎖定欄位（ownedMascotSkinIds、
+      // 以及2026-08-26新增的銅錢/保底計數器/武將精華7個抽卡系統欄位）——
+      // 新帳號的擁有清單/銅錢/保底/精華一律從空集合或0開始（比照PlayerProfile對應欄位的
+      // 預設值），不需要也不允許client在建立當下就塞任何內容進去。
+      allow create: if isOwner(uid)
+                    && !request.resource.data.keys().hasAny(lockedFieldNames())
+                    && request.resource.data.keys().hasOnly([
+                         'nickname', 'lastNicknameChangeUtc', 'createdAtUtc', 'mascotSkinId', 'experiencePoints'
+                       ])
+                    && isValidNickname(request.resource.data)
+                    && isValidMascotSkinId(request.resource.data)
+                    && isValidExperiencePoints(request.resource.data)
+                    && isValidTimeFields(request.resource.data)
+                    && isValidInitialExperience(request.resource.data);
+
+      // 更新：只能改自己的文件，且這次更新不能碰 ownedMascotSkinIds 欄位。
+      //
+      // 🔴 為什麼 ownedMascotSkinIds 連「自己」都不能寫（這是這份Rules最重要的一條）：
+      // security-auditor審查指出，ownedMascotSkinIds是「解鎖了哪些造型」的永久帳號資料，
+      // CLAUDE.md「課金點」明講這是收藏/課金誘因來源，之後接抽卡系統會拿這個欄位
+      // 當付費/解鎖判斷依據。如果允許client寫自己的這個欄位，玩家開瀏覽器DevTools
+      // 就能把自己的擁有清單改成全部38隻，等於免費解鎖——這正是CLAUDE.md
+      // 「儲值驗證放伺服器端，不是用戶端本機判斷」那條硬規則要防的事。
+      // 正式的解鎖動作之後要走Cloud Functions（用Admin SDK寫入，Admin SDK天生
+      // 繞過Security Rules，不受這條限制影響），client只能「請求解鎖」不能直接
+      // 指定最終清單內容。這條規則生效後，IPlayerProfileRepository.SaveOwnedMascotSkinsAsync
+      // 現有的client端直寫實作會全部被Firestore拒絕（回傳permission-denied）——
+      // 這是刻意的，代表「棋靈圖鑑先全部顯示已擁有」這個佔位設計本來就沒有真的呼叫
+      // SaveOwnedMascotSkinsAsync，不受影響；但如果之後有人真的接上抽卡系統又忘記
+      // 改成走Cloud Functions，這條規則會立刻讓寫入失敗、提早暴露問題，
+      // 而不是等到玩家已經能刷武將了才發現。
+      // 2026-08-13複審修正（security-auditor PASS 1🟡）：白名單檢查改用
+      // diff(resource.data).affectedKeys()，只看「這次真正被改動的欄位」，
+      // 不是request.resource.data.keys()（那是merge:true合併後的完整文件欄位）。
+      // 原本用keys().hasOnly(...)的寫法，一旦之後Cloud Functions真的寫入過
+      // ownedMascotSkinIds欄位，該玩家文件從此帶有這個不在白名單裡的既有欄位，
+      // 之後任何一次合法的暱稱/棋靈更新都會被這條規則誤判成「文件裡有不允許的
+      // 欄位」而全部打回permission-denied——跟touchesLockedFields()維持同一種
+      // 「只看這次異動」語意才是正確做法。
+      // 2026-08-16補：experiencePoints（玩家等級系統累積經驗值）加入白名單，跟mascotSkinId
+      // 同一種風險等級——不是收藏/付費判斷依據（CLAUDE.md明訂升級只換純展示效果，不發武將/
+      // 裝備/永久貨幣），允許client直寫，不用像ownedMascotSkinIds那樣鎖住。
+      //
+      // 2026-08-26補：抽卡系統第二階段——copperCoins/legendaryPityCounter/
+      // rareOrAbovePityCounter/commonEssence/eliteEssence/rareEssence/legendaryEssence
+      // 這7個新欄位比照ownedMascotSkinIds鎖住，**不加進白名單**、且加進lockedFieldNames()。
+      // 理由：這些欄位直接決定「能不能抽卡、抽到什麼」，風險等級比ownedMascotSkinIds還高
+      // （不只是解鎖判斷，還牽涉貨幣餘額本身），絕不能讓client端有任何機會直寫，
+      // 一律只能由之後的Cloud Functions用Admin SDK寫入。
+      allow update: if isOwner(uid)
+                    && !touchesLockedFields()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                         'nickname', 'lastNicknameChangeUtc', 'createdAtUtc', 'mascotSkinId', 'experiencePoints'
+                       ])
+                    && isValidNickname(request.resource.data)
+                    && isValidMascotSkinId(request.resource.data)
+                    && isValidExperiencePoints(request.resource.data)
+                    && isValidTimeFields(request.resource.data)
+                    && isValidExperienceIncrement(request.resource.data);
+
+      // 刪除：目前沒有任何流程需要刪除玩家資料，一律拒絕。
+      // 之後如果要做「刪除帳號」功能，應該走Cloud Functions（可能還要一併清對戰紀錄/
+      // 收據等其他集合），不是讓client直接對這個collection下delete。
+      allow delete: if false;
+
+      function isOwner(uid) {
+        return request.auth != null && request.auth.uid == uid;
+      }
+
+      function touchesLockedFields() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasAny(lockedFieldNames());
+      }
+
+      // 2026-08-26新增：抽卡系統第二階段——把「client永遠不能寫」的欄位集中列在這一處，
+      // create/update兩條規則都引用同一份清單，避免像過去那樣兩處分別寫、改一邊漏改另一邊。
+      // ownedMascotSkinIds是2026-08-13就鎖住的既有欄位；其餘6個是這次新增的抽卡系統資料欄位
+      // （銅錢/保底計數器/武將精華），理由見上方update規則的註解與PlayerProfile.cs區塊註解。
+      function lockedFieldNames() {
+        return [
+          'ownedMascotSkinIds',
+          'copperCoins',
+          'legendaryPityCounter',
+          'rareOrAbovePityCounter',
+          'commonEssence',
+          'eliteEssence',
+          'rareEssence',
+          'legendaryEssence'
+        ];
+      }
+
+      // 型別/長度粗略防呆，不是完整格式驗證（完整規則見NicknameService.cs，
+      // 那邊用StringInfo.LengthInTextElements算「字」數且有完整字元白名單，
+      // Firestore Rules語言做不到同等複雜度的檢查）。這裡只是defense-in-depth：
+      // 就算client邏輯有bug繞過NicknameService直接呼叫SaveNicknameAsync，
+      // 也不該讓一個超長字串或錯誤型別寫進資料庫。
+      function isValidNickname(data) {
+        return !('nickname' in data)
+          || data.nickname == null
+          || (data.nickname is string && data.nickname.size() <= 40);
+      }
+
+      function isValidMascotSkinId(data) {
+        return !('mascotSkinId' in data)
+          || data.mascotSkinId == null
+          || (data.mascotSkinId is string && data.mascotSkinId.size() <= 64);
+      }
+
+      // 2026-08-16新增：粗略防呆同isValidNickname/isValidMascotSkinId的理由——不是完整業務規則
+      // 驗證（那是PlayerLevelCalculator的責任），只防呆錯誤型別或離譜數值寫進資料庫。上限
+      // 100000遠高於MaxLevel=30實際需要的總量(1級累積到30級約23200 XP，
+      // PlayerLevelCalculatorTests.GetLevel_滿級所需總經驗值剛好封頂在30級()有算出精確值)，
+      // 留寬鬆空間避免之後XpPerMatch數值調整還要回頭改這條規則。
+      // 2026-09-13（firebase-security-rules-auditor 稽核發現）：這兩個欄位原本在可寫白名單裡
+      // 卻完全沒有型別或長度檢查，client 可以塞任意型別或超長字串進來——型別安全與
+      // 資源耗盡（DoS）兩項都中。兩者都是 ISO 8601 UTC 字串（例 "2026-09-06T00:00:00Z"，
+      // 24字元），不是 Firestore Timestamp，見 WebGLTemplates/FirebaseBridge/index.html
+      // 的 changedAtUtcIso／createdAtUtcIso。上限給 40 字元留餘裕給時區小數位寫法。
+      function isValidIsoTimeString(data, field) {
+        return !(field in data)
+          || data[field] == null
+          || (data[field] is string && data[field].size() <= 40);
+      }
+      function isValidTimeFields(data) {
+        return isValidIsoTimeString(data, 'lastNicknameChangeUtc')
+          && isValidIsoTimeString(data, 'createdAtUtc');
+      }
+      function isValidExperiencePoints(data) {
+        return !('experiencePoints' in data)
+          || data.experiencePoints == null
+          || (data.experiencePoints is int && data.experiencePoints >= 0 && data.experiencePoints <= 100000);
+      }
+
+      // 2026-09-08新增：CLAUDE.md「接排位賽前的硬性前置條件」修法②——experiencePoints決定
+      // IsRankedUnlocked（3級解鎖排位賽）這個實質功能門檻，不能讓client任意覆寫成想要的數字
+      // （原本isValidExperiencePoints只檢查型別/範圍，沒有檢查「這次改動合不合理」，玩家開
+      // DevTools可以一次寫到100000直接封頂）。這裡不做①（改走Cloud Functions驗證真的打完
+      // 一場對戰才加分）——排位賽本體還沒做，那條路線工程量留到真的要接排位賽時再上，現在
+      // 先用「只能遞增、單次差額不超過XpPerMatch(50)」擋掉最糟情況（一次改到滿級）。
+      //
+      // create（新帳號）沒有resource.data可比對，改用isValidInitialExperience()：新帳號的
+      // 經驗值只能是0或未帶欄位，不能一開帳號就帶著任意初始值。
+      function isValidInitialExperience(data) {
+        return !('experiencePoints' in data)
+          || data.experiencePoints == null
+          || data.experiencePoints == 0;
+      }
+
+      // update（既有帳號）用resource.data讀「這次寫入前」的舊值，容許沒有這個欄位的舊資料
+      // （視同0）。新值必須 >= 舊值（不能倒退／清零－防止被惡搞成負成長，也防止「改小再改大」
+      // 繞過單次差額上限）且單次差額 <= XpPerMatch(50)（跟MainMenuController呼叫
+      // SaveExperienceAsync時每場對戰固定+50的實際行為一致，未來XpPerMatch數值調整要記得
+      // 回頭改這裡的50）。差額為0（重送同一個值）視為合法，不擋idempotent寫入。
+      function previousExperiencePoints() {
+        return ('experiencePoints' in resource.data) && resource.data.experiencePoints != null
+          ? resource.data.experiencePoints
+          : 0;
+      }
+
+      function isValidExperienceIncrement(data) {
+        return !('experiencePoints' in data)
+          || data.experiencePoints == null
+          || (data.experiencePoints >= previousExperiencePoints()
+              && data.experiencePoints - previousExperiencePoints() <= 50);
+      }
+    }
+
+    // ============================================================
+    // 【萌戰三國・直播亂鬥 Curry_Live】等級存檔
+    // 資料位置：curryLiveSaves/{雲端代號}/slots/{存檔名稱}
+    //
+    // 誰能做什麼：
+    //   ・不用登入。靠「雲端代號」這串隨機長密碼保護 —— 知道代號才讀得到、寫得到那份存檔。
+    //   ・只能讀一份（get）、建立、更新；不能列出清單（list），也不能刪除。所以沒辦法用掃描的方式找到別人的存檔。
+    //   ・內容限制：只能有 v、data、savedAt 三個欄位，data 是字串且不超過 300000 字，避免被拿來塞垃圾。
+    //
+    // ⚠️ 已知風險：因為不用登入，任何人只要知道這個專案的公開金鑰，就能自己編一個代號、
+    //    建立最多 300KB 的文件，消耗免費儲存空間。需要時再改成要求匿名登入或加上 App Check。
+    // ============================================================
+    match /curryLiveSaves/{token}/slots/{slot} {
+      function validToken() { return token.size() >= 24 && token.size() <= 64; }
+      function validSave() {
+        return request.resource.data.keys().hasOnly(['v', 'data', 'savedAt'])
+          && request.resource.data.v == 1
+          && request.resource.data.data is string
+          && request.resource.data.data.size() <= 300000
+          && request.resource.data.savedAt is int
+          && slot.size() <= 80;
+      }
+      allow get: if validToken();
+      allow create, update: if validToken() && validSave();
+      allow list, delete: if false;
+    }
+
+    // 其他集合目前都不存在（本專案還沒有其他Firestore資料），預設全部拒絕，
+    // 避免之後隨手加新集合時忘記加對應規則卻意外沿用寬鬆的預設行為。
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
