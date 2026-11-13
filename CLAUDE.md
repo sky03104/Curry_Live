@@ -82,7 +82,7 @@
 
 ## 素材與資料：來自 Curry_Games（只讀）
 - `sky03104/Curry_Games` 是另一個遊戲「萌戰三國」。**只能讀，不可修改、不可 commit、不可 push。**
-- 武將資料以 `Curry_Games/UnityProject/Assets/_Project/Data/heroes.json` 為準（38 隻）。**例外：直播亂鬥自己新增的角色**放在 `data/extra-heroes.js`（手寫，不會被同步工具蓋掉），目前有「米其林」「大寶」（都是萌國）。
+- 武將資料以 `Curry_Games/UnityProject/Assets/_Project/Data/heroes.json` 為準（38 隻）。**例外：直播亂鬥自己新增的角色**放在 `data/extra-heroes.js`（手寫，不會被同步工具蓋掉），目前有「米其林」「大寶」「布丁」（都是萌國）。
   中文名、英文 ID、陣營的對應**一律照這個檔，不要自己猜**。
   - 注意：檔案裡陣營的寫法是 `Wei`／`Shu`／`Wu`／`Qun`（群不是寫「群」）。
 - 武將圖用**全身圖**：`Curry_Games/UnityProject/Assets/_Project/Resources/HeroPortraitsFullBody2D/`，
@@ -95,6 +95,7 @@
     名字、能力值、技能名都是 Claude 先定的，咖哩沒指定，要改就改 `data/extra-heroes.js`。
   - 大寶（2026-11-13 咖哩第二隻）：柴犬披戰甲，`heroId: dabao`，遊俠（技能演出＝射出光彈），血 540／攻 72／防 25（遊俠平均），技能「疾風撲擊」。名字以外的設定一樣是 Claude 先定的。
   - 陣營「萌國」：`Meng`，畫面上顯示單字「萌」（跟魏蜀吳群一致），名冊圖叫「萌國武將」，顏色 `#E0709A`（粉紅，跟群的深洋紅分得開）。
+  - 布丁（2026-11-13 咖哩第三隻）：黃金獵犬披戰甲，`heroId: pudding`，統帥（技能演出＝光環＋光柱），血 746／攻 55／防 34（統帥平均），技能「暖心號令」。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。去背時原圖左上的名牌被當成雜點去掉；尾巴顏色接近白底，被 AI 去背削掉一部分。
   - 圖：咖哩提供的原圖是白底，用 `tools/cutout_hero.py` 去背（AI 去背 rembg，連腳下陰影一起去掉）並縮成 312x396 放在 `assets/heroes/michelin.png`。
     之後要再加角色：照 `data/extra-heroes.js` 檔頭的四個步驟做。
   - 觀眾第一次上場是「留言裡含武將名就算」，所以聊天提到「米其林餐廳」之類的詞也會讓還沒上場的人帶著米其林上場。
@@ -185,8 +186,8 @@
 | `index.html` | 入口。直接開＝帶假事件面板的試玩模式；網址加 `?obs=1`＝只有透明遊戲畫面（給 OBS） |
 | `js/config.js` | **設定檔**：禮物、傷害、血量、復活秒數、顏色 |
 | `data/heroes.js` | 38 隻武將資料（自動產生） |
-| `assets/heroes/` | 40 張武將全身圖（已縮小）：38 張來自萌戰三國，加上自己新增的米其林、大寶 |
-| `data/extra-heroes.js` | 自己新增的角色資料（手寫）：米其林、大寶 |
+| `assets/heroes/` | 41 張武將全身圖（已縮小）：38 張來自萌戰三國，加上自己新增的米其林、大寶、布丁 |
+| `data/extra-heroes.js` | 自己新增的角色資料（手寫）：米其林、大寶、布丁 |
 | `tools/cutout_hero.py` | 把角色圖去背並轉成遊戲用的全身圖 |
 | `js/events.js` | 事件來源層（假面板／之後的 TikTok） |
 | `js/gift-settings.js` | TikTok 禮物 → 動作的設定（存在瀏覽器與直播用網址裡） |
