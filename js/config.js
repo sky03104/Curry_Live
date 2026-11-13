@@ -28,9 +28,16 @@ window.GAME_CONFIG = {
     xpPerKillPerVictimLevel: 10, // 再加上「對手等級 × 這個數字」（打倒高等的拿比較多）
     xpNeedBase: 40,             // 升到下一級需要的經驗值 = xpNeedBase + xpNeedPerLevel × 目前等級
     xpNeedPerLevel: 10,         //   例如 1 級升 2 級要 50；30 級升 31 級要 340
-    hpPerLevel: 0.04,           // 每升一級，血量多「基礎值的 4%」（99 級約 4.9 倍）
-    atkPerLevel: 0.04,          // 每升一級，攻擊多「基礎值的 4%」
-    defPerLevel: 0.03,          // 每升一級，防禦多「基礎值的 3%」
+    hpPerLevel: 0.015,          // 每升一級，血量多「基礎值的 1.5%」（99 級約 2.5 倍）
+    atkPerLevel: 0.015,         // 每升一級，攻擊多「基礎值的 1.5%」（99 級約 2.5 倍）
+    defPerLevel: 0.01,          // 每升一級，防禦多「基礎值的 1%」（99 級約 2 倍）
+  },
+
+  // ---------- 存檔 ----------
+  // 每位觀眾的等級、經驗值、擊倒數會自動存起來，下次開播還在（詳細說明見 js/save.js）。
+  save: {
+    enabled: true,              // false = 不存檔，每次開播等級都從 1 開始
+    intervalSeconds: 5,         // 每隔幾秒存一次（有變動才存）
   },
 
   // ---------- 傷害 ----------

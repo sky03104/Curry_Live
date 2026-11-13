@@ -12,6 +12,22 @@
   const sprite = ML.createHeroSprite(heroes, config, 'assets/heroes');
   const renderer = ML.createRenderer(document.getElementById('stage'), game, config, sprite, ML.createEffects(), () => giftSettings.legend());
 
+  // ---------- 存檔：觀眾的等級、經驗值、擊倒數 ----------
+  const save = ML.createSave(config, params);
+  const saved = config.save.enabled ? save.load() : [];
+  game.importProfiles(saved);
+  let dirty = false;                 // 有沒有還沒存的變動
+  const active = new Set();          // 這段時間有出現過的觀眾
+  hub.on(ev => { if (ev.user && ev.user.id) active.add(ev.user.id); });
+  game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup') dirty = true; });   // 擊倒、升級都發生在攻擊之後
+  function flushSave() {
+    if (!config.save.enabled || !dirty) return;
+    if (save.store(game.exportProfiles(), [...active])) { dirty = false; active.clear(); }
+  }
+  setInterval(flushSave, config.save.intervalSeconds * 1000);
+  window.addEventListener('pagehide', flushSave);       // 關掉或重新整理網頁前再存一次
+  window.addEventListener('beforeunload', flushSave);
+
   hub.on(ev => game.handleEvent(ev));
   // 收到真的 TikTok 禮物時，順便記住它的圖片（禮物提示列要用）
   hub.on(ev => { if (ev.type === 'tiktokGift') giftSettings.rememberIcon(ev.gift.name || ('#' + ev.gift.id), ev.gift.icon); });
@@ -20,7 +36,7 @@
   if (params.get('obs') === '1') {
     document.body.classList.add('obs');
   } else {
-    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings);
+    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { save, flushSave, count: saved.length });
   }
   // 接真的 TikTok，兩種方式擇一：
   //   A. TikFinity 電腦版（建議）：網址加 ?tikfinity=1
@@ -45,7 +61,11 @@
     renderer.frame(dt);
     requestAnimationFrame(loop);
   }
-  sprite.ready.then(() => requestAnimationFrame(loop));
+  sprite.ready.then(() => {
+    requestAnimationFrame(loop);
+    // 開場提示讀到了幾位觀眾的存檔（幾秒後自動消失），方便確認存檔有沒有生效
+    if (saved.length) game.announce(`已讀取存檔：${saved.length} 位觀眾的等級`);
+  });
 
-  ML.hub = hub; ML.game = game; ML.renderer = renderer; ML.giftSettings = giftSettings;   // 方便除錯與自動測試
+  ML.hub = hub; ML.game = game; ML.renderer = renderer; ML.giftSettings = giftSettings; ML.flushSave = () => { dirty = true; flushSave(); };   // 方便除錯與自動測試
 })();
