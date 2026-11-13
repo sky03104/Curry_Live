@@ -86,7 +86,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
       const tv0 = views.get(e.hits[0].id);
       let delay;       // 幾秒後「打中」
       let onHit;       // 打中那一刻，在每個被打的人身上放的特效
-      v.hold = 1.4; v.goal = null;   // 出招期間站定不走動
+      v.hold = 1.6; v.goal = null;   // 出招期間站定不走動
       if (tv0 && e.action !== 'aoe' && tv0.x !== v.x) v.face = Math.sign(tv0.x - v.x);   // 轉身面向對手
 
       if (e.action === 'aoe') {
@@ -115,58 +115,69 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
           rings.push({ v: tv, age: 0, life: 0.45, color: '#ff6b5c', max: 1.5 });
         };
       } else if (!big) {
-        // 普攻：衝過去砍一刀
-        v.lunge = { to: e.hits[0].id, t: 0, dur: 0.36 };
-        delay = 0.18;
+        // 普攻：衝過去砍一刀（2026-11-13 放慢放大：衝撞時間拉長、刀光變大、多一圈衝擊波）
+        v.lunge = { to: e.hits[0].id, t: 0, dur: 0.62 };
+        delay = 0.31;
         onHit = tv => {
-          effects.slash(tv.x, tv.y, Math.atan2(tv.y - v.y, tv.x - v.x), tv.size * 0.55, color);
-          effects.sparks(tv.x, tv.y, '#ffe9a8', 12, 380, 4);
+          effects.slash(tv.x, tv.y, Math.atan2(tv.y - v.y, tv.x - v.x), tv.size * 0.9, color);
+          effects.sparks(tv.x, tv.y, '#ffe9a8', 22, 460, 6, 0.7);
+          rings.push({ v: tv, age: 0, life: 0.4, color: '#ffe9a8', max: 1.1 });
         };
       } else {
         // 技能：先集氣（畫面變暗、光點往身上收、跳出技能名），再依兵種演出
-        const charge = 0.5;
+        // （2026-11-13 放慢放大：集氣拉長、每種演出的特效都加大並多停留一下）
+        const charge = 0.85;
         const style = (config.troops[hero.troop] || {}).skillFx || 'slam';
-        dim = { age: 0, life: charge + 0.7 };
-        v.shake = 0.5;
-        effects.converge(v.x, v.y, color, v.size * 1.1, charge);
-        floats.push({ v, text: `「${e.skillName}」`, color: '#ffd35c', scale: 1.25, age: 0, life: 1.5 });
+        dim = { age: 0, life: charge + 1.3 };
+        v.shake = 0.6; v.hold = 2.6;
+        effects.converge(v.x, v.y, color, v.size * 1.4, charge);
+        floats.push({ v, text: `「${e.skillName}」`, color: '#ffd35c', scale: 1.5, age: 0, life: 2.3 });
         if (!tv0) return;
 
         if (style === 'slam') {            // 猛將：衝過去重擊，地面裂開
-          after(charge, () => { v.lunge = { to: tv0.id, t: 0, dur: 0.5 }; });
-          delay = charge + 0.25;
+          after(charge, () => { v.lunge = { to: tv0.id, t: 0, dur: 0.72 }; });
+          delay = charge + 0.36;
           onHit = tv => {
-            effects.slash(tv.x, tv.y, Math.atan2(tv.y - v.y, tv.x - v.x), tv.size * 0.8, color);
-            effects.crack(tv.x, feet(tv), tv.size * 1.1, color);
-            effects.sparks(tv.x, tv.y, color, 30, 560, 6, 0.7);
+            const ang = Math.atan2(tv.y - v.y, tv.x - v.x);
+            effects.slash(tv.x, tv.y, ang, tv.size * 1.3, color);
+            after(0.12, () => effects.slash(tv.x, tv.y, ang + Math.PI * 0.6, tv.size * 1.1, '#ffffff'));   // 第二刀，交叉斬
+            effects.crack(tv.x, feet(tv), tv.size * 1.7, color);
+            effects.sparks(tv.x, tv.y, color, 45, 620, 7, 0.9);
+            rings.push({ v: tv, age: 0, life: 0.6, color, max: 2.2, width: 8 });
+            quake = 1.3;
+          };
+        } else if (style === 'magic') {    // 謀士：對手腳下出現法陣，然後連續落雷
+          after(charge, () => { v.hop = 1; v.hopH = 0.6; effects.circle(tv0.x, feet(tv0), tv0.size * 1.3, color, 1.5); });
+          delay = charge + 0.7;
+          onHit = tv => {
+            const strike = () => effects.bolt(tv.x, tv.y, Math.max(tv.y + 20, tv.size * 3), color, Math.max(5, tv.size * 0.07));
+            strike(); after(0.14, strike); after(0.28, strike);
+            effects.sparks(tv.x, tv.y, color, 40, 560, 7, 0.9);
+            rings.push({ v: tv, age: 0, life: 0.6, color, max: 2, width: 8 });
             quake = 1;
           };
-        } else if (style === 'magic') {    // 謀士：對手腳下出現法陣，然後落雷
-          after(charge, () => { v.hop = 1; v.hopH = 0.5; effects.circle(tv0.x, feet(tv0), tv0.size * 0.8, color, 0.9); });
-          delay = charge + 0.45;
+        } else if (style === 'ranged') {   // 遊俠：射出大光彈，命中爆開
+          after(charge, () => { v.hop = 1; v.hopH = 0.4; effects.orb(v.x, v.y, tv0.x, tv0.y, v.size * 0.4, color, 0.5); });
+          delay = charge + 0.5;
           onHit = tv => {
-            effects.bolt(tv.x, tv.y, Math.max(tv.y + 20, tv.size * 3), color, Math.max(3, tv.size * 0.04));
-            effects.sparks(tv.x, tv.y, color, 24, 460, 5, 0.6);
-            quake = 0.6;
+            effects.sparks(tv.x, tv.y, color, 50, 640, 7, 0.9);
+            rings.push({ v: tv, age: 0, life: 0.55, color, max: 2.2, width: 8 });
+            rings.push({ v: tv, age: 0, life: 0.8, color: '#ffffff', max: 3, width: 4 });
+            quake = 0.9;
           };
-        } else if (style === 'ranged') {   // 遊俠：射出光彈
-          after(charge, () => { v.hop = 1; v.hopH = 0.35; effects.orb(v.x, v.y, tv0.x, tv0.y, v.size * 0.22, color, 0.28); });
-          delay = charge + 0.28;
-          onHit = tv => {
-            effects.sparks(tv.x, tv.y, color, 30, 520, 5, 0.6);
-            rings.push({ v: tv, age: 0, life: 0.35, color, max: 1.3 });
-          };
-        } else {                            // 統帥：自身光環爆發，對手被光柱擊中
+        } else {                            // 統帥：自身光環爆發，對手被大光柱擊中
           after(charge, () => {
-            v.hop = 1; v.hopH = 0.6;
-            rings.push({ v, age: 0, life: 0.5, color, max: 2.4 });
-            effects.sparks(v.x, v.y, color, 22, 420, 5, 0.6, 0);
+            v.hop = 1; v.hopH = 0.7;
+            rings.push({ v, age: 0, life: 0.8, color, max: 3.5, width: 8 });
+            effects.sparks(v.x, v.y, color, 36, 520, 6, 0.8, 0);
           });
-          delay = charge + 0.3;
+          delay = charge + 0.5;
           onHit = tv => {
-            effects.pillar(tv.x, feet(tv), tv.size * 1.1, tv.size * 2.2, color);
-            effects.sparks(tv.x, feet(tv), color, 22, 420, 5, 0.6);
-            quake = 0.6;
+            effects.pillar(tv.x, feet(tv), tv.size * 1.6, tv.size * 3.2, color);
+            effects.crack(tv.x, feet(tv), tv.size * 1.2, color);
+            effects.sparks(tv.x, feet(tv), color, 40, 560, 7, 0.9);
+            rings.push({ v: tv, age: 0, life: 0.6, color, max: 2, width: 8 });
+            quake = 1;
           };
         }
       }
@@ -180,14 +191,14 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
           tv.pending--;
           tv.hp -= h.dmg;
           if (h.down) tv.down = true;
-          tv.flash = 1; tv.shake = strong ? 1.8 : 1;
+          tv.flash = 1; tv.shake = strong ? 2 : 1.4;
           // 被打的人往「遠離攻擊者」的方向退一下
           const dx = tv.x - v.x, dy = tv.y - v.y, d = Math.hypot(dx, dy) || 1;
-          const push = tv.size * (strong ? 0.45 : 0.22);
+          const push = tv.size * (strong ? 0.5 : 0.3);
           tv.kbx = dx / d * push; tv.kby = dy / d * push;
           effects.sparks(tv.x, tv.y, '#ffffff', 6, 260, 3);   // 碎光
           onHit(tv);
-          floats.push({ v: tv, text: '-' + h.dmg, color: strong ? '#ffb13c' : '#ff5c4d', scale: strong ? 1.5 : 1, age: 0, life: strong ? 1.6 : 1.2 });
+          floats.push({ v: tv, text: '-' + h.dmg, color: strong ? '#ffb13c' : '#ff5c4d', scale: strong ? 1.6 : 1.2, age: 0, life: strong ? 1.8 : 1.4 });
         });
       }
     }

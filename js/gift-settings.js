@@ -93,7 +93,8 @@ ML.createGiftSettings = function (config, params) {
       }).filter(Boolean);
     },
     // 產生要貼進直播軟體的網址
-    liveUrl() {
+    // extra：要另外加進網址的參數（例如存檔名稱 { save: '第二季' }）
+    liveUrl(extra) {
       const base = location.protocol === 'file:' ? config.siteUrl : location.origin + location.pathname;
       const q = new URLSearchParams();
       q.set('obs', '1');
@@ -105,6 +106,7 @@ ML.createGiftSettings = function (config, params) {
       const icons = {};
       for (const n of Object.keys(state.map)) if (this.iconOf(n)) icons[n] = this.iconOf(n);
       if (Object.keys(icons).length) q.set('icons', JSON.stringify(icons));
+      for (const [k, v] of Object.entries(extra || {})) if (v) q.set(k, v);
       return base + '?' + q.toString();
     },
   };

@@ -185,7 +185,24 @@ ML.createGame = function (config, heroes) {
         }
       }
     },
-    reset() { players.clear(); scores.clear(); time = 0; },
+    // 清空場上。keepProgress = true 時保留每位觀眾的等級、經驗值、擊倒數（只把場上武將和傷害排行榜清掉）
+    reset(keepProgress) {
+      players.clear(); time = 0;
+      if (keepProgress) scores.forEach(s => { s.damage = 0; }); else scores.clear();
+    },
+    // 存檔用：交出每位觀眾目前的進度
+    exportProfiles() { return [...scores.values()].map(s => ({ id: s.id, name: s.name, level: s.level, xp: s.xp, kills: s.kills })); },
+    // 讀檔用：把之前存的進度放回來（傷害從 0 開始，所以不會出現在排行榜上，要重新上場才算）
+    importProfiles(list) {
+      const max = config.leveling.maxLevel;
+      for (const p of list || []) {
+        if (!p || !p.id) continue;
+        const level = Math.max(1, Math.min(max, Math.floor(p.level) || 1));
+        scores.set(p.id, { id: p.id, name: p.name || '', heroName: '', damage: 0, kills: Math.max(0, Math.floor(p.kills) || 0),
+          level, xp: level >= max ? 0 : Math.max(0, Math.floor(p.xp) || 0) });
+      }
+    },
+    announce(text) { notice(text); },
     getPlayers() { return [...players.values()]; },
     getPlayer(id) { return players.get(id); },
     reviveRemaining,

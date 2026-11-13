@@ -157,14 +157,14 @@ ML.createEffects = function () {
           g: 0, drag: 0.5, size: rnd(3, 6), color: Math.random() < 0.3 ? '#fff' : color, life: rnd(0.5, 0.9) });
       }
     },
-    slash(x, y, angle, r, color) { add({ type: 'slash', x, y, angle, r, color, life: 0.26 }); },
+    slash(x, y, angle, r, color) { add({ type: 'slash', x, y, angle, r, color, life: 0.45 }); },
     circle(x, y, r, color, life) { add({ type: 'circle', ground: true, x, y, r, color, life }); },
     bolt(x, y, h, color, w) {
       const pts = jagged(x + rnd(-h * 0.15, h * 0.15), y - h, x, y, 9, h * 0.06);
       const mid = pts[5];
-      add({ type: 'bolt', pts, branch: jagged(mid[0], mid[1], mid[0] + rnd(-1, 1) * h * 0.25, mid[1] + h * 0.25, 4, h * 0.04), color, w, life: 0.3 });
+      add({ type: 'bolt', pts, branch: jagged(mid[0], mid[1], mid[0] + rnd(-1, 1) * h * 0.25, mid[1] + h * 0.25, 4, h * 0.04), color, w, life: 0.5 });
     },
-    pillar(x, y, w, h, color) { add({ type: 'pillar', x, y, w, h, color, life: 0.45 }); },
+    pillar(x, y, w, h, color) { add({ type: 'pillar', x, y, w, h, color, life: 0.7 }); },
     crack(x, y, r, color) {
       const lines = [];
       for (let c = 0; c < 7; c++) { const a = c / 7 * Math.PI * 2 + rnd(-0.3, 0.3), d = rnd(0.6, 1) * r; lines.push(jagged(0, 0, Math.cos(a) * d, Math.sin(a) * d, 4, r * 0.1)); }
