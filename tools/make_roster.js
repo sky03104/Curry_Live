@@ -2,7 +2,8 @@
 // 用法：node tools/make_roster.js [Curry_Games 的路徑，預設 ../Curry_Games]
 // 需要 Playwright（用它開一個看不見的瀏覽器把網頁拍成圖）。
 // 輸出到 roster/：一張全武將長圖 + 魏蜀吳群各一張。
-// 武將圖用 Curry_Games 的原尺寸全身圖（比遊戲裡縮小過的清楚），資料用 data/heroes.js。
+// 武將圖用 Curry_Games 的原尺寸全身圖（比遊戲裡縮小過的清楚），資料用 data/heroes.js 加上 data/extra-heroes.js。
+// 自己新增的角色（extra: true，例如米其林）不在 Curry_Games 裡，改用 assets/heroes 裡的圖。
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
@@ -12,11 +13,12 @@ const src = path.resolve(process.argv[2] || path.join(root, '..', 'Curry_Games')
 const artDir = path.join(src, 'UnityProject/Assets/_Project/Resources/HeroPortraitsFullBody2D');
 global.window = {};
 require(path.join(root, 'data/heroes.js'));
+require(path.join(root, 'data/extra-heroes.js'));
 require(path.join(root, 'js/config.js'));
 const heroes = window.HEROES_DATA, factions = window.GAME_CONFIG.factions;
 
-const img = id => {
-  const file = path.join(artDir, id + '.png');
+const img = (id, extra) => {
+  const file = extra ? path.join(root, 'assets/heroes', id + '.png') : path.join(artDir, id + '.png');
   if (fs.statSync(file).size < 1000) throw new Error(id + '.png 是 Git LFS 佔位檔，請先在 Curry_Games 執行 git lfs pull（見 CLAUDE.md）');
   return 'data:image/png;base64,' + fs.readFileSync(file).toString('base64');
 };
@@ -26,7 +28,7 @@ function section(key) {
   return `<section style="--c:${f.color}">
     <h2><span class="seal">${f.label}</span><span class="count">${list.length} 位武將</span></h2>
     <div class="grid">${list.map(h => `
-      <div class="card"><div class="pic"><img src="${img(h.heroId)}"></div>
+      <div class="card"><div class="pic"><img src="${img(h.heroId, h.extra)}"></div>
         <div class="name">${h.displayName}</div><div class="skill">技能｜${h.skillName}</div></div>`).join('')}
     </div></section>`;
 }

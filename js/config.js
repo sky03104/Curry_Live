@@ -180,5 +180,6 @@ window.GAME_CONFIG = {
     Shu: { label: '蜀', color: '#5C9C89' },
     Wu:  { label: '吳', color: '#C0872E' },
     Qun: { label: '群', color: '#A5527E' },
+    Meng: { label: '萌', color: '#E0709A' },   // 萌國（直播亂鬥自己加的陣營，米其林）。畫面上顯示一個字，名冊圖叫「萌國」
   },
 };
