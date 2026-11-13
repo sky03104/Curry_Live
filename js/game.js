@@ -329,7 +329,7 @@ ML.createGame = function (config, heroes) {
       }
       return;
     }
-    if (time >= b.nextAoeAt) { b.nextAoeAt = time + bossCfg.aoeEverySeconds; b.nextAttackAt = Math.max(b.nextAttackAt, time + 2); bossStrike(b, true); }
+    if (time >= b.nextAoeAt) { b.nextAoeAt = time + bossCfg.aoeEverySeconds; b.nextAttackAt = time + bossCfg.attackEverySeconds; bossStrike(b, true); }   // 全場攻擊那一下順便當作這一輪的單體攻擊，不會緊接著又被打一次
     else if (time >= b.nextAttackAt) { b.nextAttackAt = time + bossCfg.attackEverySeconds; bossStrike(b, false); }
   }
 

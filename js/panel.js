@@ -55,7 +55,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div class="hint">指定哪個禮物招換哪隻 BOSS。<b>沒指定的話</b>，沒被其他動作用掉的禮物會照價值：100～199 鑽招換藍BUFF 或紅BUFF（隨機一隻）、500 鑽以上深淵魔龍、1000 鑽以上深淵凱薩、1500 鑽以上太古巨猿。場上同時只有一隻 BOSS，後來招換的會排隊。</div>
         <div class="hint">藍BUFF／紅BUFF（Lv.5）：<b>最後一擊的玩家</b>獲得效果，持續 1 小時——藍BUFF 每秒回復 10 血、紅BUFF 攻擊力加倍（血條旁會出現「回」「攻」的小圓章）。</div>
         <div id="gs-boss"></div>
-        <div class="hint">玩家留言「@BOSS」或「@BOSS的名字」就能鎖定它。BOSS 每 10 秒隨機打一人，每 60 秒全場攻擊；打倒後經驗值平分給所有打過的玩家，最後一擊的人額外多拿。數值在 js/config.js 的 boss。</div>
+        <div class="hint">玩家留言「@BOSS」或「@BOSS的名字」就能鎖定它。BOSS 每 60 秒隨機打一人，每 300 秒全場攻擊；打倒後經驗值平分給所有打過的玩家，最後一擊的人額外多拿。數值在 js/config.js 的 boss。</div>
       </div>
     </details>
 
