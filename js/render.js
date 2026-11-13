@@ -541,7 +541,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     ctx.clearRect(0, 0, W, H);   // 清成透明
 
     const { lb, arena, legend } = layout();
-    if (arenas) arenas.draw(ctx, arena, dpr * k);   // 場地地面（預設全場透明＝什麼都不畫）
+    if (arenas) arenas.draw(ctx, { x: 4, y: 4, w: W - 8, h: H - 8 }, dpr * k);   // 場地地面：鋪滿整個畫面（排行榜、禮物提示列畫在它上面）；預設全場透明＝什麼都不畫
 
     if (dim) {   // 技能發動：畫面短暫變暗，讓特效更顯眼
       ctx.fillStyle = `rgba(0,0,0,${config.skillDim * Math.sin(Math.PI * dim.age / dim.life)})`;
