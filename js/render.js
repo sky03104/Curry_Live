@@ -278,7 +278,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     // BOSS：又大又固定，站在場地中間偏下；一般武將會被推開、不會疊在它身上
     const bossV = views.get('boss');
     if (bossV && game.getPlayer('boss')) {
-      const bs = clamp(Math.min(arena.h * 0.55, arena.w * 0.38), 110, 340);
+      const bs = clamp(Math.min(arena.h * 0.45, arena.w * 0.31), 90, 280);   // 2026-11-13 咖哩嫌太大：比原本小約兩成
       const tx = arena.x + arena.w / 2, ty = arena.y + arena.h * 0.78 - bs / 2;
       if (bossV.x === null) { bossV.x = tx; bossV.y = ty; bossV.size = bs; }
       bossV.tsize = bs; bossV.tx = tx; bossV.ty = ty;

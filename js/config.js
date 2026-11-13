@@ -161,8 +161,8 @@ window.GAME_CONFIG = {
   //   ・玩家留言「@BOSS」或「@BOSS的名字」鎖定它。
   // ⚠️ 下面的血量、攻擊、經驗值都是 Claude 先抓的，沒經過真人試玩，開播後看手感再調。
   boss: {
-    attackEverySeconds: 10,     // 每幾秒隨機攻擊一位玩家
-    aoeEverySeconds: 60,        // 每幾秒放一次全場攻擊
+    attackEverySeconds: 60,     // 每幾秒隨機攻擊一位玩家（2026-11-13 咖哩嫌太快：10 → 60）
+    aoeEverySeconds: 300,       // 每幾秒放一次全場攻擊（60 → 300）；剛好撞在同一秒時，那一下只放全場攻擊
     singleMultiplier: 3,        // 單體攻擊傷害 = BOSS 攻擊 × 這個數字（再被玩家防禦打折）
     aoeMultiplier: 3,           // 全場攻擊傷害 = BOSS 攻擊 × 這個數字（打到每一位玩家）
     autoTargetChance: 0.6,      // 玩家沒鎖定任何人時，有多少機率直接打 BOSS（其餘照原本的隨機對象）
