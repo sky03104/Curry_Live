@@ -9,4 +9,6 @@
 window.HEROES_DATA = window.HEROES_DATA.concat([
   // 米其林：萌國的鬥牛犬猛將。能力值取猛將中間檔（跟關羽、張飛、趙雲同一檔）。
   { heroId: 'michelin', displayName: '米其林', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '汪汪衝鋒', extra: true },
+  // 大寶：萌國的柴犬遊俠。能力值取遊俠平均（血少、攻高、防低），技能演出是射出光彈。
+  { heroId: 'dabao', displayName: '大寶', faction: 'Meng', troop: 'Ranger', baseHp: 540, baseAtk: 72, baseArmor: 25, skillName: '疾風撲擊', extra: true },
 ]);
