@@ -20,10 +20,22 @@ ML.createGame = function (config, heroes) {
 
   function fx(e) { fxListeners.forEach(fn => fn(e)); }
   function notice(text) { fx({ type: 'notice', text }); }
+
+  // ---------- BOSS 資料 ----------
+  // BOSS 在遊戲裡跟玩家的武將放在同一張表（players）裡，id 固定是 'boss'，所以攻擊、鎖定、顯示都沿用同一套；
+  // 只是它不是觀眾（isBoss: true），能力值直接用 config.boss.list 裡寫的數字，不吃等級成長。
+  const bossCfg = config.boss || { list: [] };
+  const bossById = new Map((bossCfg.list || []).map(b => [b.id, b]));
+  const bossQueue = [];        // 排隊中的 BOSS：{ def, by: 招換的觀眾名字 }
+  const BOSS_ID = 'boss';
+  const bossHero = def => ({ heroId: def.id, displayName: def.displayName, faction: 'Boss', troop: def.troop || 'Vanguard',
+    skillName: def.skillName, baseHp: def.hp, baseAtk: def.atk, baseArmor: def.def, isBoss: true, accent: def.accent, hasArt: !!def.hasArt });
+  const isBossName = r => /^boss$/i.test(r.trim());
   // ---------- 等級與能力值 ----------
   // 等級跟著「觀眾」走（不是跟著武將），所以換武將、倒地、離場再回來，等級都還在。
   // 能力值 = 武將的基礎值 ×（1 + 每級成長 ×（等級 - 1））
   function stats(p) {
+    if (p.isBoss) return { maxHp: p.maxHp, atk: p.def.atk, def: p.def.def };
     const g = config.leveling, up = p.prof.level - 1;
     return {
       maxHp: Math.round(p.hero.baseHp * config.hpMultiplier * (1 + g.hpPerLevel * up)),
@@ -41,16 +53,22 @@ ML.createGame = function (config, heroes) {
   }
   // 擊倒對手拿經驗值：對手等級越高拿越多；滿了就升級（一次可以連升好幾級）
   function gainKillXp(p, victim) {
-    const g = config.leveling, prof = p.prof;
+    const g = config.leveling;
+    grantXp(p.prof, g.xpPerKillBase + g.xpPerKillPerVictimLevel * victim.prof.level);
+  }
+  // 給某位觀眾經驗值（prof 是他的累計紀錄；人不在場上也能拿，下次上場就是新等級）。滿了就升級，一次可連升。
+  function grantXp(prof, amount) {
+    const g = config.leveling;
     if (prof.level >= g.maxLevel) return;
-    prof.xp += g.xpPerKillBase + g.xpPerKillPerVictimLevel * victim.prof.level;
+    prof.xp += amount;
     const before = prof.level;
     while (prof.level < g.maxLevel && prof.xp >= xpNeed(prof.level)) { prof.xp -= xpNeed(prof.level); prof.level++; }
     if (prof.level >= g.maxLevel) prof.xp = 0;
     if (prof.level > before) {
-      refreshHp(p);
-      fx({ type: 'levelup', id: p.id, level: prof.level });
-      notice(`${p.name} 升到 Lv.${prof.level}！`);
+      const p = players.get(prof.id);
+      if (p && !p.isBoss) refreshHp(p);
+      fx({ type: 'levelup', id: prof.id, level: prof.level });
+      notice(`${prof.name || '觀眾'} 升到 Lv.${prof.level}！`);
     }
   }
 
@@ -68,7 +86,9 @@ ML.createGame = function (config, heroes) {
     const longest = list => list.sort((a, b) => b.name.length - a.name.length)[0];    // 「名字後面還有字」：挑名字最長的
     const closest = list => list.sort((a, b) => plain(a.name).length - plain(b.name).length)[0];   // 「只打一部分」：挑最接近的
     const hero = nameTable.find(([name]) => name === rest || (r && plain(name) === r));
+    const boss = players.get(BOSS_ID);
     const steps = [
+      () => boss && isBossName(rest) && boss,                       // @BOSS：鎖定場上的 BOSS（@BOSS的名字走下面一般的名字比對）
       () => cands.filter(o => o.name === rest)[0],
       () => longest(cands.filter(o => rest.startsWith(o.name))),
       () => r && cands.filter(o => plain(o.name) === r)[0],
@@ -123,7 +143,7 @@ ML.createGame = function (config, heroes) {
     if (me) { switchHero(me, text, hit[1]); return; }
     const wait = (config.leaveRejoinSeconds || 0) - (time - (left.has(user.id) ? left.get(user.id) : -1e9));
     if (wait > 0) { notice(`${user.name} 剛烙跑，還要 ${Math.ceil(wait)} 秒才能再上場`); return; }
-    if (players.size >= config.maxOnStage) { notice(`場上已滿，${user.name} 請稍候`); return; }
+    if ([...players.values()].filter(o => !o.isBoss).length >= config.maxOnStage) { notice(`場上已滿，${user.name} 請稍候`); return; }
     const hero = hit[1];
     if (!scores.has(user.id)) scores.set(user.id, { id: user.id, damage: 0, kills: 0, level: 1, xp: 0 });
     const prof = Object.assign(scores.get(user.id), { name: user.name, heroName: hero.displayName });
@@ -154,6 +174,13 @@ ML.createGame = function (config, heroes) {
   function handleGift(user, giftId, rawCount) {
     const gift = config.gifts.find(g => g.id === giftId);
     if (!gift) return;
+    // 招換 BOSS：不用先上場（這是花大錢的禮物，不該因為沒上場就白送）
+    const summonId = (config.actions[gift.action] || {}).summon;
+    if (summonId) {
+      const n = Math.max(1, Math.min(bossCfg.maxSummonPerGift || 1, Math.floor(rawCount) || 1));
+      for (let i = 0; i < n; i++) summonBoss(user, summonId);
+      return;
+    }
     const me = players.get(user.id);
     if (!me) { notice(`${user.name} 請先留言武將名字上場`); return; }
     const count = Math.max(1, Math.min(config.maxGiftCombo, Math.floor(rawCount) || 1));
@@ -169,9 +196,13 @@ ML.createGame = function (config, heroes) {
 
     const action = config.actions[gift.action];
     if (gift.action === 'heal') {
-      const amount = Math.min(me.maxHp - me.hp, Math.round(me.maxHp * action.healPercent * count));
-      me.hp += amount;
-      fx({ type: 'heal', id: me.id, amount, icon: gift.icon });
+      // 先用「@名字」鎖定了另一位玩家（還活著、血沒滿）→ 這份回血補給他；否則補自己
+      const ally = players.get(me.lockId);
+      const target = ally && ally !== me && !ally.isBoss && !ally.down && ally.hp < ally.maxHp ? ally : me;
+      const amount = Math.min(target.maxHp - target.hp, Math.round(target.maxHp * action.healPercent * count));
+      target.hp += amount;
+      fx({ type: 'heal', id: target.id, amount, icon: gift.icon });
+      if (target !== me) notice(`${me.name} 幫 ${target.name} 補血 +${amount}`);
       return;
     }
 
@@ -181,7 +212,9 @@ ML.createGame = function (config, heroes) {
     } else {
       const locked = players.get(me.lockId);
       const pool = others(me);
+      const boss = players.get(BOSS_ID);
       targets = locked && !locked.down ? [locked]
+        : boss && !boss.down && Math.random() < (bossCfg.autoTargetChance || 0) ? [boss]   // 沒鎖定任何人時，有機會直接打 BOSS
         : pool.length ? [pool[Math.floor(Math.random() * pool.length)]] : [];
     }
     if (!targets.length) { notice(`${me.name} 找不到對手`); return; }
@@ -196,11 +229,82 @@ ML.createGame = function (config, heroes) {
       const dmg = Math.min(t.hp, Math.max(1, Math.round(atk * action.atkMultiplier * count * roll * reduce)));
       t.hp -= dmg;
       me.prof.damage += dmg;
-      if (t.hp <= 0) { t.down = true; t.downAt = time; me.prof.kills++; downed.push(t); }
+      if (t.isBoss) t.hits.set(me.id, (t.hits.get(me.id) || 0) + dmg);   // 記下誰打過 BOSS（打倒時經驗值平分給他們）
+      if (t.hp <= 0) { t.down = true; t.downAt = time; me.prof.kills++; if (t.isBoss) t.lastHitId = me.id; downed.push(t); }
       return { id: t.id, dmg, down: t.down };
     });
     fx({ type: 'attack', id: me.id, action: gift.action, icon: gift.icon, skillName: me.hero.skillName, hits });
-    downed.forEach(t => { notice(`${me.name} 擊倒了 ${t.name}！`); gainKillXp(me, t); });
+    downed.forEach(t => { if (t.isBoss) bossDefeated(t, me); else { notice(`${me.name} 擊倒了 ${t.name}！`); gainKillXp(me, t); } });
+  }
+
+  // ---------- BOSS ----------
+  // 招換：場上沒有 BOSS 就直接叫出來；已經有一隻（含正在倒下的），就排隊，前一隻消失後自動換上。
+  function summonBoss(user, bossId) {
+    const def = bossById.get(bossId);
+    if (!def) return;
+    const entry = { def, by: user.name };
+    if (players.has(BOSS_ID)) {
+      if (bossQueue.length >= (bossCfg.maxQueue || 20)) { notice(`${user.name} 招換 ${def.displayName} 失敗：排隊的 BOSS 太多了`); return; }
+      bossQueue.push(entry);
+      notice(`${user.name} 招換了 ${def.displayName}，排隊第 ${bossQueue.length} 位`);
+      fx({ type: 'bossQueue' });
+      return;
+    }
+    spawnBoss(entry);
+  }
+  function spawnBoss(entry) {
+    const def = entry.def;
+    const hero = bossHero(def);
+    const prof = { id: BOSS_ID, name: def.displayName, heroName: def.displayName, damage: 0, kills: 0, level: def.level, xp: 0 };
+    const b = { id: BOSS_ID, name: def.displayName, hero, prof, maxHp: def.hp, hp: def.hp, down: false, downAt: 0, lockId: null,
+      lastActive: time, isBoss: true, def, summoner: entry.by, hits: new Map(), lastHitId: null,
+      nextAttackAt: time + bossCfg.attackEverySeconds, nextAoeAt: time + bossCfg.aoeEverySeconds };
+    players.set(BOSS_ID, b);
+    fx({ type: 'join', id: BOSS_ID, boss: true });
+    fx({ type: 'bossSpawn', id: BOSS_ID });
+    notice(`⚠ ${entry.by} 招換了 BOSS【Lv.${def.level} ${def.displayName}】！`);
+  }
+  // 被打倒：經驗值平均分給所有打過它的玩家，最後一擊的人再額外多拿尾刀獎勵
+  function bossDefeated(b, killer) {
+    const ids = [...b.hits.keys()];
+    const share = ids.length ? Math.floor(b.def.xp / ids.length) : 0, bonus = b.def.lastHitBonus || 0;
+    for (const id of ids) {
+      const prof = scores.get(id);
+      if (prof) grantXp(prof, share + (id === b.lastHitId ? bonus : 0));
+    }
+    fx({ type: 'bossDefeated', id: b.id, share, bonus, killer: killer.name });
+    notice(`${killer.name} 打倒了 ${b.name}！`);
+    notice(`${ids.length} 位參戰者各 +${share} 經驗，尾刀獎勵 +${bonus}`);
+  }
+  // BOSS 出招：aoe = false 隨機打一位玩家；aoe = true 全場攻擊（每位玩家都吃）
+  function bossStrike(b, aoe) {
+    const pool = [...players.values()].filter(o => !o.isBoss && !o.down);
+    if (!pool.length) return;
+    const targets = aoe ? pool : [pool[Math.floor(Math.random() * pool.length)]];
+    const mult = aoe ? bossCfg.aoeMultiplier : bossCfg.singleMultiplier;
+    const hits = targets.map(t => {
+      const roll = 1 + (Math.random() * 2 - 1) * config.damageVariance;
+      const reduce = config.defenseFactor / (config.defenseFactor + stats(t).def);
+      const dmg = Math.min(t.hp, Math.max(1, Math.round(b.def.atk * mult * roll * reduce)));
+      t.hp -= dmg;
+      if (t.hp <= 0) { t.down = true; t.downAt = time; }
+      return { id: t.id, dmg, down: t.down };
+    });
+    fx({ type: 'attack', id: b.id, action: aoe ? 'aoe' : 'attack', icon: '', skillName: aoe ? b.def.aoeName : b.def.skillName, label: aoe ? b.def.aoeName + '！' : '', hits });
+    hits.filter(h => h.down).forEach(h => notice(`${b.name} 擊倒了 ${players.get(h.id).name}！`));
+  }
+  function bossUpdate(b) {
+    if (b.down) {
+      if (time - b.downAt >= bossCfg.removeAfterSeconds) {      // 倒下一陣子後消失，叫出排隊中的下一隻
+        players.delete(BOSS_ID);
+        fx({ type: 'bossGone', id: BOSS_ID });
+        const next = bossQueue.shift();
+        if (next) spawnBoss(next);
+      }
+      return;
+    }
+    if (time >= b.nextAoeAt) { b.nextAoeAt = time + bossCfg.aoeEverySeconds; b.nextAttackAt = Math.max(b.nextAttackAt, time + 2); bossStrike(b, true); }
+    else if (time >= b.nextAttackAt) { b.nextAttackAt = time + bossCfg.attackEverySeconds; bossStrike(b, false); }
   }
 
   function reviveRemaining(p) { return p.down ? Math.max(0, config.reviveSeconds - (time - p.downAt)) : 0; }
@@ -217,7 +321,8 @@ ML.createGame = function (config, heroes) {
     // 每一格畫面呼叫一次，dt = 經過的秒數
     update(dt) {
       time += dt;
-      for (const p of players.values()) {
+      for (const p of [...players.values()]) {
+        if (p.isBoss) { bossUpdate(p); continue; }
         if (p.down && time - p.downAt >= config.removeDownedAfterSeconds) {
           players.delete(p.id);
           notice(`${p.name} 倒地太久，離場了`);
@@ -229,7 +334,7 @@ ML.createGame = function (config, heroes) {
     },
     // 清空場上。keepProgress = true 時保留每位觀眾的等級、經驗值、擊倒數（只把場上武將和傷害排行榜清掉）
     reset(keepProgress) {
-      players.clear(); left.clear(); time = 0;
+      players.clear(); left.clear(); bossQueue.length = 0; time = 0;
       if (keepProgress) scores.forEach(s => { s.damage = 0; }); else scores.clear();
     },
     // 存檔用：交出每位觀眾目前的進度
@@ -260,6 +365,17 @@ ML.createGame = function (config, heroes) {
     },
     announce(text) { notice(text); },
     getPlayers() { return [...players.values()]; },
+    // BOSS 相關（畫面和面板用）
+    getBoss() {
+      const b = players.get(BOSS_ID);
+      return b ? { name: b.name, level: b.def.level, hp: b.hp, maxHp: b.maxHp, down: b.down, summoner: b.summoner,
+        attackIn: Math.max(0, b.nextAttackAt - time), aoeIn: Math.max(0, b.nextAoeAt - time) } : null;
+    },
+    getBossQueue() { return bossQueue.map(e => ({ name: e.def.displayName, level: e.def.level, by: e.by })); },
+    bossHeroes() { return (bossCfg.list || []).map(bossHero); },
+    // 測試用：把 BOSS 血量直接設成某個比例（測試尾刀獎勵）／把 BOSS 和排隊全部清掉
+    debugBossHp(ratio) { const b = players.get(BOSS_ID); if (b && !b.down) b.hp = Math.max(1, Math.round(b.maxHp * ratio)); },
+    clearBosses() { bossQueue.length = 0; if (players.has(BOSS_ID)) { players.delete(BOSS_ID); fx({ type: 'bossGone', id: BOSS_ID }); } },
     getPlayer(id) { return players.get(id); },
     reviveRemaining,
     stats,

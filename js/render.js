@@ -62,12 +62,34 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     }
     if (e.type === 'join') {
       const p = game.getPlayer(e.id);
-      views.set(e.id, { id: e.id, x: null, y: null, size: 80, hp: p.hp, shownHp: p.hp, down: false,
+      views.set(e.id, { id: e.id, boss: !!p.isBoss, deadT: 0, x: null, y: null, size: p.isBoss ? 200 : 80, hp: p.hp, shownHp: p.hp, down: false,
         flash: 0, shake: 0, hop: 1, hopH: 1.2, lunge: null, pending: 0, kbx: 0, kby: 0, face: -1, faceShown: -1, phase: Math.random() * 6 });
       return;
     }
     const v = views.get(e.id);
     if (!v) return;
+    if (e.type === 'bossSpawn') {         // BOSS 降臨：等版面排好位置（下一格）再放紫色光柱、震動、畫面變暗
+      after(0.25, () => {
+        if (!views.has(e.id) || v.x === null) return;
+        dim = { age: 0, life: 2 };
+        quake = 1.6; v.shake = 0.8;
+        effects.pillar(v.x, feet(v), v.size * 1.3, v.size * 3, '#b45cff');
+        effects.crack(v.x, feet(v), v.size * 1.8, '#b45cff');
+        effects.sparks(v.x, feet(v), '#d9a8ff', 50, 620, 7, 0.9);
+        rings.push({ v, age: 0, life: 0.9, color: '#b45cff', max: 2.6, width: 12 });
+        floats.push({ v, text: `BOSS 降臨！`, color: '#d9a8ff', scale: 1.6, age: 0, life: 2.4 });
+      });
+      return;
+    }
+    if (e.type === 'bossDefeated') {      // 打倒 BOSS：大爆發、金色字樣
+      v.shake = 1; quake = 1.8;
+      effects.sparks(v.x, v.y, '#ffd35c', 70, 700, 7, 1.1);
+      effects.pillar(v.x, feet(v), v.size * 1.2, v.size * 3, '#ffd35c');
+      rings.push({ v, age: 0, life: 1, color: '#ffd35c', max: 3, width: 12 });
+      floats.push({ v, text: 'BOSS 被打倒！', color: '#ffd35c', scale: 1.6, age: 0, life: 2.6 });
+      floats.push({ v, text: `每人 +${e.share} 經驗　尾刀 ${e.killer} +${e.bonus}`, color: '#fff3c0', scale: 0.75, age: 0.2, life: 3 });
+      return;
+    }
     if (e.type === 'levelup') {           // 升級：金色光柱、光點往上飄、跳出等級
       const p = game.getPlayer(e.id);
       v.hop = 1; v.hopH = 0.9;
@@ -109,7 +131,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         dim = { age: 0, life: land + 1.3 };
         v.shake = 0.5; v.hold = 2.4;
         effects.converge(v.x, v.y, '#ffd35c', v.size * 1.2, charge);
-        floats.push({ v, text: '全場攻擊！', color: '#ffd35c', scale: 1.4, age: 0, life: 2 });
+        floats.push({ v, text: e.label || '全場攻擊！', color: v.boss ? '#d9a8ff' : '#ffd35c', scale: 1.4, age: 0, life: 2 });
         after(charge, () => { v.hop = 1; v.hopH = 1.8; });
         after(land, () => {
           rings.push({ v, age: 0, life: 0.9, color: '#ffd35c', max: 0, width: 18 });
@@ -218,7 +240,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
 
   // ---------- 排位置 ----------
   function layout() {
-    const list = game.getPlayers();
+    const list = game.getPlayers().filter(p => !p.isBoss);   // BOSS 不參與一般武將的排位
     const n = list.length;
     const wide = W >= H;
     const lbW = wide ? clamp(W * 0.26, 260, 340) : W - 32;
@@ -228,18 +250,30 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const arena = wide ? { x: 16, y: 16, w: W - lbW - 48, h: H - 32 }
                        : { x: 16, y: lbH + 32, w: W - 32, h: H - lbH - 48 - 100 };   // 直式：底下留 100 給訊息
     // 禮物提示列：告訴觀眾「送哪個禮物會觸發哪個動作」。橫式放在排行榜左邊，直式放在排行榜下面。
+    // （2026-11-13 咖哩要求：指令列移到整個畫面的右下角，因為直播畫面的上方才是主畫面，放底下比較不會擋到）
     const items = getLegend ? getLegend() : [];
     let legend = null;
     if (items.length) {
-      const widths = items.map(it => 46 + 8 + it.label.length * 19 + 16);     // 圖片 + 間距 + 動作名稱 + 內距
-      const total = widths.reduce((a, b) => a + b, 0) + (items.length - 1) * 8;
-      const room = wide ? lb.x - 12 - 16 : W - 32;
-      const scale = Math.min(1, room / total);
-      const h = 58 * scale;
-      legend = { items, widths, scale, h, y: wide ? lb.y : lb.y + lb.h + 8, x: wide ? lb.x - 12 - total * scale : (W - total * scale) / 2 };
-      arena.y += h + 8; arena.h -= h + 8;                                     // 武將的活動範圍往下讓出這一列
+      const wOf = it => 46 + 8 + it.label.length * 19 + 16;                    // 圖片 + 間距 + 動作名稱 + 內距
+      const total = list => list.reduce((a, it) => a + wOf(it), 0) + Math.max(0, list.length - 1) * 8;
+      const room = W - 32;
+      let rows = [items];
+      // 一排放不下（縮得太小看不清楚）就分兩排：上面是四個動作，下面是三個招換 BOSS
+      if (room / total(items) < 0.7) rows = [items.filter(i => !i.boss), items.filter(i => i.boss)].filter(r => r.length);
+      const scale = Math.min(1, ...rows.map(r => room / total(r)));
+      const rowH = 58 * scale, gapY = 6 * scale, h = rows.length * rowH + (rows.length - 1) * gapY;
+      legend = { rows, wOf, total, scale, rowH, gapY, h, y: H - 16 - h };
+      arena.h -= h + 8;                                                        // 武將的活動範圍往上讓出底下這一塊
     }
     const wander = config.wander && config.wander.enabled;
+    // BOSS：又大又固定，站在場地中間偏下；一般武將會被推開、不會疊在它身上
+    const bossV = views.get('boss');
+    if (bossV && game.getPlayer('boss')) {
+      const bs = clamp(Math.min(arena.h * 0.55, arena.w * 0.38), 110, 340);
+      const tx = arena.x + arena.w / 2, ty = arena.y + arena.h * 0.78 - bs / 2;
+      if (bossV.x === null) { bossV.x = tx; bossV.y = ty; bossV.size = bs; }
+      bossV.tsize = bs; bossV.tx = tx; bossV.ty = ty;
+    }
     if (n) {
       // 試每一種「一排幾隻」，挑角色能畫最大的那種
       let best = null;
@@ -287,6 +321,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       const p = game.getPlayer(id);
       if (!p) { views.delete(id); continue; }
       if (v.pending === 0) { v.hp = p.hp; v.down = p.down; }   // 沒有演到一半的攻擊時，跟規則層對齊
+      if (v.boss && v.down) v.deadT += dt;                      // BOSS 倒下後慢慢淡出
       const k = Math.min(1, dt * 8);
       v.shownHp += (v.hp - v.shownHp) * Math.min(1, dt * 12);
       if (v.tsize) v.size += (v.tsize - v.size) * k;
@@ -316,8 +351,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const list = [...views.values()].filter(v => v.x !== null);
     for (const v of list) {
       v.moving = false; v.want = 0; v.px = v.x; v.py = v.y;
-      // 倒地、正在出招或挨打時不走動
-      if (v.down || v.lunge || v.pending > 0 || v.hold > 0) continue;
+      // 倒地、正在出招或挨打時不走動（BOSS 固定站著）
+      if (v.boss || v.down || v.lunge || v.pending > 0 || v.hold > 0) continue;
       if (!v.goal) {
         if ((v.rest = (v.rest === undefined ? Math.random() * cfg.restMax : v.rest) - dt) > 0) continue;
         // 隨機挑幾個候選地點，只考慮「走過去不會擠到別人」的，從中選最空的；
@@ -328,7 +363,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
           const x = clamp(v.x + (Math.random() * 2 - 1) * reach, b.x0, b.x1), y = clamp(v.y + (Math.random() * 2 - 1) * reach, b.y0, b.y1);
           if (Math.hypot(x - v.x, y - v.y) < v.size * 0.4) continue;       // 太近了，等於沒走
           let room = 9;
-          for (const o of list) if (o !== v) room = Math.min(room, gap(x, y, (o.goal || o).x, (o.goal || o).y, v.size));
+          for (const o of list) if (o !== v) room = Math.min(room, gap(x, y, (o.goal || o).x, (o.goal || o).y, o.boss ? (v.size + o.size) / 2 : v.size));
           if (room < 1.05) continue;
           room = Math.min(room, 2) + Math.random() * 0.3;   // 夠空就好，不必永遠跑去最空的角落
           if (!best || room > best.room) best = { x, y, room };
@@ -349,11 +384,11 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       if (g >= 1 || (a.down && c.down)) continue;
       const dx = c.x - a.x || 0.01, dy = c.y - a.y, d = Math.hypot(dx, dy);
       const push = (1 - g) * a.size * Math.min(1, dt * 5) / d;
-      const wa = a.down ? 0 : c.down ? 1 : 0.5;
+      const wa = a.boss ? 0 : c.boss ? 1 : a.down ? 0 : c.down ? 1 : 0.5;   // BOSS 推不動，別人會被推開
       a.x -= dx * push * wa; a.y -= dy * push * wa; c.x += dx * push * (1 - wa); c.y += dy * push * (1 - wa);
     }
     for (const v of list) {
-      if (!v.down) { v.x = clamp(v.x, b.x0, b.x1); v.y = clamp(v.y, b.y0, b.y1); }
+      if (!v.down && !v.boss) { v.x = clamp(v.x, b.x0, b.x1); v.y = clamp(v.y, b.y0, b.y1); }
       if (!v.want) continue;
       // 這一格實際有沒有前進？有前進才算「走路中」（才會一顛一顛）。
       // 一直被擋住走不動超過半秒，就放棄這個目的地、休息一下再換地方，不會卡在原地踏步。
@@ -401,10 +436,95 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     return { x, y };
   }
 
+  // ---------- BOSS ----------
+  // 腳下的紫色光圈：一團柔和的光暈、兩圈會轉的符文環、往上飄的光點。原點是 BOSS 的腳底。
+  function drawBossAura(x, footY, size, accent) {
+    const rx = size * 0.62, pulse = 0.8 + Math.sin(time * 2.2) * 0.2;
+    ctx.save();
+    ctx.translate(x, footY); ctx.scale(1, 0.3);                                   // 壓扁成地上的橢圓
+    const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, rx * 1.6);
+    glow.addColorStop(0, `rgba(190,110,255,${0.85 * pulse})`); glow.addColorStop(0.55, `rgba(140,70,230,${0.4 * pulse})`); glow.addColorStop(1, 'rgba(120,60,220,0)');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, rx * 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowColor = '#c27bff'; ctx.shadowBlur = 24;
+    ctx.strokeStyle = `rgba(226,180,255,${0.95 * pulse})`; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.stroke();               // 外圈
+    ctx.lineWidth = 4; ctx.setLineDash([rx * 0.18, rx * 0.1]); ctx.lineDashOffset = -time * rx * 0.6;
+    ctx.beginPath(); ctx.arc(0, 0, rx * 0.8, 0, Math.PI * 2); ctx.stroke();         // 會轉的虛線符文環
+    ctx.setLineDash([rx * 0.06, rx * 0.2]); ctx.lineDashOffset = time * rx * 0.5; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(0, 0, rx * 0.58, 0, Math.PI * 2); ctx.stroke();        // 內圈（反方向轉）
+    ctx.restore();
+    ctx.save();
+    for (let i = 0; i < 12; i++) {                                                 // 往上飄的光點
+      const a = i * 2.4 + time * 0.35, k = ((time * 0.45 + i * 0.173) % 1);
+      const px = x + Math.cos(a) * rx * (0.25 + (i % 5) * 0.14), py = footY - k * size * 0.95 - Math.abs(Math.sin(a)) * size * 0.04;
+      ctx.globalAlpha = Math.sin(Math.PI * k) * 0.9;
+      ctx.fillStyle = i % 3 ? '#e6c8ff' : accent;
+      ctx.beginPath(); ctx.arc(px, py, 2 + (i % 3), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawBoss(v, p, x, y) {
+    const size = v.size, r = size / 2, accent = p.hero.accent || '#b45cff';
+    const fade = v.down ? Math.max(0, 1 - v.deadT / 3) : 1;                        // 倒下後 3 秒淡出
+    ctx.save();
+    ctx.globalAlpha = fade;
+    if (!v.down) drawBossAura(x, y + r, size, accent);
+    else { ctx.globalAlpha = fade * 0.6; drawBossAura(x, y + r, size, accent); ctx.globalAlpha = fade; }
+    const pose = v.down ? 'down' : v.lunge ? 'attack' : v.flash > 0 ? 'hit' : 'idle';
+    let lean = 0;
+    if (v.lunge) { const t = views.get(v.lunge.to); if (t) lean = Math.sign(t.x - v.x || 1) * 0.12 * Math.sin(Math.PI * v.lunge.t / v.lunge.dur); }
+    else lean = clamp(v.kbx / size * 1.4, -0.2, 0.2);
+    sprite.draw(ctx, p.hero, x, y, size, { pose, poseTime: v.lunge ? v.lunge.t : time, flash: v.flash, lean, facing: v.faceShown, phase: v.phase, moving: false });
+
+    // 血條（比一般武將寬）：紫到粉紅的漸層，中間寫血量數字
+    const bw = clamp(size * 0.95, 150, 330), bh = clamp(size * 0.07, 14, 24), fs = clamp(size * 0.1, 16, 30);
+    const bx = x - bw / 2, by = y - r - size * 0.12 - bh;
+    const ratio = clamp(v.shownHp / p.maxHp, 0, 1);
+    const pill = (px, py, w, h) => { const rr = h / 2; ctx.beginPath(); ctx.moveTo(px + rr, py); ctx.arcTo(px + w, py, px + w, py + h, rr); ctx.arcTo(px + w, py + h, px, py + h, rr); ctx.arcTo(px, py + h, px, py, rr); ctx.arcTo(px, py, px + w, py, rr); ctx.closePath(); };
+    ctx.save();
+    pill(bx - 3, by - 3, bw + 6, bh + 6); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#c27bff'; ctx.stroke();
+    if (ratio > 0.005) {
+      const fw = Math.max(bh, bw * ratio);
+      pill(bx, by, fw, bh);
+      const g = ctx.createLinearGradient(bx, 0, bx + bw, 0); g.addColorStop(0, '#9b4dff'); g.addColorStop(1, '#ff5c9a');
+      ctx.fillStyle = g; ctx.fill(); ctx.clip();
+      ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(bx, by + bh * 0.1, fw, bh * 0.3);
+    }
+    ctx.restore();
+    text(`${Math.max(0, Math.ceil(v.shownHp))} / ${p.maxHp}`, x, by + bh / 2, Math.max(11, bh * 0.75), '#fff');
+    // 名字：Lv + 名稱
+    ctx.font = `bold ${fs}px ${FONT}`;
+    const lv = `Lv.${p.prof.level} `, lvW = ctx.measureText(lv).width * 0.8, nmW = ctx.measureText(p.name).width, left = x - (lvW + nmW) / 2;
+    text(lv, left, by - fs * 0.85, fs * 0.8, '#ffd35c', 'left');
+    text(p.name, left + lvW, by - fs * 0.9, fs, '#e6c8ff', 'left');
+    // 腳下：陣營・名稱，再下面是出招倒數
+    const fac = config.factions.Boss;
+    text(`${fac.label}・${p.name}`, x, y + r + fs * 0.9, fs * 0.8, '#d9a8ff');
+    const b = game.getBoss();
+    if (b && !b.down) text(`下次攻擊 ${Math.ceil(b.attackIn)} 秒　全場攻擊 ${Math.ceil(b.aoeIn)} 秒`, x, y + r + fs * 1.9, fs * 0.62, '#cfb4ff');
+    ctx.restore();
+  }
+
+  // 排隊中的 BOSS：一條細長的小標籤。橫式放在排行榜左邊，直式放在場地左上角
+  function drawBossQueue(arena, lb) {
+    const q = game.getBossQueue();
+    if (!q.length) return;
+    const wide = W >= H;
+    let label = 'BOSS 排隊 ▸ ' + q.slice(0, 3).map((e, i) => `${i + 1}.${e.name}`).join('  ') + (q.length > 3 ? `  +${q.length - 3}` : '');
+    ctx.font = 'bold 15px ' + FONT;
+    const w = ctx.measureText(label).width + 24, h = 34;
+    const x = wide ? lb.x - 12 - w : arena.x + 8, y = wide ? lb.y : arena.y + 8;
+    ctx.fillStyle = 'rgba(40,16,72,0.85)'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(194,123,255,0.8)'; ctx.lineWidth = 1.5; ctx.stroke();
+    text(label, x + 12, y + h / 2, 15, '#e6c8ff', 'left');
+  }
+
   function drawHero(v) {
     const p = game.getPlayer(v.id);
     const { x, y } = pos(v);
     const size = v.size, r = size / 2, fs = clamp(size * 0.2, 12, 22);
+    if (p.isBoss) { drawBoss(v, p, x, y); return; }
     const pose = v.down ? 'down' : v.lunge ? 'attack' : v.flash > 0 ? 'hit' : 'idle';
     // 身體傾斜：衝撞時往前傾，被打時往後仰
     let lean = 0;
@@ -489,23 +609,27 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
   }
 
   function drawLegend(lg) {
-    const k = lg.scale;
-    let x = lg.x;
-    lg.items.forEach((it, i) => {
-      const w = lg.widths[i] * k, h = lg.h;
-      ctx.fillStyle = 'rgba(22,26,30,0.78)';
-      ctx.beginPath(); ctx.roundRect(x, lg.y, w, h, 12 * k); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
-      const size = 46 * k, ix = x + 8 * k, iy = lg.y + (h - size) / 2;
-      const img = giftIcon(it.icon);
-      if (img) ctx.drawImage(img, ix, iy, size, size);
-      else {   // 還沒有圖片：畫一個小方框，裡面寫禮物名稱的前兩個字
-        ctx.fillStyle = 'rgba(255,255,255,0.14)';
-        ctx.beginPath(); ctx.roundRect(ix, iy, size, size, 8 * k); ctx.fill();
-        text(it.name.replace(/^#/, '').slice(0, 2), ix + size / 2, iy + size / 2, 15 * k, '#fff', 'center', false);
-      }
-      text(it.label, ix + size + 8 * k, lg.y + h / 2, 19 * k, '#ffd35c', 'left');
-      x += w + 8 * k;
+    const k = lg.scale, h = lg.rowH;
+    lg.rows.forEach((row, r) => {
+      const y = lg.y + r * (lg.rowH + lg.gapY);
+      let x = W - 16 - lg.total(row) * k;                                       // 靠右對齊
+      row.forEach(it => {
+        const w = lg.wOf(it) * k;
+        ctx.fillStyle = it.boss ? 'rgba(48,22,84,0.84)' : 'rgba(22,26,30,0.78)';   // 招換 BOSS 的底色偏紫
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, 12 * k); ctx.fill();
+        ctx.strokeStyle = it.boss ? 'rgba(194,123,255,0.8)' : 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+        const size = 46 * k, ix = x + 8 * k, iy = y + (h - size) / 2;
+        const img = giftIcon(it.icon);
+        if (img) ctx.drawImage(img, ix, iy, size, size);
+        else {   // 還沒有圖片：畫一個小方框。指定了禮物就寫名稱前兩個字；用預設鑽石數的 BOSS 就寫「500 鑽」
+          ctx.fillStyle = 'rgba(255,255,255,0.14)';
+          ctx.beginPath(); ctx.roundRect(ix, iy, size, size, 8 * k); ctx.fill();
+          if (it.hint) { text(it.hint, ix + size / 2, iy + size * 0.38, 17 * k, '#fff'); text('鑽', ix + size / 2, iy + size * 0.76, 12 * k, '#d9a8ff', 'center', false); }
+          else text(it.name.replace(/^#/, '').slice(0, 2), ix + size / 2, iy + size / 2, 15 * k, '#fff', 'center', false);
+        }
+        text(it.label, ix + size + 8 * k, y + h / 2, 19 * k, it.boss ? '#e6c8ff' : '#ffd35c', 'left');
+        x += w + 8 * k;
+      });
     });
   }
 
@@ -553,7 +677,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
 
     // 正在衝撞的畫在最上面，其餘照前後位置
     [...views.values()].filter(v => v.x !== null)
-      .sort((a, b) => (a.lunge ? 1 : 0) - (b.lunge ? 1 : 0) || a.y - b.y).forEach(drawHero);
+      .sort((a, b) => (a.lunge ? 1 : 0) - (b.lunge ? 1 : 0) || feet(a) - feet(b)).forEach(drawHero);
 
     for (const r of rings) {
       if (!views.has(r.v.id)) continue;
@@ -578,13 +702,14 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
 
     drawLeaderboard(lb);
     if (legend) drawLegend(legend);
+    drawBossQueue(arena, lb);
 
     // 訊息：橫式放在排行榜下方，直式放在畫面最底下（都不會蓋到武將）
     const wide = W >= H;
     toasts.forEach((t, i) => {
       ctx.globalAlpha = t.age > 4 ? 5 - t.age : 1;
       if (wide) text(t.text, lb.x + 4, lb.y + lb.h + 22 + i * 24, 14, '#fff', 'left');
-      else text(t.text, 20, H - 16 - (toasts.length - 1 - i) * 24, 15, '#fff', 'left');
+      else text(t.text, 20, H - 16 - (legend ? legend.h + 8 : 0) - (toasts.length - 1 - i) * 24, 15, '#fff', 'left');
       ctx.globalAlpha = 1;
     });
 

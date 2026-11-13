@@ -63,7 +63,11 @@ window.GAME_CONFIG = {
     attack: { label: '普攻',     atkMultiplier: 2.0 },   // 打一個對象
     aoe:    { label: '全場攻擊', atkMultiplier: 1.4 },   // 打場上所有其他人
     skill:  { label: '技能',     atkMultiplier: 5.5 },   // 打一個對象，很痛
-    heal:   { label: '回血',     healPercent: 0.35 },    // 補自己
+    heal:   { label: '回血',     healPercent: 0.35 },    // 補自己；如果先 @ 鎖定了另一位玩家，就改補他
+    // 招換 BOSS：這三個「動作」不是攻擊，是把 BOSS 叫到場上（BOSS 的數值在下面的 boss.list）
+    boss1:  { label: '招換魔龍', summon: 'boss_dragon' },
+    boss2:  { label: '招換凱薩', summon: 'boss_caesar' },
+    boss3:  { label: '招換巨猿', summon: 'boss_ape' },
   },
 
   // ---------- 禮物對應 ----------
@@ -74,6 +78,9 @@ window.GAME_CONFIG = {
     { id: 'firework', name: '煙火', icon: '🎆', action: 'aoe' },
     { id: 'crown',    name: '皇冠', icon: '👑', action: 'skill' },
     { id: 'heart',    name: '愛心', icon: '💖', action: 'heal' },
+    { id: 'boss1',    name: '招換深淵魔龍', icon: '🐉', action: 'boss1' },
+    { id: 'boss2',    name: '招換深淵凱薩', icon: '👹', action: 'boss2' },
+    { id: 'boss3',    name: '招換太古巨猿', icon: '🦍', action: 'boss3' },
   ],
 
   // ---------- 真的 TikTok 禮物 → 遊戲裡的禮物 ----------
@@ -126,11 +133,43 @@ window.GAME_CONFIG = {
 
     // 二、照價值分級：沒被上面指定的禮物，看它值幾顆鑽石（TikTok 的禮物定價）。
     //     從最貴的往下比，第一個「大於等於 atLeast」的就採用。
+    //     BOSS 預設：沒被指定的禮物，500 鑽招換深淵魔龍、1000 鑽招換深淵凱薩、1500 鑽招換太古巨猿
+    //     （想改成指定某個禮物，去面板「招換 BOSS 的禮物」選；不想自動招換就把這三行刪掉）
     giftByDiamonds: [
+      { atLeast: 1500, gift: 'boss3' },
+      { atLeast: 1000, gift: 'boss2' },
+      { atLeast: 500,  gift: 'boss1' },
       { atLeast: 100, gift: 'crown' },      // 100 鑽以上 → 技能
       { atLeast: 20,  gift: 'firework' },   // 20～99 鑽  → 全場攻擊
       { atLeast: 5,   gift: 'heart' },      // 5～19 鑽   → 回血
       { atLeast: 1,   gift: 'rose' },       // 1～4 鑽    → 普攻
+    ],
+  },
+
+  // ---------- BOSS ----------
+  // 觀眾丟「招換禮物」就會把 BOSS 叫到場上（玩家本身不能變成 BOSS，只能招換）。
+  //   ・場上同時只會有一隻 BOSS；BOSS 還沒死又有人招換，新的會排隊，前一隻死掉就自動換上來。
+  //   ・BOSS 在場上時：每 attackEverySeconds 秒隨機打一位玩家，每 aoeEverySeconds 秒放一次全場攻擊。
+  //   ・BOSS 被打倒：經驗值（xp）平均分給「所有打過它的玩家」，最後一擊的人再額外多拿 lastHitBonus（尾刀獎勵）。
+  //   ・玩家留言「@BOSS」或「@BOSS的名字」鎖定它。
+  // ⚠️ 下面的血量、攻擊、經驗值都是 Claude 先抓的，沒經過真人試玩，開播後看手感再調。
+  boss: {
+    attackEverySeconds: 10,     // 每幾秒隨機攻擊一位玩家
+    aoeEverySeconds: 60,        // 每幾秒放一次全場攻擊
+    singleMultiplier: 3,        // 單體攻擊傷害 = BOSS 攻擊 × 這個數字（再被玩家防禦打折）
+    aoeMultiplier: 3,           // 全場攻擊傷害 = BOSS 攻擊 × 這個數字（打到每一位玩家）
+    autoTargetChance: 0.6,      // 玩家沒鎖定任何人時，有多少機率直接打 BOSS（其餘照原本的隨機對象）
+    removeAfterSeconds: 3,      // BOSS 倒下後，過幾秒從場上消失（接著叫出排隊中的下一隻）
+    maxQueue: 20,               // 排隊最多幾隻（超過的招換會被擋下）
+    maxSummonPerGift: 3,        // 一次連送多個招換禮物，最多叫幾隻
+    list: [
+      // id：圖檔名（assets/heroes/<id>.png；還沒放圖時會先畫一隻示意用的怪獸）
+      // level：顯示的等級　hp／atk／def：血量／攻擊／防禦
+      // hasArt：assets/heroes/<id>.png 已經放好圖了就改成 true（false 時畫面先用示意用的怪獸，也不會去載入不存在的圖檔）
+      // xp：被打倒時要分給參戰玩家的經驗值總量　lastHitBonus：最後一擊的人額外多拿的經驗值
+      { id: 'boss_dragon', displayName: '深淵魔龍', level: 10, hasArt: false, hp: 6000,  atk: 80,  def: 40,  xp: 1500, lastHitBonus: 500,  skillName: '深淵吐息', aoeName: '深淵風暴', accent: '#ff4fd8' },
+      { id: 'boss_caesar', displayName: '深淵凱薩', level: 20, hasArt: false, hp: 15000, atk: 130, def: 70,  xp: 4000, lastHitBonus: 1200, skillName: '凱薩裁決', aoeName: '王權崩落', accent: '#9aa8ff' },
+      { id: 'boss_ape',    displayName: '太古巨猿', level: 30, hasArt: false, hp: 36000, atk: 190, def: 110, xp: 9000, lastHitBonus: 3000, skillName: '遠古重擊', aoeName: '地動山搖', accent: '#ffb04a' },
     ],
   },
 
@@ -182,6 +221,7 @@ window.GAME_CONFIG = {
     Shu: { label: '蜀', color: '#5C9C89' },
     Wu:  { label: '吳', color: '#C0872E' },
     Qun: { label: '群', color: '#A5527E' },
+    Boss: { label: 'BOSS', color: '#B45CFF' },   // BOSS 專用陣營（只能被招換，玩家不能變成 BOSS）
     Meng: { label: '萌', color: '#E0709A' },   // 萌國（直播亂鬥自己加的陣營，米其林）。畫面上顯示一個字，名冊圖叫「萌國」
   },
 };

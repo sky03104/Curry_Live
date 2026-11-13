@@ -9,7 +9,7 @@
 
   const hub = ML.createEventHub();
   const game = ML.createGame(config, heroes);
-  const sprite = ML.createHeroSprite(heroes, config, 'assets/heroes');
+  const sprite = ML.createHeroSprite(heroes.concat(game.bossHeroes()), config, 'assets/heroes');   // BOSS 的圖也要載入
   // 場地：直播畫面讀網址的 &arena=；面板視窗讀這個瀏覽器記住的選擇（方便預覽）
   const arenas = ML.createArenas();
   let savedArena = ''; try { savedArena = localStorage.getItem('curryLive.arena') || ''; } catch (e) { /* 讀不到就用預設 */ }
@@ -23,7 +23,7 @@
   let dirty = false;                 // 有沒有還沒存的變動
   const active = new Set();          // 這段時間有出現過的觀眾
   hub.on(ev => { if (ev.user && ev.user.id) active.add(ev.user.id); });
-  game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup') dirty = true; });   // 擊倒、升級都發生在攻擊之後
+  game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup' || e.type === 'bossDefeated') dirty = true; });   // 擊倒、升級都發生在攻擊之後；打倒 BOSS 分到經驗值也要存
   function flushSave() {
     if (!config.save.enabled || !dirty) return;
     if (save.store(game.exportProfiles(), [...active])) { dirty = false; active.clear(); }
@@ -81,7 +81,7 @@
   }
   setInterval(() => flushCloud(), config.save.cloud.intervalSeconds * 1000);
   window.addEventListener('pagehide', () => flushCloud(true));    // 關掉網頁前盡力再存一次（存不到也沒關係，下次開會從本機補上去）
-  game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup') cloudDirty = true; });
+  game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup' || e.type === 'bossDefeated') cloudDirty = true; });
   syncCloud();
 
   hub.on(ev => game.handleEvent(ev));

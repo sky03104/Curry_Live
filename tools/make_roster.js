@@ -63,7 +63,7 @@ function page(keys, title) {
 (async () => {
   const browser = await chromium.launch();
   const tab = await browser.newPage({ viewport: { width: 1080, height: 800 }, deviceScaleFactor: 1.5 });
-  const all = Object.keys(factions);
+  const all = Object.keys(factions).filter(k => heroes.some(h => h.faction === k));   // 沒有武將的陣營（BOSS）不做名冊
   const jobs = [[all, `全武將名冊（共 ${heroes.length} 位）`, '全武將名冊.jpg'],
     ...all.map(k => [[k], `${factions[k].label}國武將`.replace('群國', '群雄'), `武將名冊_${factions[k].label}.jpg`])];
   for (const [keys, title, file] of jobs) {

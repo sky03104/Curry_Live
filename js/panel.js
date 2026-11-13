@@ -9,79 +9,128 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   const $ = sel => root.querySelector(sel);
 
   root.innerHTML = `
-    <h1>假事件面板 <small>試玩用，觀眾看不到</small></h1>
+    <div class="topbar">
+      <h1>直播亂鬥 控制面板 <small>觀眾看不到</small></h1>
+      <div class="topbtns"><button id="p-openall">全部展開</button><button id="p-closeall">全部收合</button></div>
+    </div>
 
-    <section>
-      <h2>① 現在扮演哪位觀眾</h2>
-      <div class="row"><select id="p-user"></select></div>
-      <div class="row"><input id="p-newname" placeholder="新觀眾名字"><button id="p-adduser">新增觀眾</button></div>
-    </section>
+    <details class="card pinned" data-k="url" open>
+      <summary><span class="ico">📋</span>直播用網址<em>每次改設定都要重貼</em></summary>
+      <div class="body">
+        <div class="hint">設定改完後，按「複製」，貼到直播軟體的「連結／瀏覽器來源」。<b>每次改設定都要重貼一次</b>，直播畫面才會照新設定。</div>
+        <div class="row"><input id="gs-url" readonly><button id="gs-copy" class="main" style="flex:none">複製</button></div>
+        <div class="hint">有指定禮物的動作，會在直播畫面的排行榜旁邊顯示「禮物圖片＋動作名稱」。禮物圖片要等有人送過那個禮物才會出現。</div>
+      </div>
+    </details>
 
-    <section>
-      <h2>② 留言</h2>
-      <div class="row"><select id="p-hero"></select><button id="p-join" class="main">留言武將名（上場）</button></div>
-      <div class="row"><select id="p-target"></select><button id="p-lock">留言 @名字（鎖定）</button></div>
-      <div class="row"><button id="p-unlock">留言「解除鎖定」</button><button id="p-leave">留言「烙跑」</button></div>
-      <div class="row"><input id="p-text" placeholder="自己打留言內容"><button id="p-say">送出留言</button></div>
-    </section>
+    <div class="group">直播設定</div>
 
-    <section>
-      <h2>③ 送禮</h2>
-      <div class="row">數量 <input id="p-count" type="number" min="1" value="1" style="width:60px;flex:none"></div>
-      <div class="gifts" id="p-gifts"></div>
-    </section>
+    <details class="card" data-k="arena">
+      <summary><span class="ico">🏟️</span>場地<em id="p-arena-now"></em></summary>
+      <div class="body">
+        <div class="hint">武將腳下的地面。「全場透明」就是直接疊在直播畫面上；選別的場地會鋪一張地面。</div>
+        <div class="row"><select id="p-arena"></select></div>
+        <div class="hint" id="p-arena-hint"></div>
+      </div>
+    </details>
 
-    <section>
-      <h2>場地</h2>
-      <div class="hint">武將腳下的地面。「全場透明」就是現在的樣子（直接疊在直播畫面上）；選別的場地會鋪一張地面。選好後，記得把下面的「直播用網址」重貼進直播軟體。</div>
-      <div class="row"><select id="p-arena"></select></div>
-      <div class="hint" id="p-arena-hint"></div>
-    </section>
+    <details class="card" data-k="gifts">
+      <summary><span class="ico">🎁</span>禮物對應<em>普攻／全場／技能／回血</em></summary>
+      <div class="body">
+        <div class="hint">每個動作右邊選一個 TikTok 禮物。清單裡沒有的，選最下面的「自己輸入名稱…」，照 TikFinity 的 Gift Browser 抄英文名稱。</div>
+        <div id="gs-actions"></div>
+        <div class="sub">最近收到的 TikTok 禮物</div>
+        <div class="hint">連上直播後，觀眾送的禮物會出現在這裡，可以直接選它要對應哪個動作。</div>
+        <div id="gs-seen"><div class="hint">（還沒收到任何禮物）</div></div>
+        <div class="sub">沒被指定的禮物</div>
+        <label class="opt"><input type="radio" name="gs-other" value="tier">照價值分級（1 鑽普攻、5 鑽回血、20 鑽全場、100 鑽技能，500／1000／1500 鑽招換 BOSS）</label>
+        <label class="opt"><input type="radio" name="gs-other" value="ignore">忽略（送了沒反應）</label>
+        <div class="hint">回血小技巧：先留言「@某位玩家」，再送回血禮物，就會補給他，不是補自己。</div>
+      </div>
+    </details>
 
-    <section>
-      <h2>TikTok 禮物設定</h2>
-      <div class="hint">每個動作右邊選一個 TikTok 禮物。清單裡沒有的，選最下面的「自己輸入名稱…」，照 TikFinity 的 Gift Browser 抄英文名稱。</div>
-      <div id="gs-actions"></div>
-      <h2 style="margin-top:10px">最近收到的 TikTok 禮物</h2>
-      <div class="hint">連上直播後，觀眾送的禮物會出現在這裡，可以直接選它要對應哪個動作。</div>
-      <div id="gs-seen"><div class="hint">（還沒收到任何禮物）</div></div>
-      <h2 style="margin-top:10px">沒被指定的禮物</h2>
-      <label class="opt"><input type="radio" name="gs-other" value="tier">照價值分級（1 鑽以上普攻、5 回血、20 全場、100 技能）</label>
-      <label class="opt"><input type="radio" name="gs-other" value="ignore">忽略（送了沒反應）</label>
-      <h2 style="margin-top:10px">存檔（等級）</h2>
-      <div class="hint">觀眾的等級、經驗值會自動存在「跑直播畫面的那個軟體」裡，下次開播還在。傷害排行榜每次開播重新計算。</div>
-      <div class="row"><button id="sv-now" class="main">立即儲存</button></div>
-      <div class="hint" id="sv-now-result"></div>
-      <div class="hint">按了會馬上把<b>這個視窗</b>目前的等級存起來（存在這個瀏覽器；雲端存檔有開的話也存到雲端）。直播軟體裡的畫面是另一個視窗，它每 30 秒會自己存，這顆按鈕管不到它。</div>
-      <div class="row">存檔名稱 <input id="sv-slot" placeholder="不填＝預設那一份"></div>
-      <div class="hint">想讓大家的等級全部重來：填一個新名稱（例如「第二季」），再重貼直播用網址。舊的存檔不會消失，把名稱改回來就回來了。</div>
-      <h2 style="margin-top:10px">雲端存檔（Firebase）</h2>
-      <div class="hint">把等級備份到 Firebase：換電腦、重灌、換直播軟體都還在。<b>只有直播畫面會寫入雲端</b>，這個面板視窗只讀取（免得測試用的假觀眾污染真的存檔）。</div>
-      <div class="hint" id="cl-status"></div>
-      <div class="row"><input id="cl-token" placeholder="雲端代號（按「開啟」自動產生）"><button id="cl-copy" style="flex:none">複製</button></div>
-      <div class="row"><button id="cl-on">開啟雲端存檔</button><button id="cl-test">測試連線</button></div>
-      <div class="row"><button id="cl-off">關閉雲端存檔</button></div>
-      <div class="hint" id="cl-result"></div>
-      <div class="hint">⚠ <b>雲端代號就是鑰匙</b>：知道它的人可以讀寫你的存檔。直播用網址裡有它，不要把網址貼到公開的地方。想在另一台電腦用同一份存檔：把代號貼進上面的欄位，按「開啟」。</div>
-      <h2 style="margin-top:10px">直播用網址</h2>
-      <div class="hint">設定改完後，按「複製」，貼到直播軟體的「連結／瀏覽器來源」。<b>每次改設定都要重貼一次</b>，直播畫面才會照新設定。</div>
-      <div class="hint">有指定禮物的動作，會在直播畫面的排行榜旁邊顯示「禮物圖片＋動作名稱」。禮物圖片要等有人送過那個禮物才會出現。</div>
-      <div class="row"><input id="gs-url" readonly><button id="gs-copy" style="flex:none">複製</button></div>
-    </section>
+    <details class="card" data-k="boss">
+      <summary><span class="ico">🐉</span>招換 BOSS 的禮物<em>500／1000／1500 鑽</em></summary>
+      <div class="body">
+        <div class="hint">指定哪個禮物招換哪隻 BOSS。<b>沒指定的話</b>，沒被其他動作用掉的禮物會照價值：500 鑽以上招換深淵魔龍、1000 鑽以上深淵凱薩、1500 鑽以上太古巨猿。場上同時只有一隻 BOSS，後來招換的會排隊。</div>
+        <div id="gs-boss"></div>
+        <div class="hint">玩家留言「@BOSS」或「@BOSS的名字」就能鎖定它。BOSS 每 10 秒隨機打一人，每 60 秒全場攻擊；打倒後經驗值平分給所有打過的玩家，最後一擊的人額外多拿。數值在 js/config.js 的 boss。</div>
+      </div>
+    </details>
 
-    <section>
-      <h2>測試工具</h2>
-      <div class="row"><button id="p-crowd">一次讓 6 位假觀眾上場</button></div>
-      <div class="row"><button id="p-skip">時間快轉 60 秒</button><button id="p-reset">清空場上</button></div>
-      <div class="row"><button id="p-wipe">清除這個瀏覽器的等級存檔</button></div>
-      <div class="hint" id="sv-info"></div>
-    </section>
+    <div class="group">存檔</div>
 
-    <section>
-      <h2>事件紀錄</h2>
-      <div class="row"><button id="p-copyraw">複製最後一份禮物的原始資料（除錯用）</button></div>
-      <div id="p-log"></div>
-    </section>`;
+    <details class="card" data-k="save">
+      <summary><span class="ico">💾</span>存檔（等級）</summary>
+      <div class="body">
+        <div class="hint">觀眾的等級、經驗值會自動存在「跑直播畫面的那個軟體」裡，下次開播還在。傷害排行榜每次開播重新計算。</div>
+        <div class="row"><button id="sv-now" class="main">立即儲存</button></div>
+        <div class="hint" id="sv-now-result"></div>
+        <div class="hint">按了會馬上把<b>這個視窗</b>目前的等級存起來（存在這個瀏覽器；雲端存檔有開的話也存到雲端）。直播軟體裡的畫面是另一個視窗，它每 30 秒會自己存，這顆按鈕管不到它。</div>
+        <div class="row">存檔名稱 <input id="sv-slot" placeholder="不填＝預設那一份"></div>
+        <div class="hint">想讓大家的等級全部重來：填一個新名稱（例如「第二季」），再重貼直播用網址。舊的存檔不會消失，把名稱改回來就回來了。</div>
+      </div>
+    </details>
+
+    <details class="card" data-k="cloud">
+      <summary><span class="ico">☁️</span>雲端存檔（Firebase）<em id="cl-badge"></em></summary>
+      <div class="body">
+        <div class="hint">把等級備份到 Firebase：換電腦、重灌、換直播軟體都還在。<b>只有直播畫面會寫入雲端</b>，這個面板視窗只讀取（免得測試用的假觀眾污染真的存檔）。</div>
+        <div class="hint" id="cl-status"></div>
+        <div class="row"><input id="cl-token" placeholder="雲端代號（按「開啟」自動產生）"><button id="cl-copy" style="flex:none">複製</button></div>
+        <div class="row"><button id="cl-on">開啟雲端存檔</button><button id="cl-test">測試連線</button></div>
+        <div class="row"><button id="cl-off">關閉雲端存檔</button></div>
+        <div class="hint" id="cl-result"></div>
+        <div class="hint">⚠ <b>雲端代號就是鑰匙</b>：知道它的人可以讀寫你的存檔。直播用網址裡有它，不要把網址貼到公開的地方。想在另一台電腦用同一份存檔：把代號貼進上面的欄位，按「開啟」。</div>
+      </div>
+    </details>
+
+    <div class="group">試玩模擬</div>
+
+    <details class="card" data-k="play">
+      <summary><span class="ico">🎮</span>扮演觀眾<em>留言、鎖定、烙跑</em></summary>
+      <div class="body">
+        <div class="sub first">現在扮演哪位觀眾</div>
+        <div class="row"><select id="p-user"></select></div>
+        <div class="row"><input id="p-newname" placeholder="新觀眾名字"><button id="p-adduser">新增觀眾</button></div>
+        <div class="sub">留言</div>
+        <div class="row"><select id="p-hero"></select><button id="p-join" class="main">留言武將名（上場）</button></div>
+        <div class="row"><select id="p-target"></select><button id="p-lock">留言 @名字（鎖定）</button></div>
+        <div class="row"><button id="p-unlock">留言「解除鎖定」</button><button id="p-leave">留言「烙跑」</button></div>
+        <div class="row"><input id="p-text" placeholder="自己打留言內容"><button id="p-say">送出留言</button></div>
+        <div class="sub">送禮</div>
+        <div class="row">數量 <input id="p-count" type="number" min="1" value="1" style="width:60px;flex:none"></div>
+        <div class="gifts" id="p-gifts"></div>
+      </div>
+    </details>
+
+    <details class="card" data-k="bosstest">
+      <summary><span class="ico">👹</span>BOSS 測試<em id="p-boss-badge"></em></summary>
+      <div class="body">
+        <div class="hint">用目前扮演的觀眾招換 BOSS（等於丟招換禮物）。</div>
+        <div class="gifts" id="p-bosses"></div>
+        <div class="hint" id="p-boss-status">場上沒有 BOSS</div>
+        <div class="row"><button id="p-boss-hp">BOSS 剩 1% 血（測尾刀）</button><button id="p-boss-clear">清掉 BOSS 與排隊</button></div>
+      </div>
+    </details>
+
+    <details class="card" data-k="tools">
+      <summary><span class="ico">🧰</span>測試工具</summary>
+      <div class="body">
+        <div class="row"><button id="p-crowd">一次讓 6 位假觀眾上場</button></div>
+        <div class="row"><button id="p-skip">時間快轉 60 秒</button><button id="p-reset">清空場上</button></div>
+        <div class="row"><button id="p-wipe">清除這個瀏覽器的等級存檔</button></div>
+        <div class="hint" id="sv-info"></div>
+      </div>
+    </details>
+
+    <details class="card" data-k="log">
+      <summary><span class="ico">📜</span>事件紀錄</summary>
+      <div class="body">
+        <div class="row"><button id="p-copyraw">複製最後一份禮物的原始資料（除錯用）</button></div>
+        <div id="p-log"></div>
+      </div>
+    </details>`;
 
   const userSel = $('#p-user'), heroSel = $('#p-hero'), targetSel = $('#p-target'), log = $('#p-log');
 
@@ -92,14 +141,16 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   fillUsers();
 
   // 武將下拉選單，照陣營分組
-  heroSel.innerHTML = Object.entries(config.factions).map(([key, f]) =>
+  heroSel.innerHTML = Object.entries(config.factions).filter(([key]) => heroes.some(h => h.faction === key)).map(([key, f]) =>   // 沒有武將的陣營（BOSS）不列
     `<optgroup label="${f.label}">` +
     heroes.filter(h => h.faction === key).map(h => `<option>${h.displayName}</option>`).join('') +
     '</optgroup>').join('');
   heroSel.value = '呂布';
 
-  $('#p-gifts').innerHTML = config.gifts.map(g =>
-    `<button data-gift="${g.id}">${g.icon} ${g.name}<small>${config.actions[g.action].label}</small></button>`).join('');
+  const isBoss = a => !!(config.actions[a] || {}).summon;
+  const giftBtn = g => `<button data-gift="${g.id}">${g.icon} ${g.name}<small>${config.actions[g.action].label}</small></button>`;
+  $('#p-gifts').innerHTML = config.gifts.filter(g => !isBoss(g.action)).map(giftBtn).join('');
+  $('#p-bosses').innerHTML = config.gifts.filter(g => isBoss(g.action)).map(giftBtn).join('');
 
   // 假觀眾的代號就用名字本身
   const me = () => ({ id: 'fake:' + userSel.value, name: userSel.value });
@@ -140,8 +191,10 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   const giftOf = action => Object.keys(giftSettings.map).find(n => giftSettings.map[n] === action) || '';
 
   function renderGiftSettings() {
-    $('#gs-actions').innerHTML = giftSettings.actions.map(a =>
-      `<div class="gs-row"><b>${actionLabel(a)}</b><select data-action="${a}">${giftOptions(giftOf(a))}</select></div>`).join('');
+    const row = a => `<div class="gs-row"><b>${actionLabel(a)}</b><select data-action="${a}">${giftOptions(giftOf(a))}</select></div>`;
+    $('#gs-actions').innerHTML = giftSettings.actions.filter(a => !isBoss(a)).map(row).join('');
+    $('#gs-boss').innerHTML = giftSettings.actions.filter(isBoss).map(row).join('');
+    $('#p-arena-now').textContent = (renderer.arenas.list.find(x => x.key === renderer.arenas.get()) || {}).label || '';
     if (seen.size) $('#gs-seen').innerHTML = [...seen.entries()].reverse().map(([key, g]) =>
       `<div class="seen"><span title="${esc(g.label)}">${esc(g.label)}</span><select data-seen="${esc(key)}">${options(giftSettings.actionOf(key))}</select></div>`).join('');
     root.querySelector(`input[name="gs-other"][value="${giftSettings.ignoreUnlisted ? 'ignore' : 'tier'}"]`).checked = true;
@@ -152,7 +205,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     Object.keys(giftSettings.map).filter(n => giftSettings.map[n] === action).forEach(n => giftSettings.set(n, ''));
     if (name) giftSettings.set(name, action);
   }
-  $('#gs-actions').onchange = e => {
+  const onActionChange = e => {
     const sel = e.target.closest('[data-action]');
     if (!sel) return;
     let name = sel.value;
@@ -163,6 +216,8 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     setActionGift(sel.dataset.action, name);
     renderGiftSettings();
   };
+  $('#gs-actions').onchange = onActionChange;
+  $('#gs-boss').onchange = onActionChange;
   $('#gs-seen').onchange = e => {
     const sel = e.target.closest('[data-seen]');
     if (!sel) return;
@@ -244,6 +299,28 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     fakeNames.slice(0, 6).forEach((n, i) => hub.chat({ id: 'fake:' + n, name: n }, picks[i].displayName));
   };
   $('#p-skip').onclick = () => game.update(60);
+  // BOSS 測試：招換（等於丟招換禮物）、狀態、尾刀測試、清除
+  $('#p-bosses').onclick = e => { const b = e.target.closest('button'); if (b) hub.gift(me(), b.dataset.gift, 1); };
+  $('#p-boss-hp').onclick = () => game.debugBossHp(0.01);
+  $('#p-boss-clear').onclick = () => game.clearBosses();
+  setInterval(() => {
+    const b = game.getBoss(), q = game.getBossQueue();
+    $('#p-boss-status').textContent = b
+      ? `場上：Lv.${b.level} ${b.name}　血量 ${Math.max(0, Math.ceil(b.hp))}/${b.maxHp}${b.down ? '（倒下中）' : ''}　招換者：${b.summoner}` + (q.length ? `　排隊 ${q.length} 隻：` + q.map(e => e.name).join('、') : '')
+      : '場上沒有 BOSS';
+    $('#p-boss-badge').textContent = b ? `${b.name} ${Math.round(b.hp / b.maxHp * 100)}%` : '';
+  }, 500);
+  // 卡片的展開／收合：記在這個瀏覽器，下次開面板維持原樣
+  const OPEN_KEY = 'curryLive.panelOpen';
+  let openState = {};
+  try { openState = JSON.parse(localStorage.getItem(OPEN_KEY)) || {}; } catch (e) { /* 讀不到就用預設 */ }
+  const cards = [...root.querySelectorAll('details.card')];
+  cards.forEach(d => {
+    if (d.dataset.k in openState) d.open = !!openState[d.dataset.k];
+    d.ontoggle = () => { openState[d.dataset.k] = d.open; try { localStorage.setItem(OPEN_KEY, JSON.stringify(openState)); } catch (e) { /* 存不了不影響 */ } };
+  });
+  $('#p-openall').onclick = () => cards.forEach(d => { d.open = true; });
+  $('#p-closeall').onclick = () => cards.forEach(d => { d.open = d.classList.contains('pinned'); });
   // ---------- 雲端存檔 ----------
   const cl = saving.cloud;
   const renderCloud = () => {
@@ -251,6 +328,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     $('#cl-status').textContent = (st.state === 'ok' ? '🟢 ' : st.state === 'error' ? '🔴 ' : st.state === 'syncing' ? '🟡 ' : '⚪ ') + st.text;
     $('#cl-token').value = cl.token;
     $('#cl-on').textContent = cl.enabled ? '重新連線並讀取' : '開啟雲端存檔';
+    $('#cl-badge').textContent = cl.enabled ? (st.state === 'ok' ? '已連線' : st.state === 'error' ? '出錯了' : '已開啟') : '未開啟';
   };
   cl.onStatus(renderCloud);
   const say = (text, good) => { $('#cl-result').textContent = text; $('#cl-result').style.color = good === undefined ? '' : good ? '#2e7d4f' : '#B23F2B'; };

@@ -86,10 +86,16 @@ ML.createGiftSettings = function (config, params) {
     },
     iconOf(name) { const k = Object.keys(state.icons).find(k => same(k, name)); return k ? state.icons[k] : ''; },
     // 畫面上「禮物提示列」的內容：每個有指定禮物的動作一格（禮物名、圖片網址、動作名稱）
+    // 招換 BOSS 的三個指令一律列出來：有指定禮物就顯示那個禮物；沒指定就顯示預設要幾顆鑽（500／1000／1500）。
     legend() {
+      const tiers = (config.tiktok.giftByDiamonds || []);
       return this.actions.map(a => {
         const name = Object.keys(state.map).find(n => state.map[n] === a);
-        return name ? { action: a, label: config.actions[a].label, name, icon: this.iconOf(name) } : null;
+        const boss = !!config.actions[a].summon;
+        if (name) return { action: a, label: config.actions[a].label, name, icon: this.iconOf(name), boss };
+        if (!boss || state.ignoreUnlisted) return null;
+        const tier = tiers.find(x => x.gift === actionToGift[a]);   // 這隻 BOSS 的預設鑽石門檻
+        return tier ? { action: a, label: config.actions[a].label, name: '', icon: '', hint: String(tier.atLeast), boss } : null;
       }).filter(Boolean);
     },
     // 產生要貼進直播軟體的網址

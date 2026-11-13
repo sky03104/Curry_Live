@@ -25,11 +25,37 @@ ML.createHeroSprite = function (heroes, config, basePath) {
   }
 
   const ready = Promise.all(heroes.map(h => new Promise(resolve => {
+    if (h.isBoss && !h.hasArt) { resolve(); return; }   // BOSS 還沒放圖（config.boss.list 的 hasArt 是 false）就不去找圖檔，用示意怪獸
     const img = new Image();
     img.onload = () => { images.set(h.heroId, img); whites.set(h.heroId, makeWhite(img)); resolve(); };
     img.onerror = () => resolve();   // 圖載不到就畫底圈＋名字，不讓整個遊戲停擺
     img.src = `${basePath}/${h.heroId}.png`;
   })));
+
+  // 示意用的怪獸（BOSS 的正式圖檔放進 assets/heroes/<id>.png 之後就不會再用到）：
+  // 深色身體、兩支角、發光的眼睛、背上的尖刺。原點在腳底中央，往上畫。
+  function drawPlaceholderBoss(g, hero, w, h, t) {
+    const accent = hero.accent || '#b45cff', breathe = 1 + Math.sin(t * 2.4) * 0.015;
+    g.save(); g.scale(1, breathe);
+    const body = g.createLinearGradient(0, -h, 0, 0); body.addColorStop(0, '#3a2260'); body.addColorStop(1, '#150a26');
+    g.fillStyle = body;
+    g.beginPath(); g.ellipse(0, -h * 0.4, w * 0.36, h * 0.36, 0, 0, Math.PI * 2); g.fill();            // 身體
+    g.beginPath(); g.ellipse(-w * 0.2, -h * 0.12, w * 0.12, h * 0.12, 0, 0, Math.PI * 2); g.fill();     // 前腳
+    g.beginPath(); g.ellipse(w * 0.2, -h * 0.12, w * 0.12, h * 0.12, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(0, -h * 0.72, w * 0.22, h * 0.2, 0, 0, Math.PI * 2); g.fill();            // 頭
+    for (const s of [-1, 1]) {                                                                         // 角
+      g.beginPath(); g.moveTo(s * w * 0.1, -h * 0.84); g.quadraticCurveTo(s * w * 0.3, -h * 0.96, s * w * 0.28, -h * 1.0);
+      g.quadraticCurveTo(s * w * 0.2, -h * 0.92, s * w * 0.04, -h * 0.82); g.closePath(); g.fill();
+    }
+    g.fillStyle = '#271544';                                                                           // 背上的尖刺
+    for (let i = -3; i <= 3; i++) { g.beginPath(); g.moveTo(i * w * 0.08 - 8, -h * 0.72); g.lineTo(i * w * 0.08, -h * (0.82 + (3 - Math.abs(i)) * 0.03)); g.lineTo(i * w * 0.08 + 8, -h * 0.72); g.fill(); }
+    g.shadowColor = accent; g.shadowBlur = 18; g.fillStyle = accent;                                    // 發光的眼睛
+    for (const s of [-1, 1]) { g.beginPath(); g.ellipse(s * w * 0.09, -h * 0.74, w * 0.04, h * 0.025, s * 0.3, 0, Math.PI * 2); g.fill(); }
+    g.shadowBlur = 0;
+    g.strokeStyle = accent; g.globalAlpha = 0.5; g.lineWidth = 3;                                       // 身上的發光紋路
+    g.beginPath(); g.moveTo(-w * 0.2, -h * 0.5); g.quadraticCurveTo(0, -h * 0.58, w * 0.2, -h * 0.5); g.stroke();
+    g.globalAlpha = 1; g.restore();
+  }
 
   return {
     ready,
@@ -38,7 +64,8 @@ ML.createHeroSprite = function (heroes, config, basePath) {
       const color = (config.factions[hero.faction] || {}).color || '#888';
       const img = images.get(hero.heroId);
       const down = state.pose === 'down';
-      const h = size * 1.12, w = h * 312 / 396;   // 全身圖是直的（312x396），腳貼在圖的最底
+      // 全身圖是直的（312x396），腳貼在圖的最底。BOSS 的圖比例不固定（龍、猿…），照圖片自己的長寬比畫。
+      const h = size * 1.12, aspect = hero.isBoss ? (img ? img.naturalWidth / img.naturalHeight : 1.25) : 312 / 396, w = h * aspect;
       const footY = y + size / 2;
 
       ctx.save();
@@ -77,6 +104,8 @@ ML.createHeroSprite = function (heroes, config, basePath) {
           ctx.globalAlpha = Math.min(1, state.flash);
           ctx.drawImage(whites.get(hero.heroId), -w / 2, -h, w, h);
         }
+      } else if (hero.isBoss) {
+        drawPlaceholderBoss(ctx, hero, w, h, state.poseTime || 0);   // 還沒放 BOSS 的圖：先畫一隻示意用的怪獸
       } else {
         ctx.fillStyle = color;
         ctx.fillRect(-w / 2, -h, w, h);
