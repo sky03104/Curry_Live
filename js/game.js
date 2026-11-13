@@ -82,9 +82,26 @@ ML.createGame = function (config, heroes) {
   }
 
   // ---------- 留言 ----------
+  // ---------- 烙跑（自己下場）----------
+  // 留言「整句剛好就是烙跑」才算（標點、空白、大小寫不管），聊天說「他烙跑了」不會誤觸發。
+  // 下場後等級、經驗值、累計傷害都保留，再留言武將名可以重新上場，但要先等 leaveRejoinSeconds 秒。
+  const left = new Map();   // 觀眾代號 → 烙跑的時間
+  function isLeaveCommand(text) {
+    const t = plain(text);
+    return !!t && (config.commands.leave || []).some(c => plain(c) === t);
+  }
+  function leave(me) {
+    players.delete(me.id);
+    left.set(me.id, time);
+    fx({ type: 'leave', id: me.id, hero: me.hero, name: me.name });
+    notice(`${me.name} 烙跑了！`);
+  }
+
   function handleChat(user, rawText) {
     const text = rawText.trim();
     const me = players.get(user.id);
+
+    if (isLeaveCommand(text)) { if (me) leave(me); return; }
 
     if (config.commands.unlock.includes(text)) {
       if (me && me.lockId) { me.lockId = null; notice(`${me.name} 解除鎖定`); }
@@ -104,6 +121,8 @@ ML.createGame = function (config, heroes) {
     const hit = nameTable.find(([name]) => text.includes(name));
     if (!hit) return;   // 沒提到武將
     if (me) { switchHero(me, text, hit[1]); return; }
+    const wait = (config.leaveRejoinSeconds || 0) - (time - (left.has(user.id) ? left.get(user.id) : -1e9));
+    if (wait > 0) { notice(`${user.name} 剛烙跑，還要 ${Math.ceil(wait)} 秒才能再上場`); return; }
     if (players.size >= config.maxOnStage) { notice(`場上已滿，${user.name} 請稍候`); return; }
     const hero = hit[1];
     if (!scores.has(user.id)) scores.set(user.id, { id: user.id, damage: 0, kills: 0, level: 1, xp: 0 });
@@ -210,7 +229,7 @@ ML.createGame = function (config, heroes) {
     },
     // 清空場上。keepProgress = true 時保留每位觀眾的等級、經驗值、擊倒數（只把場上武將和傷害排行榜清掉）
     reset(keepProgress) {
-      players.clear(); time = 0;
+      players.clear(); left.clear(); time = 0;
       if (keepProgress) scores.forEach(s => { s.damage = 0; }); else scores.clear();
     },
     // 存檔用：交出每位觀眾目前的進度

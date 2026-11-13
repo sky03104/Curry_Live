@@ -42,7 +42,19 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
   const short = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
   // ---------- 接收遊戲通知，排入動態 ----------
+  let leavers = [];          // 烙跑的武將：已經不在遊戲裡了，但畫面上還要演完「跑出畫面」
   game.onFx(e => {
+    if (e.type === 'leave') {
+      // 烙跑：畫面上的角色朝最近的那一邊跑出去（越跑越快、越來越淡），揚起一陣塵土
+      const v = views.get(e.id);
+      views.delete(e.id);
+      if (v && v.x !== null) {
+        const dir = v.x < W / 2 ? -1 : 1;
+        leavers.push({ hero: e.hero, x: v.x, y: v.y, size: v.size, dir, age: 0, life: 1.5, dust: 0 });
+        effects.sparks(v.x, feet(v), '#e8dcc0', 16, 260, 6, 0.6, 0);
+      }
+      return;
+    }
     if (e.type === 'notice') {
       toasts.push({ text: e.text, age: 0 });
       if (toasts.length > 4) toasts.shift();
@@ -267,6 +279,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
     timers = timers.filter(t => t.t > 0);
     due.forEach(t => t.fn());
     effects.update(dt);
+    updateLeavers(dt);
     quake = Math.max(0, quake - dt * 3);
     if (dim && (dim.age += dt) >= dim.life) dim = null;
 
@@ -347,6 +360,29 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
       const moved = Math.hypot(v.x - v.px, v.y - v.py);
       if (moved >= v.want * 0.5) { v.moving = true; v.stall = Math.max(0, (v.stall || 0) - dt); }
       else if ((v.stall = (v.stall || 0) + dt) > 0.5) { v.goal = null; v.stall = 0; v.rest = 0.8 + Math.random() * 1.5; }
+    }
+  }
+
+  // 烙跑中的武將現在畫在哪：一開始慢慢起步，後面越跑越快
+  function leaverPos(g) {
+    const k = g.age / g.life;
+    return { x: g.x + g.dir * g.size * (0.3 * k + 5 * k * k), y: g.y - Math.abs(Math.sin(g.age * 16)) * g.size * 0.08 };
+  }
+  function updateLeavers(dt) {
+    for (const g of leavers) {
+      g.age += dt;
+      if ((g.dust -= dt) <= 0) { g.dust = 0.07; const p = leaverPos(g); effects.sparks(p.x - g.dir * g.size * 0.2, g.y + g.size / 2, '#e8dcc0', 4, 140, 4, 0.4, 0); }
+    }
+    leavers = leavers.filter(g => g.age < g.life);
+  }
+  function drawLeavers() {
+    for (const g of leavers) {
+      const k = g.age / g.life, p = leaverPos(g);
+      ctx.save();
+      ctx.globalAlpha = k < 0.55 ? 1 : Math.max(0, (1 - k) / 0.45);
+      sprite.draw(ctx, g.hero, p.x, p.y, g.size, { pose: 'idle', poseTime: g.age, flash: 0, lean: g.dir * 0.2, facing: g.dir });
+      text('烙跑！', g.x + g.dir * g.size * 0.3 * k, g.y - g.size * 0.62 - k * g.size * 0.25, clamp(g.size * 0.3, 18, 38), '#ffd35c');
+      ctx.restore();
     }
   }
 
@@ -500,6 +536,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
       ctx.strokeStyle = r.color; ctx.globalAlpha = 1 - k; ctx.lineWidth = r.width || (r.max ? 5 : 10);
       ctx.stroke(); ctx.globalAlpha = 1;
     }
+    drawLeavers();
     effects.draw(ctx, false);   // 其他特效（刀光、火花、落雷…）
     ctx.restore();
 
@@ -532,6 +569,6 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend) 
     // 自動測試用：讀出每隻武將目前的位置
     debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down, face: v.face, moving: v.moving })); },
     debugBounds() { return bounds; },
-    reset() { views.clear(); floats = []; rings = []; timers = []; toasts = []; dim = null; quake = 0; effects.clear(); },
+    reset() { views.clear(); leavers = []; floats = []; rings = []; timers = []; toasts = []; dim = null; quake = 0; effects.clear(); },
   };
 };
