@@ -38,6 +38,8 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       <summary><span class="ico">🧙</span>可選武將<em id="hs-count"></em></summary>
       <div class="body">
         <div class="hint">勾選要讓觀眾選的武將，沒勾的觀眾留言也上不了場（已經在場上的不受影響）。每個人各設各的，設定會寫進你自己的直播用網址。至少要留一隻。</div>
+        <div class="hint"><b>預設武將</b>：武將名字後面的圓點選一隻，還沒上場就直接送禮的觀眾，會自動帶著它上場，這份禮物照常生效。預設武將一定會開放，取消不掉。</div>
+        <label class="hs-nodef"><input type="radio" name="hs-def" value=""> 不自動上場（沒上場送禮會提醒要先留言）</label>
         <div class="row"><button id="hs-all">全選</button><button id="hs-none">只留一隻</button></div>
         <div id="hs-list"></div>
         <div class="hint">⚠ 直播畫面要重貼網址才會生效。</div>
@@ -308,11 +310,14 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   function renderHeroPool() {
     $('#hs-count').textContent = hsel.count() + '/' + heroes.length;
     $('#hs-list').innerHTML = facOrder.map(f => `<div class="hs-fac" style="color:${config.factions[f].color}">${esc(config.factions[f].label)}</div><div class="hs-grid">` +
-      heroes.filter(h => h.faction === f).map(h => `<label><input type="checkbox" data-hero="${h.heroId}"${hsel.isOn(h.heroId) ? ' checked' : ''}> ${esc(h.displayName)}</label>`).join('') + '</div>').join('');
-    root.querySelectorAll('#hs-list input[data-hero]').forEach(c => { c.onchange = () => { if (!hsel.set(c.dataset.hero, c.checked)) c.checked = true; game.setHeroPool(hsel.enabled); renderHeroPool(); renderGiftSettings(); }; });
+      heroes.filter(h => h.faction === f).map(h => `<label><input type="checkbox" data-hero="${h.heroId}"${hsel.isOn(h.heroId) ? ' checked' : ''}${hsel.defaultId === h.heroId ? ' disabled' : ''}> ${esc(h.displayName)}<input type="radio" name="hs-def" value="${h.heroId}" title="設為預設武將"${hsel.defaultId === h.heroId ? ' checked' : ''}></label>`).join('') + '</div>').join('');
+    root.querySelector(`input[name="hs-def"][value=""]`).checked = !hsel.defaultId;
+    const apply = () => { game.setHeroPool(hsel.enabled); game.setDefaultHero(hsel.defaultId); renderHeroPool(); renderGiftSettings(); };
+    root.querySelectorAll('#hs-list input[data-hero]').forEach(c => { c.onchange = () => { if (!hsel.set(c.dataset.hero, c.checked)) c.checked = true; apply(); }; });
+    root.querySelectorAll('input[name="hs-def"]').forEach(r => { r.onchange = () => { if (r.checked) { hsel.setDefault(r.value); apply(); } }; });
   }
-  $('#hs-all').onclick = () => { hsel.setMany(hsel.all); game.setHeroPool(hsel.enabled); renderHeroPool(); renderGiftSettings(); };
-  $('#hs-none').onclick = () => { hsel.setMany([hsel.enabled[0]]); game.setHeroPool(hsel.enabled); renderHeroPool(); renderGiftSettings(); };
+  $('#hs-all').onclick = () => { hsel.setMany(hsel.all); game.setHeroPool(hsel.enabled); game.setDefaultHero(hsel.defaultId); renderHeroPool(); renderGiftSettings(); };
+  $('#hs-none').onclick = () => { hsel.setMany([hsel.defaultId || hsel.enabled[0]]); game.setHeroPool(hsel.enabled); game.setDefaultHero(hsel.defaultId); renderHeroPool(); renderGiftSettings(); };
   renderHeroPool();
   renderGiftSettings();
 
