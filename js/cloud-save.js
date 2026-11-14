@@ -52,7 +52,7 @@ ML.createCloudSave = function (config, params, slot, opts) {
   const MAX_CHARS = 280000;          // 一份存檔的文字上限（Firebase 單份文件上限約 1MB，中文一字最多 3 位元組）
   const listeners = [];
   let token = '', busy = false, pending = null;
-  let remote = { profiles: [], updateTime: null, exists: false, known: false };
+  let remote = { profiles: [], settings: null, updateTime: null, exists: false, known: false };
   let status = { state: 'off', text: '雲端存檔：未開啟' };
 
   const validToken = t => /^[A-Za-z0-9_-]{24,64}$/.test(t || '');
@@ -111,15 +111,17 @@ ML.createCloudSave = function (config, params, slot, opts) {
     (r.body && r.body.error && ['FAILED_PRECONDITION', 'ABORTED', 'ALREADY_EXISTS'].includes(r.body.error.status));
   const fail = r => Object.assign(new Error(explain(r)), { friendly: explain(r) });
 
-  function decode(doc) {
+  // 一份存檔文件裡有兩樣東西：觀眾的進度（profiles），和主播的設定（settings，例如主播文字指令；沒有就是 null）
+  function parse(doc) {
     const f = (doc && doc.fields) || {};
     const text = f.data && f.data.stringValue;
-    if (!text) return [];
+    if (!text) return { profiles: [], settings: null };
     const data = JSON.parse(text);   // 壞掉會丟錯，由呼叫端處理
-    return (data.profiles || []).map(ML.normalizeProfile);
+    return { profiles: (data.profiles || []).map(ML.normalizeProfile), settings: data.settings && typeof data.settings === 'object' ? data.settings : null };
   }
-  function encode(profiles) {
-    return { v: { integerValue: '1' }, data: { stringValue: JSON.stringify({ profiles }) }, savedAt: { integerValue: String(Date.now()) } };
+  function encode(profiles, settings) {
+    const data = settings ? { profiles, settings } : { profiles };
+    return { v: { integerValue: '1' }, data: { stringValue: JSON.stringify(data) }, savedAt: { integerValue: String(Date.now()) } };
   }
 
   // ---------- 讀取 ----------
@@ -127,14 +129,14 @@ ML.createCloudSave = function (config, params, slot, opts) {
     if (!token) return [];
     setStatus('syncing', '雲端存檔：讀取中…');
     const r = await read(slot);
-    if (r.status === 404) { remote = { profiles: [], updateTime: null, exists: false, known: true }; setStatus('ok', '雲端存檔：已連線（雲端還沒有資料）'); return []; }
+    if (r.status === 404) { remote = { profiles: [], settings: null, updateTime: null, exists: false, known: true }; setStatus('ok', '雲端存檔：已連線（雲端還沒有資料）'); return []; }
     if (!r.ok) { const e = fail(r); setStatus('error', '雲端存檔：' + e.friendly); throw e; }
-    let profiles;
-    try { profiles = decode(r.body); } catch (e) {
+    let profiles, settings;
+    try { ({ profiles, settings } = parse(r.body)); } catch (e) {
       const err = Object.assign(new Error('雲端存檔的格式不對，為了安全不會覆蓋它'), { friendly: '雲端存檔的格式不對，為了安全不會覆蓋它' });
       setStatus('error', '雲端存檔：' + err.friendly); throw err;
     }
-    remote = { profiles, updateTime: r.body.updateTime, exists: true, known: true };
+    remote = { profiles, settings, updateTime: r.body.updateTime, exists: true, known: true };
     setStatus('ok', `雲端存檔：已讀取 ${profiles.length} 位觀眾`);
     return profiles;
   }
@@ -160,11 +162,12 @@ ML.createCloudSave = function (config, params, slot, opts) {
       for (let attempt = 0; attempt < 4; attempt++) {
         if (!remote.known) await load();
         const merged = finalize(ML.mergeProfiles(remote.profiles, current), remote.profiles);
-        if (remote.exists && sameContent(merged, remote.profiles)) { setStatus('ok', `雲端存檔：已是最新（${merged.length} 位觀眾）`); return merged; }
-        const r = await write(slot, encode(merged), remote.exists ? { updateTime: remote.updateTime } : { exists: false }, o && o.keepalive ? { keepalive: true } : null);
+        const settings = (o && o.settings) || remote.settings;   // 要存新的設定就用新的，否則保留雲端上原本的（不會因為存進度而把設定弄丟）
+        if (remote.exists && !(o && o.settings) && sameContent(merged, remote.profiles)) { setStatus('ok', `雲端存檔：已是最新（${merged.length} 位觀眾）`); return merged; }
+        const r = await write(slot, encode(merged, settings), remote.exists ? { updateTime: remote.updateTime } : { exists: false }, o && o.keepalive ? { keepalive: true } : null);
         if (r.ok) {
           const wr = r.body && r.body.writeResults && r.body.writeResults[0];
-          remote = { profiles: merged, updateTime: wr && wr.updateTime, exists: true, known: true };
+          remote = { profiles: merged, settings, updateTime: wr && wr.updateTime, exists: true, known: true };
           setStatus('ok', `雲端存檔：已存到雲端（${merged.length} 位觀眾）`);
           return merged;
         }
@@ -201,7 +204,7 @@ ML.createCloudSave = function (config, params, slot, opts) {
   function setToken(t) {
     t = String(t || '').trim();
     if (t && !validToken(t)) return false;
-    token = t; remote = { profiles: [], updateTime: null, exists: false, known: false };
+    token = t; remote = { profiles: [], settings: null, updateTime: null, exists: false, known: false };
     try { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); } catch (e) { /* 存不了不影響這次使用 */ }
     setStatus(t ? 'idle' : 'off', t ? '雲端存檔：已設定，尚未連線' : '雲端存檔：未開啟');
     return true;
@@ -209,6 +212,7 @@ ML.createCloudSave = function (config, params, slot, opts) {
 
   return {
     get enabled() { return !!token; }, get token() { return token; }, canWrite,
+    get settings() { return remote.settings; },   // 雲端上目前的主播設定（讀過之後才有）
     get status() { return status; }, onStatus(fn) { listeners.push(fn); },
     load, store, test, newToken, setToken,
   };
