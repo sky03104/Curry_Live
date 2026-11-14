@@ -382,7 +382,10 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
   }
   // 逐格動畫：這隻武將有設定這個動作（config.heroAnims）才播；播的時候站定不走，播完再繼續
   function startAnim(v, name) {
-    const p = game.getPlayer(v.id), info = p && !p.isBoss && !v.down && sprite.animInfo(p.hero.heroId, name);
+    const p = game.getPlayer(v.id);
+    // 有好幾組待機動畫（idle、idle2…）的武將：每次停下來隨機挑一組（時而啃骨頭、時而吃漢堡喝奶茶，每組機率一樣）
+    if (name === 'idle' && p && !p.isBoss) { const list = sprite.idleNames(p.hero.heroId); if (list.length > 1) name = list[Math.floor(Math.random() * list.length)]; }
+    const info = p && !p.isBoss && !v.down && sprite.animInfo(p.hero.heroId, name);
     if (!info) return;
     v.anim = { name, t: 0, dur: info.dur };
     v.hold = Math.max(v.hold || 0, info.dur + 0.3);
