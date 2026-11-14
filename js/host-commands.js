@@ -11,13 +11,16 @@ ML.createHostCommands = function (config) {
   const KEY = 'curryLive.hostCmd.v1';
   const actionToGift = {};   // 動作 → 遊戲禮物代號（跟送那個動作的禮物一樣處理）
   config.gifts.forEach(g => { if (!actionToGift[g.action]) actionToGift[g.action] = g.id; });
-  const actions = Object.keys(actionToGift);
+  const giftActions = Object.keys(actionToGift);
+  const REVIVE = 'revive';                                  // 特別的「復活」指令（不是禮物動作）
+  const actions = [...giftActions, REVIVE];
+  const label = a => a === REVIVE ? '復活' : (config.actions[a] || {}).label || a;
   const maxCount = a => (config.actions[a] && config.actions[a].summon) ? (config.boss && config.boss.maxSummonPerGift) || 3 : config.hostMaxCount || 1000;   // 次數上限：一般動作 hostMaxCount（1000，因為 1 鑽的玫瑰可能一次送很多個）；招換 BOSS 跟連送一樣 3
   let state = { hostId: '', hostName: '', cmds: {}, counts: {} };
 
   function cleanCmds(o) {
     const out = {};
-    if (o && typeof o === 'object') for (const [a, t] of Object.entries(o)) if (actionToGift[a] && typeof t === 'string' && t.trim()) out[a] = t.trim().slice(0, 40);
+    if (o && typeof o === 'object') for (const [a, t] of Object.entries(o)) if ((actionToGift[a] || a === REVIVE) && typeof t === 'string' && t.trim()) out[a] = t.trim().slice(0, 40);
     return out;
   }
   function cleanCounts(o) {
@@ -44,6 +47,8 @@ ML.createHostCommands = function (config) {
 
   return {
     actions,
+    label,
+    isRevive: a => a === REVIVE,
     get hostId() { return state.hostId; },
     get hostName() { return state.hostName; },
     get cmds() { return state.cmds; },
@@ -54,7 +59,7 @@ ML.createHostCommands = function (config) {
     setHost(id, name) { state.hostId = String(id || ''); state.hostName = String(name || ''); save(); },
     // 設定某個動作的指令文字；空字串 = 取消
     setCmd(action, text) {
-      if (!actionToGift[action]) return;
+      if (!actionToGift[action] && action !== REVIVE) return;
       const t = String(text || '').trim().slice(0, 40);
       if (t) state.cmds[action] = t; else delete state.cmds[action];
       save();
@@ -65,8 +70,12 @@ ML.createHostCommands = function (config) {
       if (!state.hostId || !user || user.id !== state.hostId) return null;
       const t = norm(text);
       if (!t) return null;
-      const a = actions.find(a => state.cmds[a] && norm(state.cmds[a]) === t);
-      return a ? { giftId: actionToGift[a], count: state.counts[a] || 1 } : null;
+      const a = giftActions.find(a => state.cmds[a] && norm(state.cmds[a]) === t);
+      if (a) return { giftId: actionToGift[a], count: state.counts[a] || 1 };
+      // 復活：「復活」＝讓主播自己的武將馬上復活；「復活 小明」＝復活那位觀眾；「復活 全部」＝所有倒地的人
+      const rv = state.cmds[REVIVE] && norm(state.cmds[REVIVE]);
+      if (rv && (t === rv || t.startsWith(rv + ' ') || t.startsWith(rv + '\u3000'))) return { revive: String(text).trim().slice(rv.length).trim() };
+      return null;
     },
     // 同一句字被設給兩個動作時，後面那個永遠不會觸發 → 面板用來提醒
     duplicates() {

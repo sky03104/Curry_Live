@@ -172,6 +172,33 @@ ML.createGame = function (config, heroes) {
     return p;
   }
 
+  // 滿血復活（倒地後送禮、或主播的復活指令都走這裡）
+  function revivePlayer(p) {
+    p.down = false; p.hp = p.maxHp;
+    fx({ type: 'revive', id: p.id });
+    notice(`${p.name} 的 ${p.hero.displayName} 滿血復活！`);
+  }
+  // 主播的復活指令：不用等倒地倒數，馬上滿血復活。target 空白 = 主播自己；「全部」= 所有倒地的人；其他 = 用名字找那位觀眾
+  function hostRevive(user, target) {
+    const t = String(target || '').trim();
+    if (!t) {
+      const me = players.get(user.id);
+      if (!me || me.isBoss) { notice('主播還沒上場，沒有武將可以復活'); return; }
+      if (!me.down) { notice(`${me.name} 還活著，不用復活`); return; }
+      revivePlayer(me); return;
+    }
+    if (['全部', '全場', 'all'].includes(t.toLowerCase())) {
+      const list = [...players.values()].filter(p => p.down && !p.isBoss);
+      if (!list.length) { notice('場上沒有倒地的武將'); return; }
+      list.forEach(revivePlayer); return;
+    }
+    const hit = gameApi.findProfile(t), p = hit && players.get(hit.id);
+    if (!hit) { notice(`找不到「${t.length > 10 ? t.slice(0, 10) + '…' : t}」`); return; }
+    if (!p || p.isBoss) { notice(`${hit.name} 不在場上`); return; }
+    if (!p.down) { notice(`${p.name} 還活著，不用復活`); return; }
+    revivePlayer(p);
+  }
+
   // 主播留言「等級 名字 數字」（指令字在 config.commands.setLevel）：把那位觀眾的等級調成那個數字。處理了（不管成功與否）回傳 true
   function hostLevelCommand(text) {
     const words = (config.commands.setLevel || []).slice().sort((a, b) => b.length - a.length);
@@ -227,9 +254,7 @@ ML.createGame = function (config, heroes) {
     if (me.down) {
       const wait = reviveRemaining(me);
       if (wait > 0) { notice(`${me.name} 倒地中，還要 ${Math.ceil(wait)} 秒才能復活`); return; }
-      me.down = false; me.hp = me.maxHp;
-      fx({ type: 'revive', id: me.id });
-      notice(`${me.name} 的 ${me.hero.displayName} 滿血復活！`);
+      revivePlayer(me);
       return;
     }
 
@@ -385,6 +410,7 @@ ML.createGame = function (config, heroes) {
       if (ev.type === 'chat') {
         // 主播的文字指令：主播本人留言設定好的字 = 送那個動作的禮物（不走一般留言處理）
         const hostGift = hostMatch && hostMatch(ev.user, ev.text);
+        if (hostGift && hostGift.revive !== undefined) { hostRevive(ev.user, hostGift.revive); return; }
         if (hostGift) { handleGift(ev.user, hostGift.giftId, hostGift.count || 1, config.hostMaxCount); return; }
         if (hostCheck && hostCheck(ev.user) && hostLevelCommand(ev.text)) return;   // 主播留言「等級 名字 30」：調整等級
         handleChat(ev.user, ev.text);
