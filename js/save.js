@@ -36,8 +36,8 @@ ML.createSave = function (config, params) {
       const now = Date.now();
       (active || []).forEach(id => { lastSeen[id] = now; });
       // 還是 1 級、0 經驗、沒擊倒過人的不用存（等於沒有進度）
-      let list = profiles.filter(p => p.level > 1 || p.xp > 0 || p.kills > 0)
-        .map(p => ({ id: p.id, name: p.name, level: p.level, xp: p.xp, kills: p.kills, seen: lastSeen[p.id] || now }));
+      let list = profiles.filter(p => p.level > 1 || p.xp > 0 || p.kills > 0 || p.adj)
+        .map(p => ({ id: p.id, name: p.name, level: p.level, xp: p.xp, kills: p.kills, adj: p.adj || 0, seen: lastSeen[p.id] || now }));
       if (list.length > MAX) list = list.sort((a, b) => b.seen - a.seen).slice(0, MAX);
       try { localStorage.setItem(KEY, JSON.stringify({ v: 1, savedAt: now, profiles: list })); return true; } catch (e) { return false; }
     },

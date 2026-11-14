@@ -52,6 +52,7 @@ window.GAME_CONFIG = {
       projectId: 'mengzhan-sanguo',
       apiKey: 'AIzaSyBzJytVzlJv2E6_6bSgs42WHG-2YFmhSuY',   // Firebase 網頁用金鑰，本來就是公開的，不是密碼
       baseUrl: 'https://firestore.googleapis.com',
+      pullSeconds: 300,         // 直播畫面每隔幾秒重讀一次雲端（讓主播在面板調整的等級套用進來）。每次算 1 次讀取，免費額度每天 5 萬次
       intervalSeconds: 30,      // 每隔幾秒存一次雲端（有變動才存）。Firebase 免費額度每天 2 萬次寫入，這個數字很夠用
     },
   },
@@ -237,6 +238,7 @@ window.GAME_CONFIG = {
   commands: {
     lockPrefix: '@',            // 「@對方名字」鎖定攻擊目標
     unlock: ['解除鎖定'],       // 留言這些字就解除鎖定（可以多加幾種說法）
+    setLevel: ['等級', '設定等級'],   // 主播本人留言「等級 名字 30」→ 把那位觀眾調成 Lv.30（要先在面板「主播文字指令」設定主播）
     leave: ['烙跑', '落跑'],    // 留言「整句剛好就是這些字」（後面加標點、空白沒關係）→ 自己的武將下場。可以多加幾種說法
   },
 
