@@ -279,16 +279,16 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const items = getLegend ? getLegend() : [];
     let legend = null;
     if (items.length) {
-      const base = { rowH: 44, gap: 4, icon: 36, colGap: 8 };
-      const wOf = it => 8 + base.icon + 8 + it.label.length * 17 + 14;          // 內距 + 圖片 + 間距 + 動作名稱 + 內距
+      const base = { rowH: 56, gap: 5, icon: 46, colGap: 8, font: 22 };   // 2026-11-14 咖哩嫌太小：圖片 36→46、文字 17→22
+      const wOf = it => 8 + base.icon + 8 + it.label.length * base.font + 14;          // 內距 + 圖片 + 間距 + 動作名稱 + 內距
       // 兩排直的：左邊是一般動作（普攻、全場、技能、回血），最右邊是招換 BOSS（紫色底）；只有一種就只畫一排
       const cols = [items.filter(i => !i.boss), items.filter(i => i.boss)].filter(c => c.length)
         .map(list => ({ list, w: Math.max(...list.map(wOf)) }));
       const natW = cols.reduce((a, c) => a + c.w, 0) + (cols.length - 1) * base.colGap;
       const natH = Math.max(...cols.map(c => c.list.length)) * (base.rowH + base.gap) - base.gap;
       const stackBottom = lb2 ? lb2.y + lb2.h : lb.y + lb.h;                    // 右上角排行榜們的最下緣
-      const avail = H - 16 - (wide ? stackBottom + 12 + 5 * 24 : 120);          // 橫式：排行榜和訊息文字下面剩多少；直式：隨便留 120
-      let scale = clamp(Math.min(1, avail / natH), 0.5, 1);
+      const avail = H - 16 - (wide ? stackBottom + 12 + (H >= 700 ? 4 * 24 : 0) : 120);   // 橫式：排行榜下面剩多少（畫面夠高才多留 4 行訊息的位置，扁的畫面把空間都給提示列）          // 橫式：排行榜和訊息文字下面剩多少；直式：隨便留 120
+      let scale = clamp(avail / natH, 0.75, 1.5);   // 空間夠就放大到 1.5 倍，最小也有 0.75 倍（原本最小一半，太小看不清楚）
       if (wide) scale = Math.min(scale, lbW / natW);                            // 橫式：寬度不能超過右邊排行榜那一欄，免得蓋到場地
       const w = natW * scale, h = natH * scale;
       legend = { cols, scale, base, w, h, x: W - 16 - w, y: H - 16 - h };
@@ -674,10 +674,10 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         else {   // 還沒有圖片：畫一個小方框。指定了禮物就寫名稱前兩個字；用預設鑽石數的 BOSS 就寫「500 鑽」
           ctx.fillStyle = 'rgba(255,255,255,0.14)';
           ctx.beginPath(); ctx.roundRect(ix, iy, size, size, 7 * k); ctx.fill();
-          if (it.hint) { text(it.hint, ix + size / 2, iy + size * 0.38, 14 * k, '#fff'); text('鑽', ix + size / 2, iy + size * 0.76, 10 * k, '#d9a8ff', 'center', false); }
-          else text(it.name.replace(/^#/, '').slice(0, 2), ix + size / 2, iy + size / 2, 13 * k, '#fff', 'center', false);
+          if (it.hint) { text(it.hint, ix + size / 2, iy + size * 0.38, 18 * k, '#fff'); text('鑽', ix + size / 2, iy + size * 0.76, 13 * k, '#d9a8ff', 'center', false); }
+          else text(it.name.replace(/^#/, '').slice(0, 2), ix + size / 2, iy + size / 2, 17 * k, '#fff', 'center', false);
         }
-        text(it.label, ix + size + 8 * k, y + h / 2, 17 * k, it.boss ? '#e6c8ff' : '#ffd35c', 'left');
+        text(it.label, ix + size + 8 * k, y + h / 2, bs.font * k, it.boss ? '#e6c8ff' : '#ffd35c', 'left');
       });
       cx += cw + bs.colGap * k;
     });
