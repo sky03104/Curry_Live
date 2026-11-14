@@ -258,8 +258,12 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const lbRows = Math.max(1, game.getLeaderboard().length);
     const lbH = 50 + lbRows * 32;
     const lb = { x: W - lbW - 16, y: 16, w: lbW, h: lbH };
+    // 對 BOSS 的傷害排行榜：放在傷害排行榜正下方，場上有 BOSS 才出現（2026-11-14 咖哩要求）
+    const bl = game.getBossLeaderboard();
+    const lb2 = bl ? { x: lb.x, y: lb.y + lb.h + 10, w: lb.w, h: 50 + Math.max(1, bl.rows.length) * 32, data: bl } : null;
+    const top = lb2 ? lb2.y + lb2.h - lb.y : lbH;   // 排行榜們（一個或兩個）合起來佔的高度
     const arena = wide ? { x: 16, y: 16, w: W - lbW - 48, h: H - 32 }
-                       : { x: 16, y: lbH + 32, w: W - 32, h: H - lbH - 48 - 100 };   // 直式：底下留 100 給訊息
+                       : { x: 16, y: top + 32, w: W - 32, h: H - top - 48 - 100 };   // 直式：底下留 100 給訊息
     // 禮物提示列：告訴觀眾「送哪個禮物會觸發哪個動作」。橫式放在排行榜左邊，直式放在排行榜下面。
     // （2026-11-13 咖哩要求：指令列移到整個畫面的右下角，因為直播畫面的上方才是主畫面，放底下比較不會擋到）
     const items = getLegend ? getLegend() : [];
@@ -314,7 +318,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       if (bounds.y0 > bounds.y1) bounds.y0 = bounds.y1 = (bounds.y0 + bounds.y1) / 2;
       if (bounds.x0 > bounds.x1) bounds.x0 = bounds.x1 = (bounds.x0 + bounds.x1) / 2;
     }
-    return { lb, arena, legend };
+    return { lb, lb2, arena, legend };
   }
 
   // ---------- 每一格：更新 ----------
@@ -681,6 +685,22 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     });
   }
 
+  function drawBossLeaderboard(b) {
+    const { name, rows } = b.data;
+    ctx.fillStyle = 'rgba(40,16,72,0.82)';
+    ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(194,123,255,0.8)'; ctx.lineWidth = 1.5; ctx.stroke();
+    text(`對${short(name, 6)}傷害`, b.x + b.w / 2, b.y + 24, 20, '#e6c8ff');
+    if (!rows.length) text('還沒有人打到它', b.x + b.w / 2, b.y + 62, 14, '#c9b0e6', 'center', false);
+    rows.forEach((s, i) => {
+      const y = b.y + 62 + i * 32;
+      text(String(i + 1), b.x + 22, y, 18, ['#ffd35c', '#dcdcdc', '#d99a6c'][i] || '#fff');
+      text(short(s.name, 7), b.x + 42, y, 16, '#fff', 'left');
+      text(`Lv.${s.level} ${s.heroName}`, b.x + b.w * 0.5, y, 13, '#c9b0e6', 'left', false);
+      text(String(s.damage), b.x + b.w - 14, y, 17, '#ff8a7a', 'right');
+    });
+  }
+
   // ---------- 每一格：畫 ----------
   function draw() {
     const dpr = window.devicePixelRatio || 1;
@@ -696,7 +716,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     ctx.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
     ctx.clearRect(0, 0, W, H);   // 清成透明
 
-    const { lb, arena, legend } = layout();
+    const { lb, lb2, arena, legend } = layout();
     if (arenas) arenas.draw(ctx, { x: 4, y: 4, w: W - 8, h: H - 8 }, dpr * k);   // 場地地面：鋪滿整個畫面（排行榜、禮物提示列畫在它上面）；預設全場透明＝什麼都不畫
 
     if (dim) {   // 技能發動：畫面短暫變暗，讓特效更顯眼
@@ -733,6 +753,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     }
 
     drawLeaderboard(lb);
+    if (lb2) drawBossLeaderboard(lb2);
     if (legend) drawLegend(legend);
     drawBossQueue(arena, lb);
 
@@ -740,7 +761,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const wide = W >= H;
     toasts.forEach((t, i) => {
       ctx.globalAlpha = t.age > 4 ? 5 - t.age : 1;
-      if (wide) text(t.text, lb.x + 4, lb.y + lb.h + 22 + i * 24, 14, '#fff', 'left');
+      if (wide) text(t.text, lb.x + 4, (lb2 ? lb2.y + lb2.h : lb.y + lb.h) + 22 + i * 24, 14, '#fff', 'left');
       else text(t.text, 20, H - 16 - (legend ? legend.h + 8 : 0) - (toasts.length - 1 - i) * 24, 15, '#fff', 'left');
       ctx.globalAlpha = 1;
     });
