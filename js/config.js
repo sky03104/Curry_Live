@@ -43,6 +43,12 @@ window.GAME_CONFIG = {
     levelGapFree: 5,
     levelGapPenalty: 0.1,
     levelGapMinFactor: 0.1,
+    // 同一個人短時間內被反覆打倒，經驗值遞減（咖哩 2026-11-14 要求，防止一直打剛復活的人刷經驗）：
+    // 過去 repeatKillWindow 秒（600＝10 分鐘）內已經被打倒過 n 次，這次只拿 (1 − n × repeatKillPenalty)，最少剩 repeatKillMinFactor。
+    // 預設：第 1 次 100%、第 2 次 75%、第 3 次 50%、第 4 次 25%、之後 10%。不管是誰打倒的都一起算；設 repeatKillWindow: 0 = 關掉。
+    repeatKillWindow: 600,
+    repeatKillPenalty: 0.25,
+    repeatKillMinFactor: 0.1,
     hpPerLevel: 0.015,          // 每升一級，血量多「基礎值的 1.5%」（99 級約 2.5 倍）
     atkPerLevel: 0.015,         // 每升一級，攻擊多「基礎值的 1.5%」（99 級約 2.5 倍）
     defPerLevel: 0.01,          // 每升一級，防禦多「基礎值的 1%」（99 級約 2 倍）
