@@ -18,6 +18,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       <summary><span class="ico">📋</span>直播用網址<em>每次改設定都要重貼</em></summary>
       <div class="body">
         <div class="hint">設定改完後，按「複製」，貼到直播軟體的「連結／瀏覽器來源」。<b>每次改設定都要重貼一次</b>，直播畫面才會照新設定。</div>
+        <div class="hint" id="gs-sync"></div>
         <div class="row"><input id="gs-url" readonly><button id="gs-copy" class="main" style="flex:none">複製</button></div>
         <div class="hint">有指定禮物的動作，會在直播畫面的排行榜旁邊顯示「禮物圖片＋動作名稱」。禮物圖片要等有人送過那個禮物才會出現。</div>
       </div>
@@ -323,14 +324,27 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   try { $('#sv-slot').value = localStorage.getItem('curryLive.liveSlot') || (saving.save.slot === 'default' ? '' : saving.save.slot); } catch (e) { /* 讀不到就留空 */ }
   $('#sv-slot').oninput = () => { try { localStorage.setItem('curryLive.liveSlot', $('#sv-slot').value.trim()); } catch (e) { /* 存不了不影響 */ } renderGiftSettings(); };
   // 場地下拉選單：選了馬上在面板的預覽畫面換，並記在這個瀏覽器、寫進直播用網址
+  // 禮物對應與場地一改（等 1 秒沒再動）就自動存到雲端，直播畫面定時讀回來套用，不用重貼網址
+  let gsTimer = null;
+  function gsSync() {
+    clearTimeout(gsTimer);
+    const say = t => { $('#gs-sync').textContent = t; };
+    if (!saving.cloud.enabled) { say('（沒開雲端存檔：改完要重貼直播網址才會生效）'); return; }
+    say('☁ 同步中…');
+    gsTimer = setTimeout(async () => {
+      let r = null; try { r = await saving.saveSettings({ gifts: giftSettings.exportRemote(), arena: { key: renderer.arenas.get(), at: Date.now() } }); } catch (e) { r = null; }
+      say(r && r.state === 'ok' ? `☁ 禮物對應與場地已同步到雲端（${new Date().toLocaleTimeString()}）：直播畫面約 ${config.save.cloud.pullSeconds || 90} 秒內自動套用，不用重貼網址。` : '⚠ 同步到雲端失敗：' + ((r && r.text) || '連不上') + '（改完要重貼直播網址才會生效）');
+    }, 1000);
+  }
+  giftSettings.onChange(gsSync);
   const arenaSel = $('#p-arena');
   arenaSel.innerHTML = renderer.arenas.list.map(a => `<option value="${a.key}">${a.label}</option>`).join('');
   arenaSel.value = renderer.arenas.get();
-  const arenaHint = () => { $('#p-arena-hint').textContent = renderer.arenas.get() === 'none' ? '' : '⚠ 直播畫面要重貼網址才會換場地。'; };
+  const arenaHint = () => { $('#p-arena-hint').textContent = renderer.arenas.get() === 'none' ? '' : '直播畫面約 90 秒內自動換（要開雲端存檔，否則要重貼網址）。'; };
   arenaSel.onchange = () => {
     renderer.arenas.set(arenaSel.value);
     try { localStorage.setItem('curryLive.arena', renderer.arenas.get()); } catch (e) { /* 存不了不影響 */ }
-    arenaHint(); renderGiftSettings();
+    arenaHint(); renderGiftSettings(); gsSync();
   };
   arenaHint();
 

@@ -52,10 +52,13 @@
   });
   // 讀雲端 → 跟本機目前的進度合併 → 套用到遊戲；有本機的進度雲端沒有時，也一併存上去
   // 主播在面板改的設定（主播文字指令）存在雲端存檔裡，直播畫面讀回來套用：不用每改一次就重貼網址（只有直播畫面套用，面板自己的設定以面板為準）
+  let arenaAt = 0;
   function applyCloudSettings() {
     if (!cloud.canWrite) return;
     const s = cloud.settings;
     if (s && s.host && hostCmd.applyRemote(s.host)) game.announce('已套用主播在面板改的指令設定');
+    if (s && s.gifts && giftSettings.applyRemote(s.gifts)) game.announce('已套用主播在面板改的禮物設定');
+    if (s && s.arena && Number(s.arena.at) > arenaAt && typeof s.arena.key === 'string') { arenaAt = Number(s.arena.at); arenas.set(s.arena.key); game.announce('已套用主播在面板改的場地'); }
     if (s && s.heroes && heroSettings.applyRemote(s.heroes)) { game.setHeroPool(heroSettings.enabled); game.setDefaultHero(heroSettings.defaultId); game.announce('已套用主播在面板改的可選武將設定'); }
   }
   async function saveSettings(settings) {   // 面板呼叫：把主播設定存到雲端
