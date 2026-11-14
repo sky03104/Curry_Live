@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+<defs>
+  <linearGradient id="rock" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8a7a74"/><stop offset=".5" stop-color="#58484a"/><stop offset="1" stop-color="#261c1e"/></linearGradient>
+  <linearGradient id="rock2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6c5a58"/><stop offset="1" stop-color="#231a1b"/></linearGradient>
+  <linearGradient id="copper" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc08a"/><stop offset=".5" stop-color="#c8682c"/><stop offset="1" stop-color="#6a2c10"/></linearGradient>
+  <radialGradient id="fire"><stop offset="0" stop-color="#fff6b8"/><stop offset=".35" stop-color="#ffb02e"/><stop offset=".75" stop-color="#e8401c"/><stop offset="1" stop-color="#8a1410"/></radialGradient>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<g stroke="#1a0c0c" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+  <!-- 肩上的煙囪管 -->
+  <path d="M410 190 L440 100 L476 112 L456 202 Z" fill="url(#copper)"/>
+  <path d="M432 92 L486 110 L478 132 L424 114 Z" fill="url(#copper)"/>
+  <path d="M446 80 C440 60 460 44 456 24 M470 86 C466 66 484 52 480 34" stroke="#8a7a74" stroke-width="8" fill="none" opacity=".6"/>
+  <path d="M170 196 L146 112 L178 100 L204 190 Z" fill="url(#copper)"/>
+  <!-- 腳 -->
+  <path d="M168 480 C148 520 158 560 210 562 L300 562 L292 480 Z" fill="url(#rock2)"/>
+  <path d="M432 480 C452 520 442 560 390 562 L300 562 L308 480 Z" fill="url(#rock2)"/>
+  <path d="M176 520 L290 520 L292 540 L176 540 Z M310 520 L424 520 L424 540 L310 540 Z" fill="url(#copper)" stroke-width="4"/>
+  <path d="M186 562 L182 580 M220 562 L220 582 M256 562 L260 580 M414 562 L418 580 M380 562 L380 582 M344 562 L340 580" stroke="#ffb28a" stroke-width="7" fill="none"/>
+  <!-- 手臂（石拳＋銅箍） -->
+  <path d="M146 250 C70 290 50 400 78 470 C100 520 190 520 200 470 C206 400 212 330 236 292 Z" fill="url(#rock)"/>
+  <path d="M454 250 C530 290 550 400 522 470 C500 520 410 520 400 470 C394 400 388 330 364 292 Z" fill="url(#rock)"/>
+  <path d="M74 410 L204 424 L202 462 L82 452 Z M526 410 L396 424 L398 462 L518 452 Z" fill="url(#copper)"/>
+  <circle cx="108" cy="436" r="7" fill="#ffd9b0"/><circle cx="492" cy="436" r="7" fill="#ffd9b0"/>
+  <path d="M96 490 L110 520 M130 496 L140 528 M160 494 L168 524 M504 490 L490 520 M470 496 L460 528 M440 494 L432 524" stroke="#ffb28a" stroke-width="7" fill="none"/>
+  <!-- 圓肚子身體（碎石拼成）-->
+  <path d="M130 330 C122 230 230 196 300 196 C370 196 478 230 470 330 C482 430 400 500 300 500 C200 500 118 430 130 330 Z" fill="url(#rock)"/>
+  <path d="M176 270 L240 246 L252 292 L190 312 Z M262 240 L336 240 L330 288 L270 288 Z M348 246 L420 272 L408 312 L346 292 Z" fill="url(#rock2)" stroke-width="4" opacity=".8"/>
+  <path d="M170 380 L206 340 M430 380 L396 340 M232 468 L262 440 M368 468 L338 440" fill="none" stroke="url(#fire)" stroke-width="7" filter="url(#glow)"/>
+  <!-- 肚子上的銅製熔爐艙門＋火焰 -->
+  <circle cx="300" cy="372" r="92" fill="url(#copper)"/>
+  <circle cx="300" cy="372" r="72" fill="url(#fire)" filter="url(#glow)"/>
+  <path d="M300 312 C272 340 268 372 286 392 C276 372 296 358 300 340 C306 358 326 372 314 392 C332 376 330 340 300 312 Z" fill="#fff2b0" stroke="none" opacity=".9"/>
+  <path d="M300 372 m-72 0 a72 72 0 1 0 144 0 a72 72 0 1 0 -144 0" fill="none"/>
+  <path d="M300 280 L300 316 M300 428 L300 464 M208 372 L244 372 M356 372 L392 372" stroke="#6a2c10" stroke-width="8" fill="none"/>
+  <circle cx="300" cy="372" r="92" fill="none" stroke="#6a2c10" stroke-width="5"/>
+  <!-- 肩甲（銅板＋碎石） -->
+  <path d="M130 224 C118 170 200 140 252 176 L240 236 C190 252 138 246 130 224 Z" fill="url(#copper)"/>
+  <path d="M470 224 C482 170 400 140 348 176 L360 236 C410 252 462 246 470 224 Z" fill="url(#copper)"/>
+  <path d="M146 214 L176 196 M456 214 L426 196" stroke="#ffd9b0" stroke-width="4" fill="none"/>
+  <!-- 頭（頭盔狀的圓石頭，發光的視窗眼縫）-->
+  <path d="M214 214 C206 140 254 108 300 108 C346 108 394 140 386 214 C380 246 346 258 300 258 C254 258 220 246 214 214 Z" fill="url(#rock)"/>
+  <path d="M236 134 C260 112 340 112 364 134 L356 156 C330 144 270 144 244 156 Z" fill="url(#copper)" stroke-width="4"/>
+  <path d="M300 116 L300 148" stroke="#6a2c10" stroke-width="6" fill="none"/>
+  <path d="M244 184 L356 184 L350 218 C334 228 266 228 250 218 Z" fill="#150808" stroke="none"/>
+  <g filter="url(#glow)"><path d="M262 198 L292 202 L292 212 L262 210 Z M338 198 L308 202 L308 212 L338 210 Z" fill="#ffd45a" stroke="none"/></g>
+  <path d="M222 176 L206 138 L242 158 M378 176 L394 138 L358 158" fill="url(#copper)"/>
+</g>
+</svg>
