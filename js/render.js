@@ -290,7 +290,9 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       ctx.font = `900 ${base.font}px ${FONT}`;
       const wOf = it => { const img = giftIcon(it.icon); return 14 + (img ? base.icon + 8 : 0) + ctx.measureText(it.label).width + (it.hint ? 10 + ctx.measureText(it.hint).width * base.hintFont / base.font : 0) + 14; };
       // 兩排直的：左邊是一般動作（普攻、全場、技能、回血），最右邊是招換 BOSS（紫色底）；只有一種就只畫一排
-      const cols = [items.filter(i => !i.boss), items.filter(i => i.boss)].filter(c => c.length)
+      // 2026-11-14 咖哩要求改成四排：一般動作兩排、招換 BOSS 兩排（每組各自對半分，前面那排多一個）
+      const split = list => list.length < 2 ? [list] : [list.slice(0, Math.ceil(list.length / 2)), list.slice(Math.ceil(list.length / 2))];
+      const cols = [...split(items.filter(i => !i.boss)), ...split(items.filter(i => i.boss))].filter(c => c.length)
         .map(list => ({ list, w: Math.max(...list.map(wOf)) }));
       const natW = cols.reduce((a, c) => a + c.w, 0) + (cols.length - 1) * base.colGap;
       const natH = Math.max(...cols.map(c => c.list.length)) * (base.rowH + base.gap) - base.gap;
