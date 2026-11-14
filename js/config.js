@@ -227,6 +227,10 @@ window.GAME_CONFIG = {
       eat: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3 },
       idle: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3, repeat: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭
     },
+    dabao: {
+      eat: { src: 'dabao_eat.png', frames: 8, cw: 384, ch: 387, ground: 383, fps: 3 },
+      idle: { src: 'dabao_eat.png', frames: 8, cw: 384, ch: 387, ground: 383, fps: 3, repeat: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭，連播 3 輪（跟米其林一樣）
+    },
   },
 
   // ---------- 武將圖原本面向哪邊 ----------
