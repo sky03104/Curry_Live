@@ -223,6 +223,7 @@ window.GAME_CONFIG = {
   heroAnims: {
     michelin: {
       eat: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3 },
+      idle: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭
     },
   },
 

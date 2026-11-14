@@ -752,7 +752,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     arenas,
     frame(dt) { update(dt); draw(); },
     // 自動測試用：讀出每隻武將目前的位置
-    debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down, face: v.face, moving: v.moving })); },
+    debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down, face: v.face, moving: v.moving, anim: v.anim ? v.anim.name : '' })); },
     debugBounds() { return bounds; },
     reset() { views.clear(); leavers = []; floats = []; rings = []; timers = []; toasts = []; dim = null; quake = 0; effects.clear(); },
   };
