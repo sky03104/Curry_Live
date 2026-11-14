@@ -57,7 +57,7 @@ ML.createGame = function (config, heroes) {
     };
   }
   // 升到下一級需要多少經驗值
-  function xpNeed(level) { return config.leveling.xpNeedBase + config.leveling.xpNeedPerLevel * level; }
+  function xpNeed(level) { const g = config.leveling; return g.xpNeedBase + g.xpNeedPerLevel * level + (g.xpNeedQuad || 0) * level * level; }
   // 等級或武將變了之後重算最大血量；目前血量照比例帶過去（不會因此補血）
   function refreshHp(p) {
     const ratio = p.maxHp ? p.hp / p.maxHp : 1;
@@ -67,7 +67,10 @@ ML.createGame = function (config, heroes) {
   // 擊倒對手拿經驗值：對手等級越高拿越多；滿了就升級（一次可以連升好幾級）
   function gainKillXp(p, victim) {
     const g = config.leveling;
-    grantXp(p.prof, g.xpPerKillBase + g.xpPerKillPerVictimLevel * victim.prof.level);
+    // 等級差太多（對方比自己高很多或低很多）經驗值打折：差在 levelGapFree 以內不打折，超過的每多 1 級少 levelGapPenalty，最少剩 levelGapMinFactor
+    const gap = Math.abs(victim.prof.level - p.prof.level), over = Math.max(0, gap - (g.levelGapFree || 0));
+    const factor = Math.max(g.levelGapMinFactor === undefined ? 0.1 : g.levelGapMinFactor, 1 - over * (g.levelGapPenalty || 0));
+    grantXp(p.prof, Math.max(1, Math.round((g.xpPerKillBase + g.xpPerKillPerVictimLevel * victim.prof.level) * factor)));
   }
   // 給某位觀眾經驗值（prof 是他的累計紀錄；人不在場上也能拿，下次上場就是新等級）。滿了就升級，一次可連升。
   function grantXp(prof, amount) {

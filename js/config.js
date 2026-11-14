@@ -28,14 +28,21 @@ window.GAME_CONFIG = {
   uniformHero: { enabled: true, hp: 1000, atk: 60, def: 35 },   // 2026-11-14 咖哩要求「再調高一點」：700/50/30 → 1000/60/35
 
   // ---------- 等級 ----------
-  // 擊倒別人的武將拿經驗值，滿了就升級。等級跟著觀眾走，換武將、倒地、離場再回來都還在；
-  // 但重新整理網頁會全部歸零（遊戲沒有存檔）。
+  // 擊倒別人的武將拿經驗值，滿了就升級。等級跟著觀眾走，換武將、倒地、離場再回來都還在（有存檔，見下面「存檔」）。
   leveling: {
     maxLevel: 99,               // 等級上限
     xpPerKillBase: 50,          // 每擊倒一隻，固定拿到的經驗值
     xpPerKillPerVictimLevel: 10, // 再加上「對手等級 × 這個數字」（打倒高等的拿比較多）
-    xpNeedBase: 40,             // 升到下一級需要的經驗值 = xpNeedBase + xpNeedPerLevel × 目前等級
-    xpNeedPerLevel: 10,         //   例如 1 級升 2 級要 50；30 級升 31 級要 340
+    // 升到下一級需要的經驗值 = xpNeedBase + xpNeedPerLevel × 等級 + xpNeedQuad × 等級²（越高等越難升；2026-11-14 咖哩嫌一天就 54 級，加上平方項）
+    //   例如 1 級升 2 級要 52；30 級升 31 級要 2,140；53 級升 54 級要 6,188；98 級升 99 級要 20,228
+    xpNeedBase: 40,
+    xpNeedPerLevel: 10,
+    xpNeedQuad: 2,
+    // 擊倒「等級差太多」的人，經驗值打折（咖哩 2026-11-14 要求）：等級差在 levelGapFree 以內不打折，
+    // 超過的部分每多 1 級少 levelGapPenalty（0.1＝10%），最少剩 levelGapMinFactor（0.1＝10%）。不管對方比自己高或低都算。
+    levelGapFree: 5,
+    levelGapPenalty: 0.1,
+    levelGapMinFactor: 0.1,
     hpPerLevel: 0.015,          // 每升一級，血量多「基礎值的 1.5%」（99 級約 2.5 倍）
     atkPerLevel: 0.015,         // 每升一級，攻擊多「基礎值的 1.5%」（99 級約 2.5 倍）
     defPerLevel: 0.01,          // 每升一級，防禦多「基礎值的 1%」（99 級約 2 倍）
