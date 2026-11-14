@@ -237,6 +237,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         }
       }
 
+      // 技能不是「衝撞」型（謀士、遊俠、統帥）的武將若有 skill 逐格動畫：算好打中的時間，讓動畫的打擊那一格剛好對上（動畫約 0.65 秒後打到）
+      if (big && typeof delay === 'number' && ((config.troops[hero.troop] || {}).skillFx || 'slam') !== 'slam') after(Math.max(0.2, delay - 0.65), () => startAnim(v, 'skill'));
       for (const h of e.hits) {
         const tv = views.get(h.id);
         if (!tv) continue;

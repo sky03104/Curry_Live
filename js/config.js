@@ -251,6 +251,10 @@ window.GAME_CONFIG = {
     // 西當普利鼠：待機吃起司蛋糕（10 格，每秒 4 格，連播 2 輪）
     hamster: {
       idle: { src: 'hamster_cake.png', frames: 10, cw: 269, ch: 309, ground: 306, fps: 4, repeat: 2 },
+      // 攻擊：換成大錘子跳起來往下重擊（8 格，第 6 格落地砸中；普攻約 0.5 秒、技能約 1 秒，打中的時間對上第 6 格）
+      attack: { src: 'hamster_attack.png', frames: 8, cw: 318, ch: 543, ground: 460, fps: 16 },
+      skill: { src: 'hamster_attack.png', frames: 8, cw: 318, ch: 543, ground: 460, fps: 8 },
+      walk: { src: 'hamster_walk.png', frames: 7, cw: 271, ch: 324, ground: 320, fps: 9 },   // 走路循環（原圖 16 格有的有羽扇有的沒有，只挑有羽扇的 7 格）
     },
     dabao: {
       eat: { src: 'dabao_drumstick.png', frames: 8, cw: 379, ch: 360, ground: 350, fps: 3 },   // 回血：吃大雞腿（一輪）
