@@ -57,7 +57,7 @@ ML.createGame = function (config, heroes) {
     };
   }
   // 升到下一級需要多少經驗值
-  function xpNeed(level) { return config.leveling.xpNeedBase + config.leveling.xpNeedPerLevel * level; }
+  function xpNeed(level) { const g = config.leveling; return g.xpNeedBase + g.xpNeedPerLevel * level + (g.xpNeedQuad || 0) * level * level; }
   // 等級或武將變了之後重算最大血量；目前血量照比例帶過去（不會因此補血）
   function refreshHp(p) {
     const ratio = p.maxHp ? p.hp / p.maxHp : 1;
@@ -67,7 +67,15 @@ ML.createGame = function (config, heroes) {
   // 擊倒對手拿經驗值：對手等級越高拿越多；滿了就升級（一次可以連升好幾級）
   function gainKillXp(p, victim) {
     const g = config.leveling;
-    grantXp(p.prof, g.xpPerKillBase + g.xpPerKillPerVictimLevel * victim.prof.level);
+    // 打比自己低很多級的人，經驗值打折（防止高等刷低等）：低 levelGapFree 級以內不打折，超過的每多 1 級少 levelGapPenalty，最少剩 levelGapMinFactor。打比自己高的不打折
+    const gap = p.prof.level - victim.prof.level, over = Math.max(0, gap - (g.levelGapFree || 0));
+    const factor = Math.max(g.levelGapMinFactor === undefined ? 0.1 : g.levelGapMinFactor, 1 - over * (g.levelGapPenalty || 0));
+    // 同一個人（不管誰打的）短時間內被反覆打倒，每多被打倒一次，經驗值再打折（防止一直打剛復活的人刷經驗）：
+    // 過去 repeatKillWindow 秒內已經被打倒過 n 次，這次拿 (1 − n × repeatKillPenalty)，最少剩 repeatKillMinFactor
+    const win = g.repeatKillWindow || 0, log = (killLog.get(victim.id) || []).filter(t => time - t < win), repeat = log.length;
+    log.push(time); killLog.set(victim.id, log);
+    const repeatFactor = win ? Math.max(g.repeatKillMinFactor === undefined ? 0.1 : g.repeatKillMinFactor, 1 - repeat * (g.repeatKillPenalty || 0)) : 1;
+    grantXp(p.prof, Math.max(1, Math.round((g.xpPerKillBase + g.xpPerKillPerVictimLevel * victim.prof.level) * factor * repeatFactor)));
   }
   // 給某位觀眾經驗值（prof 是他的累計紀錄；人不在場上也能拿，下次上場就是新等級）。滿了就升級，一次可連升。
   function grantXp(prof, amount) {
@@ -119,6 +127,7 @@ ML.createGame = function (config, heroes) {
   // 留言「整句剛好就是烙跑」才算（標點、空白、大小寫不管），聊天說「他烙跑了」不會誤觸發。
   // 下場後等級、經驗值、累計傷害都保留，再留言武將名可以重新上場，但要先等 leaveRejoinSeconds 秒。
   const left = new Map();   // 觀眾代號 → 烙跑的時間
+  const killLog = new Map();   // 觀眾代號 → 最近被打倒的時間們（遊戲秒數）。同一個人被反覆打倒，經驗值遞減用；不存檔
   function isLeaveCommand(text) {
     const t = plain(text);
     return !!t && (config.commands.leave || []).some(c => plain(c) === t);
@@ -434,7 +443,7 @@ ML.createGame = function (config, heroes) {
     },
     // 清空場上。keepProgress = true 時保留每位觀眾的等級、經驗值、擊倒數（只把場上武將和傷害排行榜清掉）
     reset(keepProgress) {
-      players.clear(); left.clear(); bossQueue.length = 0; time = 0;
+      players.clear(); left.clear(); killLog.clear(); bossQueue.length = 0; time = 0;
       scores.forEach(s => { s.buffs = null; });   // 遊戲時間歸零，BUFF 也一併清掉
       if (keepProgress) scores.forEach(s => { s.damage = 0; }); else scores.clear();
     },
