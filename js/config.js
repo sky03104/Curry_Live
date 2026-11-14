@@ -241,6 +241,12 @@ window.GAME_CONFIG = {
       idle: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3, repeat: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭
       idle2: { src: 'michelin_snack.png', frames: 8, cw: 465, ch: 355, ground: 351, fps: 3, repeat: 3 },   // 第二組待機：吃漢堡喝奶茶。每次停下來隨機挑 idle（啃骨頭）或 idle2（吃漢堡喝奶茶），機率一樣（idle3、idle4 依此類推）
     },
+    // 魚哥：一組南瓜桶大揮擊。attack（普攻，約 0.67 秒，第 5 格打中配合衝撞）／skill（技能，衝撞那一刻播）／idle（停下來時播一次）
+    yuge: {
+      attack: { src: 'yuge_attack.png', frames: 8, cw: 504, ch: 422, ground: 418, fps: 12 },
+      skill: { src: 'yuge_attack.png', frames: 8, cw: 504, ch: 422, ground: 418, fps: 10 },
+      idle: { src: 'yuge_attack.png', frames: 8, cw: 504, ch: 422, ground: 418, fps: 5 },
+    },
     dabao: {
       eat: { src: 'dabao_drumstick.png', frames: 8, cw: 379, ch: 360, ground: 350, fps: 3 },   // 回血：吃大雞腿（一輪）
       idle: { src: 'dabao_eat.png', frames: 8, cw: 384, ch: 387, ground: 383, fps: 3, repeat: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭，連播 3 輪（跟米其林一樣）

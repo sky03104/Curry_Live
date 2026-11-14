@@ -141,6 +141,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       let delay;       // 幾秒後「打中」
       let onHit;       // 打中那一刻，在每個被打的人身上放的特效
       v.hold = 1.6; v.goal = null;   // 出招期間站定不走動
+      if (e.action !== 'aoe' && !big) startAnim(v, 'attack');   // 有出招逐格動畫的武將（魚哥）：普攻播 attack
       if (tv0 && e.action !== 'aoe' && tv0.x !== v.x) v.face = Math.sign(tv0.x - v.x);   // 轉身面向對手
 
       if (e.action === 'aoe') {
@@ -189,7 +190,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         if (!tv0) return;
 
         if (style === 'slam') {            // 猛將：衝過去重擊，地面裂開
-          after(charge, () => { v.lunge = { to: tv0.id, t: 0, dur: 0.72 }; });
+          after(charge, () => { v.lunge = { to: tv0.id, t: 0, dur: 0.72 }; startAnim(v, 'skill'); });
           delay = charge + 0.36;
           onHit = tv => {
             const ang = Math.atan2(tv.y - v.y, tv.x - v.x);
@@ -362,7 +363,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       v.hold = Math.max(0, (v.hold || 0) - dt);
       v.faceShown += clamp(v.face - v.faceShown, -dt * 12, dt * 12);   // 轉身不是瞬間翻面，而是很快地轉過去
       v.flash = Math.max(0, v.flash - dt * 4);
-      if (v.anim && ((v.anim.t += dt) >= v.anim.dur + 0.3 || v.down || v.lunge)) v.anim = null;   // 播完（或倒地、出招）就結束
+      if (v.anim && ((v.anim.t += dt) >= v.anim.dur + 0.3 || v.down || (v.lunge && !v.anim.fight))) v.anim = null;   // 播完（或倒地、出招）就結束
       v.shake = Math.max(0, v.shake - dt * 4);
       v.hop = Math.max(0, v.hop - dt * 2.2);
       const kd = Math.max(0, 1 - dt * 7); v.kbx *= kd; v.kby *= kd;   // 擊退慢慢彈回原位
@@ -387,7 +388,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     if (name === 'idle' && p && !p.isBoss) { const list = sprite.idleNames(p.hero.heroId); if (list.length > 1) name = list[Math.floor(Math.random() * list.length)]; }
     const info = p && !p.isBoss && !v.down && sprite.animInfo(p.hero.heroId, name);
     if (!info) return;
-    v.anim = { name, t: 0, dur: info.dur };
+    v.anim = { name, t: 0, dur: info.dur, fight: name === 'attack' || name === 'skill' };   // 出招動畫（attack／skill）衝撞時也繼續播
     v.hold = Math.max(v.hold || 0, info.dur + 0.3);
   }
   function roam(dt) {

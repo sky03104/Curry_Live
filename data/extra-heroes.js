@@ -13,4 +13,6 @@ window.HEROES_DATA = window.HEROES_DATA.concat([
   { heroId: 'dabao', displayName: '大寶', faction: 'Meng', troop: 'Ranger', baseHp: 540, baseAtk: 72, baseArmor: 25, skillName: '疾風撲擊', extra: true },
   // 布丁：萌國的黃金獵犬統帥。能力值取統帥平均（血、攻、防都在中間），技能演出是光環＋光柱。
   { heroId: 'pudding', displayName: '布丁', faction: 'Meng', troop: 'Commander', baseHp: 746, baseAtk: 55, baseArmor: 34, skillName: '暖心號令', extra: true },
+  // 魚哥：萌國的南瓜裝小女孩猛將（拿南瓜桶揮擊）。能力值取猛將中間檔（跟米其林同一檔），技能「南瓜重擊」，演出＝衝撞地裂。名字以外的設定是 Claude 先定的。
+  { heroId: 'yuge', displayName: '魚哥', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '南瓜重擊', extra: true },
 ]);
