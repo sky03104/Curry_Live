@@ -67,8 +67,8 @@ ML.createGame = function (config, heroes) {
   // 擊倒對手拿經驗值：對手等級越高拿越多；滿了就升級（一次可以連升好幾級）
   function gainKillXp(p, victim) {
     const g = config.leveling;
-    // 等級差太多（對方比自己高很多或低很多）經驗值打折：差在 levelGapFree 以內不打折，超過的每多 1 級少 levelGapPenalty，最少剩 levelGapMinFactor
-    const gap = Math.abs(victim.prof.level - p.prof.level), over = Math.max(0, gap - (g.levelGapFree || 0));
+    // 打比自己低很多級的人，經驗值打折（防止高等刷低等）：低 levelGapFree 級以內不打折，超過的每多 1 級少 levelGapPenalty，最少剩 levelGapMinFactor。打比自己高的不打折
+    const gap = p.prof.level - victim.prof.level, over = Math.max(0, gap - (g.levelGapFree || 0));
     const factor = Math.max(g.levelGapMinFactor === undefined ? 0.1 : g.levelGapMinFactor, 1 - over * (g.levelGapPenalty || 0));
     grantXp(p.prof, Math.max(1, Math.round((g.xpPerKillBase + g.xpPerKillPerVictimLevel * victim.prof.level) * factor)));
   }

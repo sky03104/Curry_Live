@@ -38,8 +38,8 @@ window.GAME_CONFIG = {
     xpNeedBase: 40,
     xpNeedPerLevel: 10,
     xpNeedQuad: 2,
-    // 擊倒「等級差太多」的人，經驗值打折（咖哩 2026-11-14 要求）：等級差在 levelGapFree 以內不打折，
-    // 超過的部分每多 1 級少 levelGapPenalty（0.1＝10%），最少剩 levelGapMinFactor（0.1＝10%）。不管對方比自己高或低都算。
+    // 擊倒「比自己低很多級」的人，經驗值打折（咖哩 2026-11-14 要求，防止高等刷低等）：對方比自己低 levelGapFree 級以內不打折，
+    // 超過的部分每多 1 級少 levelGapPenalty（0.1＝10%），最少剩 levelGapMinFactor（0.1＝10%）。**擊倒比自己高的人不打折**（低等打高等不吃虧）。
     levelGapFree: 5,
     levelGapPenalty: 0.1,
     levelGapMinFactor: 0.1,
