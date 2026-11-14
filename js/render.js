@@ -264,21 +264,26 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const top = lb2 ? lb2.y + lb2.h - lb.y : lbH;   // 排行榜們（一個或兩個）合起來佔的高度
     const arena = wide ? { x: 16, y: 16, w: W - lbW - 48, h: H - 32 }
                        : { x: 16, y: top + 32, w: W - 32, h: H - top - 48 - 100 };   // 直式：底下留 100 給訊息
-    // 禮物提示列：告訴觀眾「送哪個禮物會觸發哪個動作」。橫式放在排行榜左邊，直式放在排行榜下面。
-    // （2026-11-13 咖哩要求：指令列移到整個畫面的右下角，因為直播畫面的上方才是主畫面，放底下比較不會擋到）
+    // 禮物提示列：告訴觀眾「送哪個禮物會觸發哪個動作」。
+    // （2026-11-13 咖哩要求移到畫面右下角；2026-11-14 再要求改成「一排直的」：一個動作一列，從右下角往上疊。
+    //   空間不夠（排行榜佔了很多、或畫面很扁）就整排縮小，最小縮到一半。）
     const items = getLegend ? getLegend() : [];
     let legend = null;
     if (items.length) {
-      const wOf = it => 46 + 8 + it.label.length * 19 + 16;                    // 圖片 + 間距 + 動作名稱 + 內距
-      const total = list => list.reduce((a, it) => a + wOf(it), 0) + Math.max(0, list.length - 1) * 8;
-      const room = W - 32;
-      let rows = [items];
-      // 一排放不下（縮得太小看不清楚）就分兩排：上面是四個動作，下面是三個招換 BOSS
-      if (room / total(items) < 0.7) rows = [items.filter(i => !i.boss), items.filter(i => i.boss)].filter(r => r.length);
-      const scale = Math.min(1, ...rows.map(r => room / total(r)));
-      const rowH = 58 * scale, gapY = 6 * scale, h = rows.length * rowH + (rows.length - 1) * gapY;
-      legend = { rows, wOf, total, scale, rowH, gapY, h, y: H - 16 - h };
-      arena.h -= h + 8;                                                        // 武將的活動範圍往上讓出底下這一塊
+      const base = { rowH: 44, gap: 4, icon: 36, colGap: 8 };
+      const wOf = it => 8 + base.icon + 8 + it.label.length * 17 + 14;          // 內距 + 圖片 + 間距 + 動作名稱 + 內距
+      // 兩排直的：左邊是一般動作（普攻、全場、技能、回血），最右邊是招換 BOSS（紫色底）；只有一種就只畫一排
+      const cols = [items.filter(i => !i.boss), items.filter(i => i.boss)].filter(c => c.length)
+        .map(list => ({ list, w: Math.max(...list.map(wOf)) }));
+      const natW = cols.reduce((a, c) => a + c.w, 0) + (cols.length - 1) * base.colGap;
+      const natH = Math.max(...cols.map(c => c.list.length)) * (base.rowH + base.gap) - base.gap;
+      const stackBottom = lb2 ? lb2.y + lb2.h : lb.y + lb.h;                    // 右上角排行榜們的最下緣
+      const avail = H - 16 - (wide ? stackBottom + 12 + 5 * 24 : 120);          // 橫式：排行榜和訊息文字下面剩多少；直式：隨便留 120
+      let scale = clamp(Math.min(1, avail / natH), 0.5, 1);
+      if (wide) scale = Math.min(scale, lbW / natW);                            // 橫式：寬度不能超過右邊排行榜那一欄，免得蓋到場地
+      const w = natW * scale, h = natH * scale;
+      legend = { cols, scale, base, w, h, x: W - 16 - w, y: H - 16 - h };
+      if (!wide) arena.w -= w + 8;                                              // 直式：場地讓出右邊這一塊
     }
     const wander = config.wander && config.wander.enabled;
     // BOSS：又大又固定，站在場地中間偏下；一般武將會被推開、不會疊在它身上
@@ -645,27 +650,27 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
   }
 
   function drawLegend(lg) {
-    const k = lg.scale, h = lg.rowH;
-    lg.rows.forEach((row, r) => {
-      const y = lg.y + r * (lg.rowH + lg.gapY);
-      let x = W - 16 - lg.total(row) * k;                                       // 靠右對齊
-      row.forEach(it => {
-        const w = lg.wOf(it) * k;
+    const k = lg.scale, bs = lg.base, h = bs.rowH * k;
+    let cx = lg.x;
+    lg.cols.forEach(col => {
+      const cw = col.w * k;
+      col.list.forEach((it, i) => {
+        const y = lg.y + lg.h - (col.list.length - i) * (bs.rowH + bs.gap) * k + bs.gap * k, x = cx;   // 每一排都從最底下往上疊（貼齊右下角）
         ctx.fillStyle = it.boss ? 'rgba(48,22,84,0.84)' : 'rgba(22,26,30,0.78)';   // 招換 BOSS 的底色偏紫
-        ctx.beginPath(); ctx.roundRect(x, y, w, h, 12 * k); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(x, y, cw, h, 10 * k); ctx.fill();
         ctx.strokeStyle = it.boss ? 'rgba(194,123,255,0.8)' : 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
-        const size = 46 * k, ix = x + 8 * k, iy = y + (h - size) / 2;
+        const size = bs.icon * k, ix = x + 8 * k, iy = y + (h - size) / 2;
         const img = giftIcon(it.icon);
         if (img) ctx.drawImage(img, ix, iy, size, size);
         else {   // 還沒有圖片：畫一個小方框。指定了禮物就寫名稱前兩個字；用預設鑽石數的 BOSS 就寫「500 鑽」
           ctx.fillStyle = 'rgba(255,255,255,0.14)';
-          ctx.beginPath(); ctx.roundRect(ix, iy, size, size, 8 * k); ctx.fill();
-          if (it.hint) { text(it.hint, ix + size / 2, iy + size * 0.38, 17 * k, '#fff'); text('鑽', ix + size / 2, iy + size * 0.76, 12 * k, '#d9a8ff', 'center', false); }
-          else text(it.name.replace(/^#/, '').slice(0, 2), ix + size / 2, iy + size / 2, 15 * k, '#fff', 'center', false);
+          ctx.beginPath(); ctx.roundRect(ix, iy, size, size, 7 * k); ctx.fill();
+          if (it.hint) { text(it.hint, ix + size / 2, iy + size * 0.38, 14 * k, '#fff'); text('鑽', ix + size / 2, iy + size * 0.76, 10 * k, '#d9a8ff', 'center', false); }
+          else text(it.name.replace(/^#/, '').slice(0, 2), ix + size / 2, iy + size / 2, 13 * k, '#fff', 'center', false);
         }
-        text(it.label, ix + size + 8 * k, y + h / 2, 19 * k, it.boss ? '#e6c8ff' : '#ffd35c', 'left');
-        x += w + 8 * k;
+        text(it.label, ix + size + 8 * k, y + h / 2, 17 * k, it.boss ? '#e6c8ff' : '#ffd35c', 'left');
       });
+      cx += cw + bs.colGap * k;
     });
   }
 
@@ -762,7 +767,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     toasts.forEach((t, i) => {
       ctx.globalAlpha = t.age > 4 ? 5 - t.age : 1;
       if (wide) text(t.text, lb.x + 4, (lb2 ? lb2.y + lb2.h : lb.y + lb.h) + 22 + i * 24, 14, '#fff', 'left');
-      else text(t.text, 20, H - 16 - (legend ? legend.h + 8 : 0) - (toasts.length - 1 - i) * 24, 15, '#fff', 'left');
+      else text(t.text, 20, H - 16 - (toasts.length - 1 - i) * 24, 15, '#fff', 'left');
       ctx.globalAlpha = 1;
     });
 
