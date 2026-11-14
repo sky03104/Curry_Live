@@ -98,6 +98,7 @@ window.GAME_CONFIG = {
   // ---------- 禮物對應 ----------
   // id：程式內部代號。之後接真的 TikTok 時，會把 TikTok 的禮物對應到這裡的 id。
   // action：對應上面四種動作之一（attack / aoe / skill / heal）
+  toastSeconds: 60,   // 排行榜下面的訊息文字停留幾秒（2026-11-14 咖哩要求從 5 秒改 60 秒；同時最多顯示 4 則，來了新的會擠掉最舊的）
   gifts: [
     { id: 'rose',     name: '玫瑰', icon: '🌹', action: 'attack' },
     { id: 'firework', name: '煙火', icon: '🎆', action: 'aoe' },

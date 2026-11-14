@@ -12,6 +12,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
   let floats = [];           // 飄起來的字（傷害數字、補血、技能名）
   let rings = [];            // 擴散的圓圈（全場攻擊、技能命中）
   let timers = [];           // 「幾秒後做某事」（讓扣血剛好發生在撞到的那一刻）
+  const toastLife = config.toastSeconds || 60;   // 訊息停留秒數（最後 1 秒逐漸變淡）
   let toasts = [];           // 左下角訊息
   let time = 0, W = 0, H = 0, viewK = 1;   // viewK：畫面整體縮小的比例（很小的直播畫面會等比例縮小來畫）
   let dim = null;            // 技能發動時畫面短暫變暗
@@ -375,7 +376,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     if (config.wander && config.wander.enabled && bounds) roam(dt);
     floats.forEach(f => f.age += dt); floats = floats.filter(f => f.age < (f.life || 1) && views.has(f.v.id));
     rings.forEach(r => r.age += dt); rings = rings.filter(r => r.age < r.life);
-    toasts.forEach(t => t.age += dt); toasts = toasts.filter(t => t.age < 5);
+    toasts.forEach(t => t.age += dt); toasts = toasts.filter(t => t.age < toastLife);
   }
 
   // 待機時在場上隨意走動：走到一個隨機地點 → 停一下 → 再挑下一個地點
@@ -791,7 +792,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     // 訊息：橫式放在排行榜下方，直式放在畫面最底下（都不會蓋到武將）
     const wide = W >= H;
     toasts.forEach((t, i) => {
-      ctx.globalAlpha = t.age > 4 ? 5 - t.age : 1;
+      ctx.globalAlpha = t.age > toastLife - 1 ? toastLife - t.age : 1;
       if (wide) text(t.text, lb.x + 4, (lb2 && !wide ? lb2.y + lb2.h : lb.y + lb.h) + 22 + i * 24, 14, '#fff', 'left');
       else text(t.text, 20, H - 16 - (toasts.length - 1 - i) * 24, 15, '#fff', 'left');
       ctx.globalAlpha = 1;
