@@ -24,13 +24,22 @@ ML.createHeroSprite = function (heroes, config, basePath) {
     return c;
   }
 
-  const ready = Promise.all(heroes.map(h => new Promise(resolve => {
-    if (h.isBoss && !h.hasArt) { resolve(); return; }   // BOSS 還沒放圖（config.boss.list 的 hasArt 是 false）就不去找圖檔，用示意怪獸
+  // 「用到才載入」（2026-11-14）：以前一開網頁就把全部武將圖（約 11 MB）載入，角色越多越慢；
+  // 現在某隻武將第一次要畫（上場、換角、BOSS 出現）時，才去下載它那一張圖，之後就在記憶體裡。
+  // 狀態：'loading' 下載中（這時先不畫，通常不到 0.1 秒）／'ok' 好了／'error' 載不到（畫底色塊＋名字，BOSS 畫示意怪獸）。
+  const loadState = new Map();   // heroId → 'loading' | 'ok' | 'error'
+  function load(h) {
+    const id = h.heroId, s = loadState.get(id);
+    if (s) return s;
+    if (h.isBoss && !h.hasArt) { loadState.set(id, 'error'); return 'error'; }   // BOSS 還沒放圖（config.boss.list 的 hasArt 是 false）就不去找圖檔，用示意怪獸
+    loadState.set(id, 'loading');
     const img = new Image();
-    img.onload = () => { images.set(h.heroId, img); whites.set(h.heroId, makeWhite(img)); resolve(); };
-    img.onerror = () => resolve();   // 圖載不到就畫底圈＋名字，不讓整個遊戲停擺
-    img.src = `${basePath}/${h.heroId}.png`;
-  })));
+    img.onload = () => { images.set(id, img); whites.set(id, makeWhite(img)); loadState.set(id, 'ok'); };
+    img.onerror = () => loadState.set(id, 'error');   // 圖載不到就畫底色塊＋名字，不讓整個遊戲停擺
+    img.src = `${basePath}/${id}.png`;
+    return 'loading';
+  }
+  const ready = Promise.resolve();   // 不用等圖：畫面可以馬上開始跑
 
   // 示意用的怪獸（BOSS 的正式圖檔放進 assets/heroes/<id>.png 之後就不會再用到）：
   // 深色身體、兩支角、發光的眼睛、背上的尖刺。原點在腳底中央，往上畫。
@@ -59,8 +68,10 @@ ML.createHeroSprite = function (heroes, config, basePath) {
 
   return {
     ready,
+    preload(hero) { load(hero); },   // 先去下載（上場時呼叫，讓第一次畫的時候圖已經在了）
     // (x, y) 是角色中心，size 是角色高度。state = { pose, poseTime, flash(0~1 閃白強度), lean(身體傾斜角度), facing(-1 面向左 ~ 1 面向右) }
     draw(ctx, hero, x, y, size, state) {
+      if (load(hero) === 'loading') return;   // 這隻的圖還在下載，先不畫（下一格就會出現）
       const color = (config.factions[hero.faction] || {}).color || '#888';
       const img = images.get(hero.heroId);
       const down = state.pose === 'down';
