@@ -20,6 +20,13 @@ window.GAME_CONFIG = {
   maxOnStage: 24,               // 場上最多幾隻武將
   leaderboardSize: 5,           // 排行榜顯示前幾名
 
+  // ---------- 全員同能力 ----------
+  // 2026-11-14 咖哩要求：直播亂鬥不像真的遊戲需要搭配，所以所有武將的血量、攻擊、防禦都一樣（用下面這組數字，
+  // 不看 data/heroes.js 裡每隻自己的數值——那份是自動從萌戰三國同步來的，改了會被蓋掉，所以統一在這裡覆蓋）。
+  // 技能名稱、技能演出、陣營還是各自不同。想恢復每隻自己的數值：把 enabled 改成 false。
+  // 數字取原本 41 隻平均（血 682／攻 50／防 31）附近的整數；等級成長照舊，BOSS 的數值不受影響。
+  uniformHero: { enabled: true, hp: 1000, atk: 60, def: 35 },   // 2026-11-14 咖哩要求「再調高一點」：700/50/30 → 1000/60/35
+
   // ---------- 等級 ----------
   // 擊倒別人的武將拿經驗值，滿了就升級。等級跟著觀眾走，換武將、倒地、離場再回來都還在；
   // 但重新整理網頁會全部歸零（遊戲沒有存檔）。
@@ -163,8 +170,8 @@ window.GAME_CONFIG = {
   boss: {
     attackEverySeconds: 60,     // 每幾秒隨機攻擊一位玩家（2026-11-13 咖哩嫌太快：10 → 60）
     aoeEverySeconds: 300,       // 每幾秒放一次全場攻擊（60 → 300）；剛好撞在同一秒時，那一下只放全場攻擊
-    singleMultiplier: 3,        // 單體攻擊傷害 = BOSS 攻擊 × 這個數字（再被玩家防禦打折）
-    aoeMultiplier: 3,           // 全場攻擊傷害 = BOSS 攻擊 × 這個數字（打到每一位玩家）
+    singleMultiplier: 1.5,      // 單體攻擊傷害 = BOSS 攻擊 × 這個數字（再被玩家防禦打折）（2026-11-14 咖哩嫌還是太痛：3 → 1.5）
+    aoeMultiplier: 1,           // 全場攻擊傷害 = BOSS 攻擊 × 這個數字（打到每一位玩家）（3 → 1）
     autoTargetChance: 0.6,      // 玩家沒鎖定任何人時，有多少機率直接打 BOSS（其餘照原本的隨機對象）
     removeAfterSeconds: 3,      // BOSS 倒下後，過幾秒從場上消失（接著叫出排隊中的下一隻）
     maxQueue: 20,               // 排隊最多幾隻（超過的招換會被擋下）
@@ -182,7 +189,7 @@ window.GAME_CONFIG = {
         reward: { regenPerSecond: 10, seconds: 3600, label: '藍BUFF 效果：每秒回復 10 血' } },
       { id: 'boss_red',    displayName: '紅BUFF',   level: 5,  hasArt: true,  hp: 2500,  atk: 55,  def: 20,  xp: 600,  lastHitBonus: 200,  skillName: '烈焰荊棘', aoeName: '熔岩爆發', accent: '#ff5c4d',
         reward: { atkMultiplier: 2, seconds: 3600, label: '紅BUFF 效果：攻擊力加倍' } },
-      { id: 'boss_ape',    displayName: '太古巨猿', level: 30, hasArt: true,  hp: 36000, atk: 190, def: 110, xp: 9000, lastHitBonus: 3000, skillName: '遠古重擊', aoeName: '地動山搖', accent: '#ffb04a' },
+      { id: 'boss_ape',    displayName: '太古巨猿', level: 30, hasArt: true,  hp: 20000, atk: 190, def: 110, xp: 9000, lastHitBonus: 3000, skillName: '遠古重擊', aoeName: '地動山搖', accent: '#ffb04a' },
     ],
   },
 
