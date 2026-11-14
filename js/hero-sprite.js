@@ -87,7 +87,7 @@ ML.createHeroSprite = function (heroes, config, basePath) {
     // 這隻武將有沒有這個動作、圖準備好了沒；回傳 { 秒數 } 或 null
     animInfo(heroId, name) {
       const m = animMeta(heroId, name);
-      return m && loadSheet(heroId, name) ? { dur: m.frames / (m.fps || 4) } : null;
+      return m && loadSheet(heroId, name) ? { dur: m.frames * (m.repeat || 1) / (m.fps || 4) } : null;
     },
     // (x, y) 是角色中心，size 是角色高度。state = { pose, poseTime, flash(0~1 閃白強度), lean(身體傾斜角度), facing(-1 面向左 ~ 1 面向右) }
     draw(ctx, hero, x, y, size, state) {
@@ -102,7 +102,10 @@ ML.createHeroSprite = function (heroes, config, basePath) {
       let anim = null;
       if (state.anim && !down && !(state.flash > 0.05)) {
         const m = animMeta(hero.heroId, state.anim.name), sh = m && loadSheet(hero.heroId, state.anim.name);
-        if (sh) anim = { m, sh, frame: Math.min(m.frames - 1, Math.floor(state.anim.t * (m.fps || 4))) };
+        if (sh) {
+          const n = Math.floor(state.anim.t * (m.fps || 4));   // 第幾格（連續算）；repeat 次循環播完後停在最後一格
+          anim = { m, sh, frame: n >= m.frames * (m.repeat || 1) ? m.frames - 1 : n % m.frames };
+        }
       }
 
       ctx.save();
