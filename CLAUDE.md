@@ -268,7 +268,8 @@
 | `bridge/server.js` | TikTok 橋接程式（在主播電腦上跑，不是網頁的一部分） |
 | `bridge/啟動.bat` | Windows 一鍵啟動橋接程式 |
 | `tools/make_roster.js` | 產生武將名冊圖片（發給觀眾看有哪些武將可選），輸出到 `roster/` |
-| `roster/` | 武將名冊圖片：全武將長圖一張＋魏蜀吳群各一張。武將資料或圖有變就重跑 `node tools/make_roster.js` |
+| `roster/` | 武將名冊圖片：全武將長圖一張＋魏蜀吳群各一張。武將資料或圖有變就重跑 `node tools/make_roster.js`；另有 `玩法說明.jpg`（`node tools/make_howto.js`） |
+| `tools/make_howto.js` | 產生「玩法說明」圖片 `roster/玩法說明.jpg`（發給觀眾看怎麼玩）。可用 `--attack 玫瑰 --aoe 煙火 --skill 皇冠 --heal 愛心` 填上主播指定的禮物名；數字（60 秒復活、99 級、BOSS 鑽石數）寫在腳本裡，改了 `js/config.js` 要回頭改 |
 | `tools/sync_from_curry_games.py` | 從 Curry_Games 同步資料與全身圖 |
 
 ## 工作方式
