@@ -1,6 +1,6 @@
 """把「綠底、多格排在一張圖上」的連續動作圖，轉成遊戲用的逐格動畫條（透明背景、一排橫放）。
 
-用法：python3 tools/make_anim_sheet.py <原圖> <輸出檔名> [--grid 4x2] [--faces right|left] [--match-height 328] [--equalize area]
+用法：python3 tools/make_anim_sheet.py <原圖> <輸出檔名> [--grid 4x2] [--faces right|left] [--match-height 328] [--equalize area] [--erase-grid 6]
 範例：python3 tools/make_anim_sheet.py 米其林吃骨頭.jpg assets/heroes/michelin_eat.png --grid 4x2 --faces right
 
 做的事：
@@ -8,6 +8,7 @@
   2. 不是按格線切，而是「找連在一起的像素」（骨頭會跨進隔壁格，按格線切會切到）。
      每個連通塊依重心歸到哪一格；每格最大的那塊是狗，其他（骨頭、碎屑）跟著那一格。
   3. 每格以「狗的腳底」對齊、「狗的中心」對齊；原圖面向右的會左右翻成面向左（遊戲預設面向左）。
+  3.5 （選用 --erase-grid N）原圖格子之間有黑色格線時，把每條格線兩側 N 像素塗成綠色，不然格線會把所有格子連成一塊。
   4. （選用 --equalize area）每格狗的畫面大小常常不一樣（例如第二排比第一排大一圈），加這個選項會讓每格狗的「面積」拉到一樣大，播放時就不會忽大忽小。
   5. 全部格子用同一個縮放比例（讓站著的狗跟 assets/heroes/ 的單張圖一樣大），排成一排。
 輸出後會印出要貼進 js/config.js 的 heroAnims 設定（格寬、格高、腳底在哪一列）。
@@ -20,7 +21,7 @@ from PIL import Image
 def parse():
     a = sys.argv[1:]
     if len(a) < 2: print(__doc__); sys.exit(1)
-    opt = {'grid': '4x2', 'faces': 'right', 'match-height': '328', 'equalize': ''}
+    opt = {'grid': '4x2', 'faces': 'right', 'match-height': '328', 'equalize': '', 'erase-grid': '0'}
     pos = []
     i = 0
     while i < len(a):
@@ -61,6 +62,10 @@ def main():
     cols, rows = map(int, opt['grid'].split('x'))
     im = Image.open(src); W, H = im.size
     rgba = key_green(im)
+    n = int(opt['erase-grid'])
+    if n > 0:   # 把格線附近塗成透明（等於背景）
+        for k in range(1, cols): x = round(k * W / cols); rgba[:, max(0, x - n):x + n, 3] = 0
+        for k in range(1, rows): y = round(k * H / rows); rgba[max(0, y - n):y + n, :, 3] = 0
     lab, comps = components(rgba[..., 3] > 40)
     comps = [c for c in comps if c['size'] >= 20]
     cw, ch = W / cols, H / rows
