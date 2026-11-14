@@ -113,6 +113,12 @@ ML.createHeroSprite = function (heroes, config, basePath) {
         }
       }
 
+      // 走路中：有登記走路動畫（config.heroAnims.<id>.walk）就循環播（不被打、沒在播別的動畫時）
+      if (!anim && state.moving && !down && !(state.flash > 0.05)) {
+        const m = animMeta(hero.heroId, 'walk'), sh = m && loadSheet(hero.heroId, 'walk');
+        if (sh) anim = { m, sh, frame: Math.floor((state.poseTime || 0) * (m.fps || 8) + (state.phase || 0)) % m.frames };
+      }
+
       ctx.save();
       if (down) {                       // 倒地：躺平、變灰、變淡
         ctx.translate(x, footY - w * 0.42);
