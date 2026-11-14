@@ -50,8 +50,10 @@ ML.createGiftSettings = function (config, params) {
     for (const [n, a] of Object.entries(state.map)) t.giftByName[n] = actionToGift[a];
     t.ignoreUnlisted = state.ignoreUnlisted;
   }
+  let appliedAt = 0; const listeners = [];
   function save() {
     apply();
+    listeners.forEach(f => { try { f(); } catch (e) { /* 不影響設定本身 */ } });
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 存不了也不影響這次使用 */ }
   }
 
@@ -73,6 +75,18 @@ ML.createGiftSettings = function (config, params) {
     },
     actionOf(name) { const k = Object.keys(state.map).find(k => same(k, name)); return k ? state.map[k] : ''; },
     setIgnoreUnlisted(v) { state.ignoreUnlisted = !!v; save(); },
+    onChange(f) { listeners.push(f); },   // 設定被改了就通知（面板用來自動同步到雲端）
+    // 雲端同步：面板改了會存到雲端，直播畫面定時讀回來套用（不用重貼網址）。圖片網址兩邊各自學到的合併起來
+    exportRemote() { return { map: { ...state.map }, ignoreUnlisted: state.ignoreUnlisted, icons: { ...state.icons }, at: Date.now() }; },
+    applyRemote(g) {
+      if (!g || typeof g !== 'object' || !(Number(g.at) > appliedAt) || typeof g.map !== 'object' || !g.map) return false;
+      appliedAt = Number(g.at);
+      const map = {}; for (const [n, a] of Object.entries(g.map)) if (actionToGift[a]) map[String(n).slice(0, 80)] = a;
+      const icons = {}; for (const [n, u] of Object.entries({ ...(g.icons || {}), ...state.icons })) if (/^https?:|^file:/.test(u || '')) icons[n] = u;
+      state = { map, ignoreUnlisted: !!g.ignoreUnlisted, icons };
+      apply(); try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 存不了不影響 */ }
+      return true;
+    },
     // 記住某個禮物的圖片網址（收到禮物時呼叫）。回傳 true 代表是新學到的
     rememberIcon(name, url) {
       if (!name || !/^https?:|^file:/.test(url || '')) return false;
