@@ -52,7 +52,7 @@ window.GAME_CONFIG = {
       projectId: 'mengzhan-sanguo',
       apiKey: 'AIzaSyBzJytVzlJv2E6_6bSgs42WHG-2YFmhSuY',   // Firebase 網頁用金鑰，本來就是公開的，不是密碼
       baseUrl: 'https://firestore.googleapis.com',
-      pullSeconds: 300,         // 直播畫面每隔幾秒重讀一次雲端（讓主播在面板調整的等級套用進來）。每次算 1 次讀取，免費額度每天 5 萬次
+      pullSeconds: 90,          // 直播畫面每隔幾秒重讀一次雲端（讓主播在面板調整的等級、主播文字指令設定套用進來，不用重貼網址）。每次算 1 次讀取，一天約 960 次，免費額度每天 5 萬次，大約夠 50 位實況主
       intervalSeconds: 30,      // 每隔幾秒存一次雲端（有變動才存）。Firebase 免費額度每天 2 萬次寫入，這個數字很夠用
     },
   },

@@ -411,7 +411,7 @@ ML.createGame = function (config, heroes) {
         // 主播的文字指令：主播本人留言設定好的字 = 送那個動作的禮物（不走一般留言處理）
         const hostGift = hostMatch && hostMatch(ev.user, ev.text);
         if (hostGift && hostGift.revive !== undefined) { hostRevive(ev.user, hostGift.revive); return; }
-        if (hostGift) { handleGift(ev.user, hostGift.giftId, hostGift.count || 1, config.hostMaxCount); return; }
+        if (hostGift) { notice(`主播指令：${hostGift.label || '動作'} ×${hostGift.count || 1}`); handleGift(ev.user, hostGift.giftId, hostGift.count || 1, config.hostMaxCount); return; }   // 訊息區會寫出這次算幾個：寫 ×1 代表直播網址裡沒帶次數（忘了重貼網址）
         if (hostCheck && hostCheck(ev.user) && hostLevelCommand(ev.text)) return;   // 主播留言「等級 名字 30」：調整等級
         handleChat(ev.user, ev.text);
       }

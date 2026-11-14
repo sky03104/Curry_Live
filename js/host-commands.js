@@ -42,6 +42,7 @@ ML.createHostCommands = function (config) {
     } catch (e) { /* 讀不到就當沒設定 */ }
   }
   if (!fromUrl()) fromStorage();
+  let appliedAt = 0;   // 套用過的雲端設定的時間（只套用比這個新的）
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 存不了不影響這次使用 */ } };
   const norm = t => String(t || '').trim().toLowerCase();
 
@@ -64,6 +65,14 @@ ML.createHostCommands = function (config) {
       if (t) state.cmds[action] = t; else delete state.cmds[action];
       save();
     },
+    // 雲端同步：把目前的主播設定整包打包／套用（面板改了會存到雲端，直播畫面定時讀回來，不用重貼網址）
+    exportRemote() { return { hostId: state.hostId, hostName: state.hostName, cmds: { ...state.cmds }, counts: { ...state.counts }, at: Date.now() }; },
+    applyRemote(h) {
+      if (!h || typeof h !== 'object' || !(Number(h.at) > appliedAt)) return false;
+      appliedAt = Number(h.at);
+      state = { hostId: String(h.hostId || '').slice(0, 80), hostName: String(h.hostName || ''), cmds: cleanCmds(h.cmds), counts: cleanCounts(h.counts) };
+      save(); return true;
+    },
     isHost(user) { return !!(state.hostId && user && user.id === state.hostId); },
     // 這句留言是不是主播的指令？是就回傳 { giftId, count }（count = 這個動作設定的次數），不是回傳 null
     match(user, text) {
@@ -71,7 +80,7 @@ ML.createHostCommands = function (config) {
       const t = norm(text);
       if (!t) return null;
       const a = giftActions.find(a => state.cmds[a] && norm(state.cmds[a]) === t);
-      if (a) return { giftId: actionToGift[a], count: state.counts[a] || 1 };
+      if (a) return { giftId: actionToGift[a], count: state.counts[a] || 1, label: label(a) };
       // 復活：「復活」＝讓主播自己的武將馬上復活；「復活 小明」＝復活那位觀眾；「復活 全部」＝所有倒地的人
       const rv = state.cmds[REVIVE] && norm(state.cmds[REVIVE]);
       if (rv && (t === rv || t.startsWith(rv + ' ') || t.startsWith(rv + '\u3000'))) return { revive: String(text).trim().slice(rv.length).trim() };

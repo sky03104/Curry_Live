@@ -51,11 +51,24 @@
     lastCloudState = st.state;
   });
   // 讀雲端 → 跟本機目前的進度合併 → 套用到遊戲；有本機的進度雲端沒有時，也一併存上去
+  // 主播在面板改的設定（主播文字指令）存在雲端存檔裡，直播畫面讀回來套用：不用每改一次就重貼網址（只有直播畫面套用，面板自己的設定以面板為準）
+  function applyCloudSettings() {
+    if (!cloud.canWrite) return;
+    const s = cloud.settings;
+    if (s && s.host && hostCmd.applyRemote(s.host)) game.announce('已套用主播在面板改的指令設定');
+  }
+  async function saveSettings(settings) {   // 面板呼叫：把主播設定存到雲端
+    if (!cloud.enabled) return { state: 'off' };
+    const merged = await cloud.store(realProfiles(), { force: true, settings });
+    if (merged) { game.importProfiles(merged, true); return { state: 'ok' }; }
+    return { state: 'fail', text: cloud.status.text };
+  }
   async function syncCloud() {
     if (!cloud.enabled || !config.save.enabled) return 0;
     try {
       const remote = await cloud.load();
       game.importProfiles(remote, true);
+      applyCloudSettings();
       if (remote.length) game.announce(`已讀取雲端存檔：${remote.length} 位觀眾的等級`);
       if (cloud.canWrite && realProfiles().length) cloudDirty = true;
       await flushCloud();
@@ -65,7 +78,7 @@
   async function flushCloud(leaving) {
     if (!cloud.enabled || !cloud.canWrite || !cloudDirty) return;
     const merged = await cloud.store(realProfiles(), { keepalive: !!leaving });
-    if (merged) { game.importProfiles(merged, true); cloudDirty = false; }   // 別的視窗賺到的等級也套進來
+    if (merged) { game.importProfiles(merged, true); cloudDirty = false; applyCloudSettings(); }   // 別的視窗賺到的等級、面板改的指令設定也套進來
   }
   // ---------- 手動儲存（面板的「立即儲存」按鈕）----------
   // 不用等定時存檔，馬上把「這個視窗目前有的進度」存到本機，雲端有開的話也存到雲端。
@@ -88,7 +101,7 @@
   }
   setInterval(() => flushCloud(), config.save.cloud.intervalSeconds * 1000);
   // 直播畫面每隔一段時間重讀一次雲端：主播在面板調整的等級才會套用進來（每 5 分鐘一次，免費額度夠用）
-  if (cloud.canWrite) setInterval(async () => { if (!cloud.enabled || cloudDirty) return; try { game.importProfiles(await cloud.load(), true); } catch (e) { /* 這次讀不到下次再試 */ } }, (config.save.cloud.pullSeconds || 300) * 1000);
+  if (cloud.canWrite) setInterval(async () => { if (!cloud.enabled) return; try { game.importProfiles(await cloud.load(), true); applyCloudSettings(); } catch (e) { /* 這次讀不到下次再試 */ } }, (config.save.cloud.pullSeconds || 300) * 1000);
   window.addEventListener('pagehide', () => flushCloud(true));    // 關掉網頁前盡力再存一次（存不到也沒關係，下次開會從本機補上去）
   game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup' || e.type === 'bossDefeated' || e.type === 'levelSet') cloudDirty = true; });
   syncCloud();
@@ -101,7 +114,7 @@
   if (params.get('obs') === '1') {
     document.body.classList.add('obs');
   } else {
-    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { heroSettings, hostCmd, save, flushSave, count: saved.length, cloud, syncCloud, saveNow });
+    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { heroSettings, hostCmd, saveSettings, save, flushSave, count: saved.length, cloud, syncCloud, saveNow });
   }
   // 接真的 TikTok，兩種方式擇一：
   //   A. TikFinity 電腦版（建議）：網址加 ?tikfinity=1
