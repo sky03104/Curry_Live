@@ -424,6 +424,14 @@ ML.createGame = function (config, heroes) {
     reviveRemaining,
     stats,
     xpNeed,
+    // 對 BOSS 的傷害排行榜：場上有 BOSS 才有（沒有就回 null）；只算這一隻 BOSS 的傷害，打完下一隻重新算
+    getBossLeaderboard() {
+      const b = players.get(BOSS_ID);
+      if (!b) return null;
+      const rows = [...b.hits.entries()].map(([id, damage]) => { const s = scores.get(id) || {}; return { id, name: s.name || '', level: s.level || 1, heroName: s.heroName || '', damage }; })
+        .sort((x, y) => y.damage - x.damage).slice(0, config.leaderboardSize);
+      return { name: b.name, rows };
+    },
     getLeaderboard() {
       return [...scores.values()].filter(s => s.damage > 0)
         .sort((a, b) => b.damage - a.damage).slice(0, config.leaderboardSize);
