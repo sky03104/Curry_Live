@@ -123,6 +123,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       effects.rise(v.x, v.y + v.size * 0.2, '#7dffa0', 20, v.size * 0.4);
       rings.push({ v, age: 0, life: 0.5, color: '#7dffa0', max: 1.2 });
       floats.push({ v, text: '+' + e.amount, color: '#7dffa0', scale: 1, age: 0 });
+      startAnim(v, 'eat');   // 有「吃東西」動畫的武將（米其林）回血時播一次
     } else if (e.type === 'attack') {
       const hero = game.getPlayer(e.id).hero;
       const color = bright((config.factions[hero.faction] || { color: '#cccccc' }).color);
@@ -339,6 +340,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       v.hold = Math.max(0, (v.hold || 0) - dt);
       v.faceShown += clamp(v.face - v.faceShown, -dt * 12, dt * 12);   // 轉身不是瞬間翻面，而是很快地轉過去
       v.flash = Math.max(0, v.flash - dt * 4);
+      if (v.anim && ((v.anim.t += dt) >= v.anim.dur + 0.3 || v.down || v.lunge)) v.anim = null;   // 播完（或倒地、出招）就結束
       v.shake = Math.max(0, v.shake - dt * 4);
       v.hop = Math.max(0, v.hop - dt * 2.2);
       const kd = Math.max(0, 1 - dt * 7); v.kbx *= kd; v.kby *= kd;   // 擊退慢慢彈回原位
@@ -355,6 +357,13 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
   // 回傳值小於 1 代表太近、會互相擋到。
   function gap(ax, ay, bx, by, size) {
     return Math.hypot((bx - ax) / (size * 1.05), (by - ay) / (size * 1.2 + Math.min(62, size * 0.8)));   // 武將小的時候，上下需要的間隔也跟著小
+  }
+  // 逐格動畫：這隻武將有設定這個動作（config.heroAnims）才播；播的時候站定不走，播完再繼續
+  function startAnim(v, name) {
+    const p = game.getPlayer(v.id), info = p && !p.isBoss && !v.down && sprite.animInfo(p.hero.heroId, name);
+    if (!info) return;
+    v.anim = { name, t: 0, dur: info.dur };
+    v.hold = Math.max(v.hold || 0, info.dur + 0.3);
   }
   function roam(dt) {
     const cfg = config.wander, b = bounds;
@@ -382,7 +391,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         v.goal = best; v.stall = 0;
       }
       const dx = v.goal.x - v.x, dy = v.goal.y - v.y, d = Math.hypot(dx, dy), step = cfg.speed * v.size * dt;
-      if (d <= step) { v.goal = null; v.rest = cfg.restMin + Math.random() * (cfg.restMax - cfg.restMin); continue; }
+      if (d <= step) { v.goal = null; v.rest = cfg.restMin + Math.random() * (cfg.restMax - cfg.restMin); if (!v.anim) startAnim(v, 'idle'); continue; }   // 走到定點停下來：有待機動畫就播一次
       v.x += dx / d * step; v.y += dy / d * step;
       v.want = step; v.dir = Math.sign(dx);
       if (Math.abs(v.goal.x - v.x) > v.size * 0.2) v.face = v.dir;   // 面向前進方向（幾乎直上直下時不轉身）
@@ -540,7 +549,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     let lean = 0;
     if (v.lunge) { const t = views.get(v.lunge.to); if (t) lean = Math.sign(t.x - v.x || 1) * 0.22 * Math.sin(Math.PI * v.lunge.t / v.lunge.dur); }
     else lean = clamp(v.kbx / size * 1.4, -0.35, 0.35) + (v.moving ? v.dir * 0.06 : 0);   // 走路時微微往前進方向傾
-    sprite.draw(ctx, p.hero, x, y, size, { pose, poseTime: v.lunge ? v.lunge.t : time, flash: v.flash, lean, facing: v.faceShown, phase: v.phase, moving: v.moving });
+    sprite.draw(ctx, p.hero, x, y, size, { pose, poseTime: v.lunge ? v.lunge.t : time, flash: v.flash, lean, facing: v.faceShown, phase: v.phase, moving: v.moving, anim: v.anim });
 
     // 血條
     const bw = Math.max(54, size * 0.95), bh = Math.max(7, size * 0.09);
@@ -743,7 +752,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     arenas,
     frame(dt) { update(dt); draw(); },
     // 自動測試用：讀出每隻武將目前的位置
-    debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down, face: v.face, moving: v.moving })); },
+    debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down, face: v.face, moving: v.moving, anim: v.anim ? v.anim.name : '' })); },
     debugBounds() { return bounds; },
     reset() { views.clear(); leavers = []; floats = []; rings = []; timers = []; toasts = []; dim = null; quake = 0; effects.clear(); },
   };

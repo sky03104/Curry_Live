@@ -49,6 +49,13 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       <div class="body">
         <div class="hint">每個動作右邊選一個 TikTok 禮物。清單裡沒有的，選最下面的「自己輸入名稱…」，照 TikFinity 的 Gift Browser 抄英文名稱。</div>
         <div id="gs-actions"></div>
+        <details class="sub-details">
+          <summary>📥 貼上 TikFinity 的禮物清單<em id="gi-count"></em></summary>
+          <div class="hint">在 TikFinity 的 Gift Browser 把禮物名稱複製下來（一行一個，後面可以接鑽石數，例如「玫瑰 1」），貼在這裡按「匯入」，上面的下拉選單就會多一組「已匯入的禮物」，名稱跟實際收到的一樣，不會抄錯。圖片還是要等有人送過才會出現。</div>
+          <textarea id="gi-text" rows="5" placeholder="玫瑰 1&#10;愛心 5&#10;獅子 29999"></textarea>
+          <div class="row"><button id="gi-add" class="main">匯入</button><button id="gi-clear">清空已匯入</button></div>
+          <div class="hint" id="gi-msg"></div>
+        </details>
         <div class="sub">最近收到的 TikTok 禮物</div>
         <div class="hint">連上直播後，觀眾送的禮物會出現在這裡，可以直接選它要對應哪個動作。</div>
         <div id="gs-seen"><div class="hint">（還沒收到任何禮物）</div></div>
@@ -180,6 +187,27 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   // ---------- TikTok 禮物設定 ----------
   const actionLabel = a => config.actions[a].label;
   const seen = new Map();   // 最近收到的 TikTok 禮物：名稱（或 #編號）→ { 顯示名稱, 鑽石數 }
+  // 收過的禮物記在這個瀏覽器，重新整理後選單裡還在（不然只剩下英文的「常見禮物」，名稱跟實際收到的對不上）
+  const SEEN_KEY = 'curryLive.seenGifts.v1';
+  try { (JSON.parse(localStorage.getItem(SEEN_KEY)) || []).forEach(([k, label]) => seen.set(k, { label })); } catch (e) { /* 讀不到就從空的開始 */ }
+  // 從 TikFinity 貼上來的禮物清單（名稱照貼的存，所以跟實際收到的一樣）
+  const IMP_KEY = 'curryLive.importedGifts.v1';
+  let imported = [];   // [{ name, diamonds }]
+  try { imported = (JSON.parse(localStorage.getItem(IMP_KEY)) || []).filter(g => g && g.name); } catch (e) { imported = []; }
+  const saveImported = () => { try { localStorage.setItem(IMP_KEY, JSON.stringify(imported)); } catch (e) { /* 存不了不影響 */ } };
+  // 一行一個禮物：「名稱」「名稱 5」「名稱,5」「名稱（5 鑽）」「名稱<Tab>5」都認；最後面的數字當鑽石數
+  function parseGiftList(text) {
+    const out = [];
+    for (let line of String(text || '').split(/\r?\n/)) {
+      line = line.replace(/^[\s\-*•·\d]+[.)、]\s*/, '').trim();   // 去掉開頭的編號／項目符號
+      if (!line) continue;
+      const m = line.match(/^(.*?)[\s,，\t|:：(（]+(\d+)\s*(?:鑽石?|鑽|diamonds?|coins?)?\s*[)）]?$/i);
+      const name = (m ? m[1] : line).trim(), diamonds = m ? +m[2] : 0;
+      if (name && name.length <= 60 && !out.some(g => g.name.toLowerCase() === name.toLowerCase())) out.push({ name, diamonds });
+    }
+    return out;
+  }
+  const saveSeen = () => { try { localStorage.setItem(SEEN_KEY, JSON.stringify([...seen.entries()].map(([k, g]) => [k, g.label]))); } catch (e) { /* 存不了不影響 */ } };
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const options = current => '<option value="">不指定</option>' +
     giftSettings.actions.map(a => `<option value="${a}"${a === current ? ' selected' : ''}>${actionLabel(a)}</option>`).join('');
@@ -189,20 +217,25 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   function giftOptions(current) {
     const same = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
     const recent = [...seen.entries()].reverse().map(([key, g]) => ({ name: key, label: g.label }));
-    const common = (config.tiktok.commonGifts || []).filter(c => !recent.some(r => same(r.name, c.name)))
+    const common = (imported.length ? [] : (config.tiktok.commonGifts || [])).filter(c => !recent.some(r => same(r.name, c.name)))
       .map(c => ({ name: c.name, label: `${c.name}（${c.diamonds} 鑽）` }));
-    const known = [...recent, ...common];
+    const imp = imported.filter(g => !recent.some(r => same(r.name, g.name)))
+      .map(g => ({ name: g.name, label: g.diamonds ? `${g.name}（${g.diamonds} 鑽）` : g.name }));
+    const known = [...recent, ...imp, ...common];
     const opt = o => `<option value="${esc(o.name)}"${current && same(o.name, current) ? ' selected' : ''}>${esc(o.label)}</option>`;
     return `<option value="">不指定</option>` +
       (current && !known.some(o => same(o.name, current)) ? `<option value="${esc(current)}" selected>${esc(current)}</option>` : '') +
       (recent.length ? `<optgroup label="最近收到的禮物">${recent.map(opt).join('')}</optgroup>` : '') +
-      `<optgroup label="常見禮物">${common.map(opt).join('')}</optgroup>` +
+      (imp.length ? `<optgroup label="已匯入的禮物">${imp.map(opt).join('')}</optgroup>` : '') +
+      (common.length ? `<optgroup label="常見禮物（英文參考，可能跟收到的名稱不同）">${common.map(opt).join('')}</optgroup>` : '') +
       `<option value="${CUSTOM}">自己輸入名稱…</option>`;
   }
   const giftOf = action => Object.keys(giftSettings.map).find(n => giftSettings.map[n] === action) || '';
 
   function renderGiftSettings() {
-    const row = a => `<div class="gs-row"><b>${actionLabel(a)}</b><select data-action="${a}">${giftOptions(giftOf(a))}</select></div>`;
+    // 選好的禮物，旁邊顯示它的圖片（要有人送過那個禮物才知道圖片網址）
+    const icon = a => { const u = giftOf(a) && giftSettings.iconOf(giftOf(a)); return u ? `<img class="gs-ico" src="${esc(u)}" alt="">` : ''; };
+    const row = a => `<div class="gs-row"><b>${actionLabel(a)}</b>${icon(a)}<select data-action="${a}">${giftOptions(giftOf(a))}</select></div>`;
     $('#gs-actions').innerHTML = giftSettings.actions.filter(a => !isBoss(a)).map(row).join('');
     $('#gs-boss').innerHTML = giftSettings.actions.filter(isBoss).map(row).join('');
     $('#p-arena-now').textContent = (renderer.arenas.list.find(x => x.key === renderer.arenas.get()) || {}).label || '';
@@ -235,6 +268,18 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     if (sel.value) setActionGift(sel.value, sel.dataset.seen); else giftSettings.set(sel.dataset.seen, '');
     renderGiftSettings();
   };
+  const importCount = () => { $('#gi-count').textContent = imported.length ? imported.length + ' 個' : ''; };
+  $('#gi-add').onclick = () => {
+    const list = parseGiftList($('#gi-text').value);
+    if (!list.length) { $('#gi-msg').textContent = '沒有讀到任何禮物名稱。請一行貼一個。'; return; }
+    for (const g of list) { const i = imported.findIndex(x => x.name.toLowerCase() === g.name.toLowerCase()); if (i >= 0) imported[i] = g; else imported.push(g); }
+    if (imported.length > 400) imported = imported.slice(-400);
+    saveImported(); importCount(); $('#gi-text').value = '';
+    $('#gi-msg').textContent = `已匯入 ${list.length} 個禮物（共 ${imported.length} 個）。上面的下拉選單裡找「已匯入的禮物」。`;
+    renderGiftSettings();
+  };
+  $('#gi-clear').onclick = () => { if (imported.length && !window.confirm('清空已匯入的禮物清單？（已經設定好的對應不會受影響）')) return; imported = []; saveImported(); importCount(); $('#gi-msg').textContent = '已清空。'; renderGiftSettings(); };
+  importCount();
   root.querySelectorAll('input[name="gs-other"]').forEach(r => { r.onchange = () => { giftSettings.setIgnoreUnlisted(r.value === 'ignore'); renderGiftSettings(); }; });
   $('#gs-copy').onclick = () => {
     const box = $('#gs-url'); box.select();
@@ -285,7 +330,8 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       // 真的 TikTok 禮物：記進「最近收到」，並寫明它對應到哪個動作（或為什麼沒反應）
       const g = ev.gift, key = g.name || ('#' + g.id);
       seen.delete(key); seen.set(key, { label: `${g.name || '（沒有名稱）編號 ' + g.id}（${g.diamonds} 鑽）` });
-      while (seen.size > 12) seen.delete(seen.keys().next().value);
+      while (seen.size > 30) seen.delete(seen.keys().next().value);
+      saveSeen();
       const to = ev.mapped ? actionLabel((config.gifts.find(x => x.id === ev.mapped) || {}).action) : '沒有對應，已忽略';
       addLog(`📦 TikTok 禮物：${seen.get(key).label} ×${ev.count} → ${to}（${g.icon ? '有讀到圖片' : '沒讀到圖片'}）` + (g.raw ? `　原始資料：${g.raw}` : ''));
       renderGiftSettings();

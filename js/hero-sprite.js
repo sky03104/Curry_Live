@@ -39,6 +39,21 @@ ML.createHeroSprite = function (heroes, config, basePath) {
     img.src = `${basePath}/${id}.png`;
     return 'loading';
   }
+  // ---------- 逐格動畫（config.heroAnims）----------
+  // 某隻武將有設定的動作（例如米其林的 eat／idle），圖是「一排橫放的連續圖」。第一次畫到才下載。
+  const sheets = new Map();   // 'heroId/動作' → 圖
+  function animMeta(heroId, name) { const a = (config.heroAnims || {})[heroId]; return a && a[name] || null; }
+  function loadSheet(heroId, name) {
+    const key = heroId + '/' + name, m = animMeta(heroId, name);
+    if (!m) return null;
+    if (!sheets.has(key)) {
+      sheets.set(key, null);
+      const img = new Image();
+      img.onload = () => sheets.set(key, img);   // 載不到就維持 null，這個動作就不會播
+      img.src = `${basePath}/${m.src}`;
+    }
+    return sheets.get(key);
+  }
   const ready = Promise.resolve();   // 不用等圖：畫面可以馬上開始跑
 
   // 示意用的怪獸（BOSS 的正式圖檔放進 assets/heroes/<id>.png 之後就不會再用到）：
@@ -68,7 +83,12 @@ ML.createHeroSprite = function (heroes, config, basePath) {
 
   return {
     ready,
-    preload(hero) { load(hero); },   // 先去下載（上場時呼叫，讓第一次畫的時候圖已經在了）
+    preload(hero) { load(hero); Object.keys((config.heroAnims || {})[hero.heroId] || {}).forEach(n => loadSheet(hero.heroId, n)); },   // 先去下載（上場時呼叫，讓第一次畫的時候圖已經在了）
+    // 這隻武將有沒有這個動作、圖準備好了沒；回傳 { 秒數 } 或 null
+    animInfo(heroId, name) {
+      const m = animMeta(heroId, name);
+      return m && loadSheet(heroId, name) ? { dur: m.frames / (m.fps || 4) } : null;
+    },
     // (x, y) 是角色中心，size 是角色高度。state = { pose, poseTime, flash(0~1 閃白強度), lean(身體傾斜角度), facing(-1 面向左 ~ 1 面向右) }
     draw(ctx, hero, x, y, size, state) {
       if (load(hero) === 'loading') return;   // 這隻的圖還在下載，先不畫（下一格就會出現）
@@ -78,6 +98,12 @@ ML.createHeroSprite = function (heroes, config, basePath) {
       // 全身圖是直的（312x396），腳貼在圖的最底。BOSS 的圖比例不固定（龍、猿…），照圖片自己的長寬比畫。
       const h = size * 1.12, aspect = hero.isBoss ? (img ? img.naturalWidth / img.naturalHeight : 1.25) : 312 / 396, w = h * aspect;
       const footY = y + size / 2;
+      // 正在播逐格動畫（state.anim = { name, t }）：改畫那一格。被打（閃白）時先回到單張圖，閃白才看得到
+      let anim = null;
+      if (state.anim && !down && !(state.flash > 0.05)) {
+        const m = animMeta(hero.heroId, state.anim.name), sh = m && loadSheet(hero.heroId, state.anim.name);
+        if (sh) anim = { m, sh, frame: Math.min(m.frames - 1, Math.floor(state.anim.t * (m.fps || 4))) };
+      }
 
       ctx.save();
       if (down) {                       // 倒地：躺平、變灰、變淡
@@ -95,7 +121,7 @@ ML.createHeroSprite = function (heroes, config, basePath) {
         const turn = (state.facing === undefined ? -1 : state.facing) * artDir;   // 1 = 照原圖畫，-1 = 左右相反
         ctx.scale(Math.sign(turn || 1) * Math.max(0.15, Math.abs(turn)), 1);
         // 待機／走路時圖片自己也會動（以腳為軸心）：呼吸（一下高一下矮）＋身體左右輕晃（頭晃得比腳多）
-        if (state.pose === 'idle') {
+        if (state.pose === 'idle' && !anim) {
           const t = (state.poseTime || 0), ph = state.phase || 0;
           if (state.moving) {                                   // 走路：隨腳步一壓一彈，身體左右搖
             const step = Math.sin(t * 9 + ph);
@@ -109,7 +135,11 @@ ML.createHeroSprite = function (heroes, config, basePath) {
         }
       }
       // 以下以「腳底中央」為原點往上畫
-      if (img) {
+      if (anim) {
+        // 動畫圖的像素比例跟單張圖（312x396）一樣，所以用同一個縮放；腳底那一列對在原點
+        const k = h / 396, m = anim.m;
+        ctx.drawImage(anim.sh, anim.frame * m.cw, 0, m.cw, m.ch, -m.cw * k / 2, -m.ground * k, m.cw * k, m.ch * k);
+      } else if (img) {
         ctx.drawImage(img, -w / 2, -h, w, h);
         if (state.flash > 0 && !down) {
           ctx.globalAlpha = Math.min(1, state.flash);
