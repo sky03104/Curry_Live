@@ -43,7 +43,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div class="row"><select id="hc-pick"></select><button id="hc-set" class="main" style="flex:none">我就是主播</button></div>
         <div class="hc-who" id="hc-who"></div>
         <div class="sub">② 每個動作的指令文字（留空 = 不用）＋次數</div>
-        <div class="hint">右邊的「次」＝一次留言算幾個禮物（傷害、回血乘上次數），不用同一句打好幾遍。一般動作最多 10 次，招換 BOSS 最多 3 次。</div>
+        <div class="hint">右邊的「次」＝一次留言算幾個禮物（傷害、回血乘上次數），不用同一句打好幾遍。一般動作最多 1000 次（1 鑽的玫瑰可能一次送很多個），招換 BOSS 最多 3 次。</div>
         <div id="hc-cmds"></div>
         <div class="hint" id="hc-warn"></div>
         <div class="hint">⚠ 直播畫面要重貼網址才會生效。主播還沒上場時留言指令，會自動帶預設武將上場（跟送禮一樣）。</div>

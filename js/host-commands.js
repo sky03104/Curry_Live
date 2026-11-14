@@ -12,7 +12,7 @@ ML.createHostCommands = function (config) {
   const actionToGift = {};   // 動作 → 遊戲禮物代號（跟送那個動作的禮物一樣處理）
   config.gifts.forEach(g => { if (!actionToGift[g.action]) actionToGift[g.action] = g.id; });
   const actions = Object.keys(actionToGift);
-  const maxCount = a => (config.actions[a] && config.actions[a].summon) ? (config.boss && config.boss.maxSummonPerGift) || 3 : config.maxGiftCombo || 10;   // 次數上限：跟連送禮物一樣（一般動作 10、招換 BOSS 3）
+  const maxCount = a => (config.actions[a] && config.actions[a].summon) ? (config.boss && config.boss.maxSummonPerGift) || 3 : config.hostMaxCount || 1000;   // 次數上限：一般動作 hostMaxCount（1000，因為 1 鑽的玫瑰可能一次送很多個）；招換 BOSS 跟連送一樣 3
   let state = { hostId: '', hostName: '', cmds: {}, counts: {} };
 
   function cleanCmds(o) {
