@@ -34,6 +34,16 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       </div>
     </details>
 
+    <details class="card" data-k="heroes">
+      <summary><span class="ico">🧙</span>可選武將<em id="hs-count"></em></summary>
+      <div class="body">
+        <div class="hint">勾選要讓觀眾選的武將，沒勾的觀眾留言也上不了場（已經在場上的不受影響）。每個人各設各的，設定會寫進你自己的直播用網址。至少要留一隻。</div>
+        <div class="row"><button id="hs-all">全選</button><button id="hs-none">只留一隻</button></div>
+        <div id="hs-list"></div>
+        <div class="hint">⚠ 直播畫面要重貼網址才會生效。</div>
+      </div>
+    </details>
+
     <details class="card" data-k="gifts">
       <summary><span class="ico">🎁</span>禮物對應<em>普攻／全場／技能／回血</em></summary>
       <div class="body">
@@ -199,7 +209,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     if (seen.size) $('#gs-seen').innerHTML = [...seen.entries()].reverse().map(([key, g]) =>
       `<div class="seen"><span title="${esc(g.label)}">${esc(g.label)}</span><select data-seen="${esc(key)}">${options(giftSettings.actionOf(key))}</select></div>`).join('');
     root.querySelector(`input[name="gs-other"][value="${giftSettings.ignoreUnlisted ? 'ignore' : 'tier'}"]`).checked = true;
-    $('#gs-url').value = giftSettings.liveUrl({ save: $('#sv-slot').value.trim(), cloud: saving.cloud.enabled ? saving.cloud.token : '', arena: renderer.arenas.get() === 'none' ? '' : renderer.arenas.get() });
+    $('#gs-url').value = giftSettings.liveUrl({ save: $('#sv-slot').value.trim(), cloud: saving.cloud.enabled ? saving.cloud.token : '', arena: renderer.arenas.get() === 'none' ? '' : renderer.arenas.get(), ...saving.heroSettings.urlParams() });
   }
   // 一個動作只對應一個禮物：選了新的，就取代這個動作原本的
   function setActionGift(action, name) {
@@ -246,6 +256,19 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     arenaHint(); renderGiftSettings();
   };
   arenaHint();
+
+  // 可選武將：依陣營分組的勾選清單
+  const hsel = saving.heroSettings;
+  const facOrder = Object.keys(config.factions).filter(f => heroes.some(h => h.faction === f));
+  function renderHeroPool() {
+    $('#hs-count').textContent = hsel.count() + '/' + heroes.length;
+    $('#hs-list').innerHTML = facOrder.map(f => `<div class="hs-fac" style="color:${config.factions[f].color}">${esc(config.factions[f].label)}</div><div class="hs-grid">` +
+      heroes.filter(h => h.faction === f).map(h => `<label><input type="checkbox" data-hero="${h.heroId}"${hsel.isOn(h.heroId) ? ' checked' : ''}> ${esc(h.displayName)}</label>`).join('') + '</div>').join('');
+    root.querySelectorAll('#hs-list input[data-hero]').forEach(c => { c.onchange = () => { if (!hsel.set(c.dataset.hero, c.checked)) c.checked = true; game.setHeroPool(hsel.enabled); renderHeroPool(); renderGiftSettings(); }; });
+  }
+  $('#hs-all').onclick = () => { hsel.setMany(hsel.all); game.setHeroPool(hsel.enabled); renderHeroPool(); renderGiftSettings(); };
+  $('#hs-none').onclick = () => { hsel.setMany([hsel.enabled[0]]); game.setHeroPool(hsel.enabled); renderHeroPool(); renderGiftSettings(); };
+  renderHeroPool();
   renderGiftSettings();
 
   // ---------- 事件紀錄 ----------
