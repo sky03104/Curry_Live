@@ -34,6 +34,7 @@ ML.createHeroSettings = function (heroes, params) {
   if (!fromUrl()) fromStorage();
   if (!enabled.size) enabled = new Set(all);   // 一隻都沒開的設定視為無效，退回全開
 
+  let appliedAt = 0;
   function persist() { try { localStorage.setItem(KEY, JSON.stringify({ enabled: [...enabled], def })); } catch (e) { /* 存不了不影響這次使用 */ } }
   return {
     all,
@@ -53,6 +54,16 @@ ML.createHeroSettings = function (heroes, params) {
       persist(); return true;
     },
     setMany(ids) { const s = new Set(clean(ids)); if (!s.size) return false; if (def) s.add(def); enabled = s; persist(); return true; },   // 預設武將一定留著
+    // 雲端同步：面板改了會存到雲端，直播畫面定時讀回來套用（不用重貼網址）
+    exportRemote() { return { enabled: [...enabled], def: this.defaultId, at: Date.now() }; },
+    applyRemote(h) {
+      if (!h || typeof h !== 'object' || !(Number(h.at) > appliedAt) || !Array.isArray(h.enabled)) return false;
+      appliedAt = Number(h.at);
+      const s = new Set(clean(h.enabled)); if (!s.size) return false;
+      def = typeof h.def === 'string' && valid.has(h.def) ? h.def : '';
+      if (def) s.add(def);
+      enabled = s; persist(); return true;
+    },
     // 要加進直播用網址的參數（全開時什麼都不加）
     urlParams() {
       const out = {};

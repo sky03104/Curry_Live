@@ -70,6 +70,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div class="hint"><b>預設武將</b>：武將名字後面的圓點選一隻，還沒上場就直接送禮的觀眾，會自動帶著它上場，這份禮物照常生效。預設武將一定會開放，取消不掉。</div>
         <label class="hs-nodef"><input type="radio" name="hs-def" value=""> 不自動上場（沒上場送禮會提醒要先留言）</label>
         <div class="row"><button id="hs-all">全選</button><button id="hs-none">只留一隻</button></div>
+        <div class="hint" id="hs-sync"></div>
         <div id="hs-list"></div>
         <div class="hint">⚠ 直播畫面要重貼網址才會生效。</div>
       </div>
@@ -335,18 +336,29 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
 
   // 可選武將：依陣營分組的勾選清單
   const hsel = saving.heroSettings;
+  // 可選武將／預設武將一改（等 1 秒沒再動）就自動存到雲端，直播畫面定時讀回來套用，不用重貼網址
+  let hsTimer = null;
+  function hsSync() {
+    clearTimeout(hsTimer);
+    if (!saving.cloud.enabled) { $('#hs-sync').textContent = '（沒開雲端存檔：改完要重貼直播網址才會生效）'; return; }
+    $('#hs-sync').textContent = '☁ 同步中…';
+    hsTimer = setTimeout(async () => {
+      let r = null; try { r = await saving.saveSettings({ heroes: hsel.exportRemote() }); } catch (e) { r = null; }
+      $('#hs-sync').textContent = r && r.state === 'ok' ? `☁ 已同步到雲端（${new Date().toLocaleTimeString()}）：直播畫面約 ${config.save.cloud.pullSeconds || 90} 秒內自動套用，不用重貼網址。` : '⚠ 同步到雲端失敗：' + ((r && r.text) || '連不上') + '（改完要重貼直播網址才會生效）';
+    }, 1000);
+  }
   const facOrder = Object.keys(config.factions).filter(f => heroes.some(h => h.faction === f));
   function renderHeroPool() {
     $('#hs-count').textContent = hsel.count() + '/' + heroes.length;
     $('#hs-list').innerHTML = facOrder.map(f => `<div class="hs-fac" style="color:${config.factions[f].color}">${esc(config.factions[f].label)}</div><div class="hs-grid">` +
       heroes.filter(h => h.faction === f).map(h => `<label><input type="checkbox" data-hero="${h.heroId}"${hsel.isOn(h.heroId) ? ' checked' : ''}${hsel.defaultId === h.heroId ? ' disabled' : ''}> ${esc(h.displayName)}<input type="radio" name="hs-def" value="${h.heroId}" title="設為預設武將"${hsel.defaultId === h.heroId ? ' checked' : ''}></label>`).join('') + '</div>').join('');
     root.querySelector(`input[name="hs-def"][value=""]`).checked = !hsel.defaultId;
-    const apply = () => { game.setHeroPool(hsel.enabled); game.setDefaultHero(hsel.defaultId); renderHeroPool(); renderGiftSettings(); };
+    const apply = () => { game.setHeroPool(hsel.enabled); game.setDefaultHero(hsel.defaultId); renderHeroPool(); renderGiftSettings(); hsSync(); };
     root.querySelectorAll('#hs-list input[data-hero]').forEach(c => { c.onchange = () => { if (!hsel.set(c.dataset.hero, c.checked)) c.checked = true; apply(); }; });
     root.querySelectorAll('input[name="hs-def"]').forEach(r => { r.onchange = () => { if (r.checked) { hsel.setDefault(r.value); apply(); } }; });
   }
-  $('#hs-all').onclick = () => { hsel.setMany(hsel.all); game.setHeroPool(hsel.enabled); game.setDefaultHero(hsel.defaultId); renderHeroPool(); renderGiftSettings(); };
-  $('#hs-none').onclick = () => { hsel.setMany([hsel.defaultId || hsel.enabled[0]]); game.setHeroPool(hsel.enabled); game.setDefaultHero(hsel.defaultId); renderHeroPool(); renderGiftSettings(); };
+  $('#hs-all').onclick = () => { hsel.setMany(hsel.all); game.setHeroPool(hsel.enabled); game.setDefaultHero(hsel.defaultId); renderHeroPool(); renderGiftSettings(); hsSync(); };
+  $('#hs-none').onclick = () => { hsel.setMany([hsel.defaultId || hsel.enabled[0]]); game.setHeroPool(hsel.enabled); game.setDefaultHero(hsel.defaultId); renderHeroPool(); renderGiftSettings(); hsSync(); };
   renderHeroPool();
   renderGiftSettings();
 

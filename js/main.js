@@ -56,10 +56,11 @@
     if (!cloud.canWrite) return;
     const s = cloud.settings;
     if (s && s.host && hostCmd.applyRemote(s.host)) game.announce('已套用主播在面板改的指令設定');
+    if (s && s.heroes && heroSettings.applyRemote(s.heroes)) { game.setHeroPool(heroSettings.enabled); game.setDefaultHero(heroSettings.defaultId); game.announce('已套用主播在面板改的可選武將設定'); }
   }
   async function saveSettings(settings) {   // 面板呼叫：把主播設定存到雲端
     if (!cloud.enabled) return { state: 'off' };
-    const merged = await cloud.store(realProfiles(), { force: true, settings });
+    const merged = await cloud.store(realProfiles(), { force: true, settings: { ...(cloud.settings || {}), ...settings } });   // 跟雲端上原本的設定合併（改可選武將不會把主播指令弄丟，反過來也是）
     if (merged) { game.importProfiles(merged, true); return { state: 'ok' }; }
     return { state: 'fail', text: cloud.status.text };
   }
