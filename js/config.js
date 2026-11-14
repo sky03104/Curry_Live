@@ -62,6 +62,7 @@ window.GAME_CONFIG = {
   //   對方防禦 50 → 傷害剩 67%；防禦 100 → 剩 50%；防禦 200 → 剩 33%
   defenseFactor: 100,
   damageVariance: 0.1,          // 傷害浮動幅度。0.1 = 每次傷害上下浮動 10%
+  hostMaxCount: 1000,           // 主播文字指令「次數」的上限（一次留言最多算幾個禮物）。招換 BOSS 仍用 boss.maxSummonPerGift
   maxGiftCombo: 10,             // 一次連送很多個同樣禮物時，最多算幾個
 
   // ---------- 四種動作 ----------

@@ -42,7 +42,8 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div class="hint">先用主播的帳號在直播間<b>隨便留言一次</b>，再從下面選自己（用帳號代號比對，不會被取一樣暱稱的人冒充）。</div>
         <div class="row"><select id="hc-pick"></select><button id="hc-set" class="main" style="flex:none">我就是主播</button></div>
         <div class="hc-who" id="hc-who"></div>
-        <div class="sub">② 每個動作的指令文字（留空 = 不用）</div>
+        <div class="sub">② 每個動作的指令文字（留空 = 不用）＋次數</div>
+        <div class="hint">右邊的「次」＝一次留言算幾個禮物（傷害、回血乘上次數），不用同一句打好幾遍。一般動作最多 1000 次（1 鑽的玫瑰可能一次送很多個），招換 BOSS 最多 3 次。</div>
         <div id="hc-cmds"></div>
         <div class="hint" id="hc-warn"></div>
         <div class="hint">⚠ 直播畫面要重貼網址才會生效。主播還沒上場時留言指令，會自動帶預設武將上場（跟送禮一樣）。</div>
@@ -381,9 +382,10 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   const hc = saving.hostCmd, recent = new Map();   // 最近留言的人：代號 → 名字
   const hcWho = () => { $('#hc-who').textContent = hc.hostId ? `目前主播：${hc.hostName || '（沒有名字）'}（代號 ${hc.hostId.slice(0, 14)}${hc.hostId.length > 14 ? '…' : ''}）` : '目前還沒設定主播，指令不會生效。'; $('#hc-state').textContent = hc.hostId && Object.keys(hc.cmds).length ? '已設定' : ''; };
   const hcPick = () => { const cur = $('#hc-pick').value; $('#hc-pick').innerHTML = [...recent.entries()].reverse().map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join('') || '<option value="">（還沒有人留言）</option>'; if (recent.has(cur)) $('#hc-pick').value = cur; };
-  const hcRows = () => { $('#hc-cmds').innerHTML = hc.actions.map(a => `<div class="hc-row"><b>${esc(actionLabel(a))}</b><input data-hc="${a}" maxlength="40" placeholder="例如：打他" value="${esc(hc.cmds[a] || '')}"></div>`).join(''); };
+  const hcRows = () => { $('#hc-cmds').innerHTML = hc.actions.map(a => `<div class="hc-row"><b>${esc(actionLabel(a))}</b><input data-hc="${a}" maxlength="40" placeholder="例如：打他" value="${esc(hc.cmds[a] || '')}"><input type="number" class="hc-n" data-hcn="${a}" min="1" max="${hc.maxCount(a)}" value="${hc.countOf(a)}" title="次數：一次算幾個（最多 ${hc.maxCount(a)}）"><span class="hc-x">次</span></div>`).join(''); };
   const hcWarn = () => { const d = hc.duplicates(); $('#hc-warn').textContent = d.length ? `⚠ ${d.map(actionLabel).join('、')} 的指令文字跟前面的動作重複，這幾個不會觸發。` : ''; };
   $('#hc-set').onclick = () => { const id = $('#hc-pick').value; if (!id) return; hc.setHost(id, recent.get(id) || ''); hcWho(); renderGiftSettings(); };
+  $('#hc-cmds').onchange = e => { const n = e.target.closest('[data-hcn]'); if (!n) return; hc.setCount(n.dataset.hcn, n.value); n.value = hc.countOf(n.dataset.hcn); renderGiftSettings(); };
   $('#hc-cmds').oninput = e => { const i = e.target.closest('[data-hc]'); if (!i) return; hc.setCmd(i.dataset.hc, i.value); hcWarn(); hcWho(); renderGiftSettings(); };
   hcRows(); hcWho(); hcPick(); hcWarn();
   hub.on(ev => {

@@ -204,7 +204,7 @@ ML.createGame = function (config, heroes) {
   function hit_name(text) { const m = nameTable.find(([name]) => name === text); return m ? m[0] : null; }
 
   // ---------- 送禮 ----------
-  function handleGift(user, giftId, rawCount) {
+  function handleGift(user, giftId, rawCount, comboMax) {   // comboMax：這次最多算幾個（觀眾連送用 maxGiftCombo；主播文字指令放寬到 hostMaxCount）
     const gift = config.gifts.find(g => g.id === giftId);
     if (!gift) return;
     // 招換 BOSS：不用先上場（這是花大錢的禮物，不該因為沒上場就白送）
@@ -222,7 +222,7 @@ ML.createGame = function (config, heroes) {
       me = joinHero(user, dh);
       if (!me) return;
     }
-    const count = Math.max(1, Math.min(config.maxGiftCombo, Math.floor(rawCount) || 1));
+    const count = Math.max(1, Math.min(comboMax || config.maxGiftCombo, Math.floor(rawCount) || 1));
 
     if (me.down) {
       const wait = reviveRemaining(me);
@@ -385,7 +385,7 @@ ML.createGame = function (config, heroes) {
       if (ev.type === 'chat') {
         // 主播的文字指令：主播本人留言設定好的字 = 送那個動作的禮物（不走一般留言處理）
         const hostGift = hostMatch && hostMatch(ev.user, ev.text);
-        if (hostGift) { handleGift(ev.user, hostGift, 1); return; }
+        if (hostGift) { handleGift(ev.user, hostGift.giftId, hostGift.count || 1, config.hostMaxCount); return; }
         if (hostCheck && hostCheck(ev.user) && hostLevelCommand(ev.text)) return;   // 主播留言「等級 名字 30」：調整等級
         handleChat(ev.user, ev.text);
       }
