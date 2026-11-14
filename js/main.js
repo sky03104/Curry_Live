@@ -12,6 +12,7 @@
   // 可選武將：這位實況主開放哪些武將（網址 &heroes= / &skip=，沒有就用這個瀏覽器記住的）
   const heroSettings = ML.createHeroSettings(heroes, params);
   game.setHeroPool(heroSettings.enabled);
+  game.setDefaultHero(heroSettings.defaultId);   // 還沒上場就送禮的觀眾，自動帶著這隻上場
   const sprite = ML.createHeroSprite(heroes.concat(game.bossHeroes()), config, 'assets/heroes');   // BOSS 的圖也要載入
   // 場地：直播畫面讀網址的 &arena=；面板視窗讀這個瀏覽器記住的選擇（方便預覽）
   const arenas = ML.createArenas();

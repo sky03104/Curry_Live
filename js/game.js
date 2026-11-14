@@ -17,6 +17,7 @@ ML.createGame = function (config, heroes) {
     if (heroById.has(id)) nameTable.push([alias, heroById.get(id)]);
   }
   nameTable.sort((a, b) => b[0].length - a[0].length);
+  let defaultHeroId = '';   // 還沒上場就送禮時自動上場的預設武將（空字串 = 不自動上場）
   // 這位實況主開放哪些武將：留言只比對開放的武將（已在場上的不受影響）。允許清單由 hero-settings.js 決定
   function setHeroPool(ids) {
     const ok = new Set(ids);
@@ -151,10 +152,14 @@ ML.createGame = function (config, heroes) {
     const hit = nameTable.find(([name]) => text.includes(name));
     if (!hit) return;   // 沒提到武將
     if (me) { switchHero(me, text, hit[1]); return; }
+    joinHero(user, hit[1]);
+  }
+
+  // 讓一位觀眾帶著某隻武將上場（留言武將名、或還沒上場就送禮時自動上場都走這裡）。成功回傳場上的武將，不能上場（剛烙跑、場上滿了）回傳 null
+  function joinHero(user, hero) {
     const wait = (config.leaveRejoinSeconds || 0) - (time - (left.has(user.id) ? left.get(user.id) : -1e9));
-    if (wait > 0) { notice(`${user.name} 剛烙跑，還要 ${Math.ceil(wait)} 秒才能再上場`); return; }
-    if ([...players.values()].filter(o => !o.isBoss).length >= config.maxOnStage) { notice(`場上已滿，${user.name} 請稍候`); return; }
-    const hero = hit[1];
+    if (wait > 0) { notice(`${user.name} 剛烙跑，還要 ${Math.ceil(wait)} 秒才能再上場`); return null; }
+    if ([...players.values()].filter(o => !o.isBoss).length >= config.maxOnStage) { notice(`場上已滿，${user.name} 請稍候`); return null; }
     if (!scores.has(user.id)) scores.set(user.id, { id: user.id, damage: 0, kills: 0, level: 1, xp: 0 });
     const prof = Object.assign(scores.get(user.id), { name: user.name, heroName: hero.displayName });
     const p = { id: user.id, name: user.name, hero, prof, maxHp: 0, hp: 0, down: false, downAt: 0, lockId: null, lastActive: time };
@@ -162,6 +167,7 @@ ML.createGame = function (config, heroes) {
     players.set(user.id, p);
     fx({ type: 'join', id: p.id });
     notice(p.prof.level > 1 ? `${p.name} 的 ${hero.displayName}（Lv.${p.prof.level}）上場！` : `${p.name} 的 ${hero.displayName} 上場！`);
+    return p;
   }
 
   // ---------- 換武將 ----------
@@ -191,8 +197,14 @@ ML.createGame = function (config, heroes) {
       for (let i = 0; i < n; i++) summonBoss(user, summonId);
       return;
     }
-    const me = players.get(user.id);
-    if (!me) { notice(`${user.name} 請先留言武將名字上場`); return; }
+    let me = players.get(user.id);
+    if (!me) {
+      // 還沒上場就送禮：有設定預設武將就自動帶著它上場，這份禮物照常生效；沒設定就提醒要先留言
+      const dh = defaultHeroId && heroById.get(defaultHeroId);
+      if (!dh) { notice(`${user.name} 請先留言武將名字上場`); return; }
+      me = joinHero(user, dh);
+      if (!me) return;
+    }
     const count = Math.max(1, Math.min(config.maxGiftCombo, Math.floor(rawCount) || 1));
 
     if (me.down) {
@@ -346,6 +358,7 @@ ML.createGame = function (config, heroes) {
 
   return {
     setHeroPool,
+    setDefaultHero(id) { defaultHeroId = heroById.has(id) ? id : ''; },
     onFx(fn) { fxListeners.push(fn); },
     handleEvent(ev) {
       // 任何留言或送禮都算「有動作」，用來判斷這位觀眾還在不在

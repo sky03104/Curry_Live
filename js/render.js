@@ -65,6 +65,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       sprite.preload(p.hero);   // 先去下載這隻的圖（用到才載入）
       views.set(e.id, { id: e.id, boss: !!p.isBoss, deadT: 0, x: null, y: null, size: p.isBoss ? 200 : 80, hp: p.hp, shownHp: p.hp, down: false,
         flash: 0, shake: 0, hop: 1, hopH: 1.2, lunge: null, pending: 0, kbx: 0, kby: 0, face: -1, faceShown: -1, phase: Math.random() * 6 });
+      if (W > 0) layout();   // 馬上排好位置：上場和送禮可能發生在同一瞬間（沒上場就送禮會自動上場），攻擊演出需要它的位置
       return;
     }
     const v = views.get(e.id);
