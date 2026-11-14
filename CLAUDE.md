@@ -140,6 +140,7 @@
   - 圖：咖哩提供的原圖是白底，用 `tools/cutout_hero.py` 去背（AI 去背 rembg，連腳下陰影一起去掉）並縮成 312x396 放在 `assets/heroes/michelin.png`。
     之後要再加角色：照 `data/extra-heroes.js` 檔頭的四個步驟做。
   - 魚哥（2026-11-14 咖哩第四隻）：南瓜裝小女孩拿南瓜桶揮擊，`heroId: yuge`，猛將（技能演出＝衝撞地裂），血 928／攻 52／防 47（同米其林），技能「南瓜重擊」。名字以外的設定是 Claude 先定的。圖是咖哩提供的白底原圖（`tools/cutout_hero.py` 去背），動畫是一組 8 格南瓜桶大揮擊（`assets/heroes/yuge_attack.png`，Gemini 生成、`make_anim_sheet.py --grid 4x2 --faces left --match-height 396 --equalize area`）。**出招動畫是新機制**：`heroAnims` 裡寫 `attack`（普攻出招時播，約 0.67 秒，第 5 格打中對齊 0.31 秒的命中時間）／`skill`（技能衝撞那一刻播）；這兩種衝撞時不會被中斷（`v.anim.fight`），沒登記的武將完全不受影響。魚哥的 `idle` 也先用同一組（播一次）。**走路動畫（`walk`，2026-11-14 新機制）**：`heroAnims.<id>.walk` 有登記的武將，移動時一直循環播（`hero-sprite.js` 的 draw，被打、播別的動畫時不播），圖 `assets/heroes/yuge_walk.png`（原圖面向右，用 `--faces right` 翻成面向左；8 格，每秒 10 格）。驗證：瀏覽器測過普攻、技能、走路都有播、無錯誤；⚠️ 沒在直播軟體裡看過，名冊圖與玩法說明圖還沒重新產生。
+  - 西當普利鼠（2026-11-14 咖哩第五隻）：寫實倉鼠穿綠金鎧甲、拿羽扇，`heroId: hamster`，謀士（技能演出＝法陣落雷），血 600／攻 68／防 28，技能「起司風暴」。名字以外的設定是 Claude 先定的。**第一版圖（橘棕色卡通老鼠）臉、耳朵、鼻子、米白嘴部、尾巴都是《湯姆貓與傑利鼠》的傑利鼠，違反「不可使用其他作品角色」，沒有用**；咖哩改成寫實倉鼠後才採用（來源由咖哩自行負責）。待機動畫＝吃起司蛋糕（`assets/heroes/hamster_cake.png`，Gemini 生成，**10 格**，每秒 4 格連播 2 輪）。**這張圖的格子排列是 3＋3＋4（不是整齊的 4x2）**，所以 `make_anim_sheet.py` 新增 `--row-counts 3,3,4`（每列各自平分寬度），這組用 `--faces right --row-counts 3,3,4 --match-height 301 --equalize area`（原圖面向右；`match-height` 是單張圖裡角色的高度，因為角色橫向很寬、單張圖被縮得比 396 矮，要先量）。目前只有待機動畫，還沒有攻擊、走路。驗證：瀏覽器測過上場、停下來時有播待機動畫、無錯誤；⚠️ 沒在直播軟體裡看過，名冊圖與玩法說明圖還沒重新產生。
   - 觀眾第一次上場是「留言裡含武將名就算」，所以聊天提到「米其林餐廳」之類的詞也會讓還沒上場的人帶著米其林上場。
 - 同步方式：`python3 tools/sync_from_curry_games.py`（需要 Pillow），會重新產生 `data/heroes.js`，
   並把全身圖縮成 312x396 放到 `assets/heroes/`（原圖每張約 0.5MB，縮小後整包約 7MB）。
@@ -250,7 +251,7 @@
 | `index.html` | 入口。直接開＝帶假事件面板的試玩模式；網址加 `?obs=1`＝只有透明遊戲畫面（給 OBS） |
 | `js/config.js` | **設定檔**：禮物、傷害、血量、復活秒數、顏色 |
 | `data/heroes.js` | 38 隻武將資料（自動產生） |
-| `assets/heroes/` | 42 張武將全身圖（已縮小）：38 張來自萌戰三國，加上自己新增的米其林、大寶、布丁、魚哥 |
+| `assets/heroes/` | 43 張武將全身圖（已縮小）：38 張來自萌戰三國，加上自己新增的米其林、大寶、布丁、魚哥、西當普利鼠 |
 | `data/extra-heroes.js` | 自己新增的角色資料（手寫）：米其林、大寶、布丁 |
 | `tools/cutout_hero.py` | 把角色圖去背並轉成遊戲用的全身圖 |
 | `js/events.js` | 事件來源層（假面板／之後的 TikTok） |

@@ -15,4 +15,6 @@ window.HEROES_DATA = window.HEROES_DATA.concat([
   { heroId: 'pudding', displayName: '布丁', faction: 'Meng', troop: 'Commander', baseHp: 746, baseAtk: 55, baseArmor: 34, skillName: '暖心號令', extra: true },
   // 魚哥：萌國的南瓜裝小女孩猛將（拿南瓜桶揮擊）。能力值取猛將中間檔（跟米其林同一檔），技能「南瓜重擊」，演出＝衝撞地裂。名字以外的設定是 Claude 先定的。
   { heroId: 'yuge', displayName: '魚哥', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '南瓜重擊', extra: true },
+  // 西當普利鼠：萌國的倉鼠謀士（拿羽扇、穿綠金鎧甲）。能力值取謀士水準（血少、攻中、防低），技能演出＝法陣落雷。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
+  { heroId: 'hamster', displayName: '西當普利鼠', faction: 'Meng', troop: 'Strategist', baseHp: 600, baseAtk: 68, baseArmor: 28, skillName: '起司風暴', extra: true },
 ]);

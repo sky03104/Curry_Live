@@ -248,6 +248,10 @@ window.GAME_CONFIG = {
       walk: { src: 'yuge_walk.png', frames: 8, cw: 236, ch: 417, ground: 413, fps: 10 },   // 走路循環（移動時一直播）
       idle: { src: 'yuge_attack.png', frames: 8, cw: 504, ch: 422, ground: 418, fps: 5 },
     },
+    // 西當普利鼠：待機吃起司蛋糕（10 格，每秒 4 格，連播 2 輪）
+    hamster: {
+      idle: { src: 'hamster_cake.png', frames: 10, cw: 269, ch: 309, ground: 306, fps: 4, repeat: 2 },
+    },
     dabao: {
       eat: { src: 'dabao_drumstick.png', frames: 8, cw: 379, ch: 360, ground: 350, fps: 3 },   // 回血：吃大雞腿（一輪）
       idle: { src: 'dabao_eat.png', frames: 8, cw: 384, ch: 387, ground: 383, fps: 3, repeat: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭，連播 3 輪（跟米其林一樣）
