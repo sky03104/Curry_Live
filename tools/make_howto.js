@@ -1,7 +1,7 @@
 // 產生「玩法說明」圖片（發給觀眾看怎麼玩；版面是給 TikTok 圖文貼文用的）。
 // 用法：node tools/make_howto.js [--attack 玫瑰] [--aoe 煙火] [--skill 皇冠] [--heal 愛心] [--boss1 …] [--boss2 …] [--boss3 …]
 //   後面的禮物名稱是「主播自己指定的禮物」，沒給就寫「主播公布」（招換 BOSS 沒給就寫預設鑽石數）。想換說明文字就改下面各張的內容。
-// 需要 Playwright。輸出：roster/玩法說明_1.jpg … _4.jpg，每張 1080x1920（9:16），照順序當 TikTok 圖文貼文的輪播圖（滑著看）。
+// 需要 Playwright。輸出：roster/玩法說明_1.jpg … _9.jpg（前 4 張是玩法，後面蜀魏吳群萌各一張陣營武將圖，附武將名稱和技能名），每張 1080x1920（9:16），照順序當 TikTok 圖文貼文的輪播圖（滑著看）。
 // 版面為 TikTok 留的安全區：上面 130px、下面 300px（標題文字和按鈕會蓋住）、右邊 110px（愛心、留言按鈕）不放重要內容。
 // 數字（60 秒復活、99 級、BOSS 鑽石數）請對照 js/config.js；改了設定要回頭改這裡。風格跟武將名冊一致（米白宣紙底）。
 const fs = require('fs');
@@ -9,13 +9,19 @@ const path = require('path');
 const { chromium } = require('playwright');
 
 const root = path.join(__dirname, '..');
+global.window = {};   // 讀武將資料與陣營設定（跟 make_roster.js 一樣）
+require(path.join(root, 'data/heroes.js'));
+require(path.join(root, 'data/extra-heroes.js'));
+require(path.join(root, 'js/config.js'));
+const heroData = window.HEROES_DATA, factions = window.GAME_CONFIG.factions;
+const FACTION_ORDER = ['Shu', 'Wei', 'Wu', 'Qun', 'Meng'];   // 蜀魏吳群萌（有武將的才做）
 const args = {};
 for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, '')] = process.argv[i + 1];
 const gift = k => args[k] || '主播公布';
 const bossGift = (k, def) => args[k] || def;
 const img = f => 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/heroes', f)).toString('base64');
 const hero = (f, name, c) => `<div class="h"><img src="${img(f)}"><span style="background:${c}">${name}</span></div>`;
-const TOTAL = 4;
+const TOTAL = 4 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 4 張玩法 + 每個陣營一張
 
 const css = `
 * { box-sizing: border-box; margin: 0; }
@@ -53,6 +59,14 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .steps { display: flex; flex-direction: column; gap: 16px; margin-top: 10px; text-align: left; }
 .steps div { background: rgba(255,255,255,.1); border: 3px solid rgba(255,255,255,.25); border-radius: 22px; padding: 16px 26px; font-size: 44px; font-weight: 700; }
 .steps i { font-style: normal; display: inline-block; width: 60px; height: 60px; line-height: 60px; text-align: center; border-radius: 50%; background: #D9563E; margin-right: 16px; font-weight: 900; }
+.fac-head { display: flex; align-items: center; gap: 22px; margin-bottom: 18px; }
+.fac-head .seal { width: 120px; height: 120px; border-radius: 26px; background: var(--c); color: #fff; font-size: 84px; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 0 rgba(0,0,0,.2); }
+.fac-head .tt { font-size: 66px; font-weight: 900; color: var(--c); line-height: 1.1; } .fac-head .tt small { display: block; font-size: 36px; color: #8C9490; font-weight: 700; margin-top: 6px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.hc { background: #F2ECDA; border: 4px solid var(--c); border-radius: 24px; text-align: center; padding: 12px 6px 14px; min-width: 0; }
+.hc .pic { display: flex; align-items: center; justify-content: center; } .hc img { max-width: 100%; object-fit: contain; }
+.hc .nm { font-size: 44px; font-weight: 900; margin-top: 4px; line-height: 1.15; }
+.hc .sk { font-size: 30px; color: #fff; background: var(--c); border-radius: 12px; display: inline-block; padding: 2px 14px; margin-top: 6px; font-weight: 700; }
 .swipe { margin-top: 30px; font-size: 38px; color: #ffd35c; font-weight: 900; }
 `;
 const top = n => `<div class="top"><div class="t">萌戰三國・<b>直播亂鬥</b></div><div class="pg">${n}/${TOTAL}</div></div>`;
@@ -63,7 +77,7 @@ const slides = [
   <div class="sub">留言選武將、送禮打架　30 秒看懂玩法</div>
   <div class="row"><img src="${img('lvbu.png')}"><img src="${img('guanyu.png')}"><img src="${img('diaochan.png')}"><img src="${img('michelin.png')}"></div>
   <div class="steps"><div><i>1</i>留言武將名字　上場！</div><div><i>2</i>送禮物　你的武將出手</div><div><i>3</i>一起打倒大 BOSS</div></div>
-  <div class="swipe">往左滑，看詳細玩法 ➜</div></div>`,
+  <div class="swipe">往左滑　看玩法＋全部武將 ➜</div></div>`,
 
 `<div class="slide">${top(2)}<div class="body">
   <div class="card"><div class="no">1</div><h2>留言選武將上場</h2>
@@ -103,6 +117,19 @@ const slides = [
   <div class="big" style="text-align:center;font-weight:900;color:#D9563E">快來直播間一起玩！</div>
 </div></div>`,
 ];
+
+// 陣營武將頁：每個武將一格（圖＋名字＋技能名）。每格大小依這個陣營的人數算，11 人也塞得進安全區
+const AVAIL_H = 1920 - 130 - 300 - 90 - 140;   // 扣掉上面標題列、陣營標題之後，格子可用的高度
+for (const key of FACTION_ORDER) {
+  const f = factions[key], list = heroData.filter(h => h.faction === key);
+  if (!list.length) continue;
+  const rows = Math.ceil(list.length / 3), perRow = Math.min(rows === 1 ? 520 : 430, (AVAIL_H - (rows - 1) * 14) / rows), imgH = Math.round(perRow - 118);
+  slides.push(`<div class="slide" style="--c:${f.color}">${top(slides.length + 1)}<div class="body" style="justify-content:flex-start">
+    <div class="fac-head"><div class="seal">${f.label}</div><div class="tt">${f.label + (key === 'Meng' ? '國' : '')}武將<small>${list.length} 位武將　留言名字就能選</small></div></div>
+    <div class="grid3">${list.map(h => `<div class="hc"><div class="pic"><img src="${img(h.heroId + '.png')}" style="height:${imgH}px"></div><div class="nm">${h.displayName}</div><div class="sk">${h.skillName}</div></div>`).join('')}</div>
+    ${key === 'Meng' ? `<div class="card" style="margin-top:24px;padding-left:36px;text-align:center;background:#FBE9F0;border-color:#F3C4D6"><p style="font-size:46px;line-height:1.5"><b>直播亂鬥專屬的萌國角色</b><br>其他地方看不到，<br>留言名字就能選！<br><span class="say">米其林</span><span class="say">大寶</span><span class="say">布丁</span></p></div>` : ''}
+  </div></div>`);
+}
 
 (async () => {
   const b = await chromium.launch();
