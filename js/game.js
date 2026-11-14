@@ -37,11 +37,12 @@ ML.createGame = function (config, heroes) {
   function stats(p) {
     if (p.isBoss) return { maxHp: p.maxHp, atk: p.def.atk, def: p.def.def };
     const g = config.leveling, up = p.prof.level - 1;
+    const u = config.uniformHero, base = u && u.enabled ? { hp: u.hp, atk: u.atk, def: u.def } : { hp: p.hero.baseHp, atk: p.hero.baseAtk, def: p.hero.baseArmor };   // 全員同能力（config.uniformHero）
     const bf = p.prof.buffs, atkBuff = bf && bf.atk && bf.atk.until > time ? bf.atk.mult : 1;   // 紅BUFF：攻擊力加倍
     return {
-      maxHp: Math.round(p.hero.baseHp * config.hpMultiplier * (1 + g.hpPerLevel * up)),
-      atk: p.hero.baseAtk * (1 + g.atkPerLevel * up) * atkBuff,
-      def: p.hero.baseArmor * (1 + g.defPerLevel * up),
+      maxHp: Math.round(base.hp * config.hpMultiplier * (1 + g.hpPerLevel * up)),
+      atk: base.atk * (1 + g.atkPerLevel * up) * atkBuff,
+      def: base.def * (1 + g.defPerLevel * up),
     };
   }
   // 升到下一級需要多少經驗值
