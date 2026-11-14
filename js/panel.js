@@ -49,6 +49,17 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       </div>
     </details>
 
+    <details class="card" data-k="levels">
+      <summary><span class="ico">📈</span>調整玩家等級<em id="lv-count"></em></summary>
+      <div class="body">
+        <div class="hint">主播可以把某位觀眾的等級調高或調低（經驗值會歸零）。<b>要開著雲端存檔</b>：面板按「套用」會存到雲端，直播畫面約 5 分鐘內（或重新整理後）套用；沒開雲端的話，這裡只會改面板自己的紀錄，直播畫面看不到。</div>
+        <div class="hint">直播進行中想馬上調整：主播本人在直播間留言「<b>等級 名字 30</b>」就會立刻把那位觀眾調成 Lv.30（要先在「主播文字指令」設定主播）。</div>
+        <div class="row"><input id="lv-find" placeholder="搜尋名字（空白＝等級最高的 30 位）"><button id="lv-refresh" style="flex:none">更新清單</button></div>
+        <div id="lv-list"></div>
+        <div class="hint" id="lv-msg"></div>
+      </div>
+    </details>
+
     <details class="card" data-k="heroes">
       <summary><span class="ico">🧙</span>可選武將<em id="hs-count"></em></summary>
       <div class="body">
@@ -343,6 +354,29 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     log.prepend(line);
     while (log.children.length > 40) log.lastChild.remove();
   }
+  // 調整玩家等級：列出已知的觀眾（雲端讀回來的、或這次出現過的），可以直接改等級
+  const lvRender = () => {
+    const q = $('#lv-find').value.trim().toLowerCase();
+    const all = game.exportProfiles().filter(p => p.name);
+    $('#lv-count').textContent = all.length ? all.length + ' 位' : '';
+    const rows = all.filter(p => !q || p.name.toLowerCase().includes(q)).sort((a, b) => b.level - a.level || b.xp - a.xp).slice(0, 30);
+    $('#lv-list').innerHTML = rows.map(p => `<div class="hc-row"><b title="${esc(p.name)}" style="width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</b><span style="flex:none;font-size:12px">Lv.${p.level}</span><input type="number" min="1" max="${config.leveling.maxLevel}" value="${p.level}" data-lv="${esc(p.id)}" style="max-width:64px"><button data-lvset="${esc(p.id)}" style="flex:none">套用</button></div>`).join('') || '<div class="hint">（還沒有觀眾紀錄）</div>';
+  };
+  $('#lv-find').oninput = lvRender; $('#lv-refresh').onclick = lvRender;
+  $('#lv-list').onclick = async e => {
+    const b = e.target.closest('[data-lvset]'); if (!b) return;
+    const id = b.dataset.lvset, input = root.querySelector(`input[data-lv="${CSS.escape(id)}"]`);
+    const r = game.setLevel(id, input.value);
+    if (!r) { $('#lv-msg').textContent = '找不到這位觀眾'; return; }
+    $('#lv-msg').textContent = `已把 ${r.name} 調成 Lv.${r.level}，存檔中…`;
+    let res = null; try { res = await saving.saveNow(); } catch (err) { res = null; }
+    const c = res && res.cloud;
+    $('#lv-msg').textContent = `已把 ${r.name} 調成 Lv.${r.level}。` + (!id.startsWith('tt:') ? '（這是面板測試用的假觀眾，不會存到雲端）' : c && c.state === 'ok' ? '已存到雲端，直播畫面約 5 分鐘內套用。' : c ? '⚠ 雲端沒存成功：' + (c.text || c.state) : '⚠ 沒有開雲端存檔，只改了這個面板自己的紀錄。');
+    lvRender();
+  };
+  hub.on(ev => { if (ev.type === 'chat') setTimeout(lvRender, 0); });
+  lvRender();
+
   // 主播文字指令的設定畫面
   const hc = saving.hostCmd, recent = new Map();   // 最近留言的人：代號 → 名字
   const hcWho = () => { $('#hc-who').textContent = hc.hostId ? `目前主播：${hc.hostName || '（沒有名字）'}（代號 ${hc.hostId.slice(0, 14)}${hc.hostId.length > 14 ? '…' : ''}）` : '目前還沒設定主播，指令不會生效。'; $('#hc-state').textContent = hc.hostId && Object.keys(hc.cmds).length ? '已設定' : ''; };

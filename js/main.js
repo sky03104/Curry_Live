@@ -15,7 +15,7 @@
   game.setDefaultHero(heroSettings.defaultId);   // 還沒上場就送禮的觀眾，自動帶著這隻上場
   // 主播文字指令：主播本人留言設定好的字，效果等於送那個動作的禮物
   const hostCmd = ML.createHostCommands(config, params);
-  game.setHostMatcher((user, text) => hostCmd.match(user, text));
+  game.setHostMatcher((user, text) => hostCmd.match(user, text), user => hostCmd.isHost(user));
   const sprite = ML.createHeroSprite(heroes.concat(game.bossHeroes()), config, 'assets/heroes');   // BOSS 的圖也要載入
   // 場地：直播畫面讀網址的 &arena=；面板視窗讀這個瀏覽器記住的選擇（方便預覽）
   const arenas = ML.createArenas();
@@ -30,7 +30,7 @@
   let dirty = false;                 // 有沒有還沒存的變動
   const active = new Set();          // 這段時間有出現過的觀眾
   hub.on(ev => { if (ev.user && ev.user.id) active.add(ev.user.id); });
-  game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup' || e.type === 'bossDefeated') dirty = true; });   // 擊倒、升級都發生在攻擊之後；打倒 BOSS 分到經驗值也要存
+  game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup' || e.type === 'bossDefeated' || e.type === 'levelSet') dirty = true; });   // 擊倒、升級都發生在攻擊之後；打倒 BOSS 分到經驗值也要存
   function flushSave() {
     if (!config.save.enabled || !dirty) return;
     if (save.store(game.exportProfiles(), [...active])) { dirty = false; active.clear(); }
@@ -42,7 +42,7 @@
   // ---------- 雲端存檔（Firebase）：只有直播畫面（obs=1）會寫入，面板視窗只讀取 ----------
   const cloud = ML.createCloudSave(config, params, save.slot, { canWrite: params.get('obs') === '1' });
   // 只存真實觀眾（面板測試用的假觀眾 fake: 不進雲端），而且只存有進度的（1 級、0 經驗、沒擊倒過人的不用存）
-  const realProfiles = () => game.exportProfiles().filter(p => p.id.startsWith('tt:') && (p.level > 1 || p.xp > 0 || p.kills > 0));
+  const realProfiles = () => game.exportProfiles().filter(p => p.id.startsWith('tt:') && (p.level > 1 || p.xp > 0 || p.kills > 0 || p.adj));
   let cloudDirty = false, lastCloudState = '';
   cloud.onStatus(st => {
     // 狀態變成「出錯」或「從出錯恢復」時，在畫面訊息區提醒一次（不要一直洗版）
@@ -87,8 +87,10 @@
     return res;
   }
   setInterval(() => flushCloud(), config.save.cloud.intervalSeconds * 1000);
+  // 直播畫面每隔一段時間重讀一次雲端：主播在面板調整的等級才會套用進來（每 5 分鐘一次，免費額度夠用）
+  if (cloud.canWrite) setInterval(async () => { if (!cloud.enabled || cloudDirty) return; try { game.importProfiles(await cloud.load(), true); } catch (e) { /* 這次讀不到下次再試 */ } }, (config.save.cloud.pullSeconds || 300) * 1000);
   window.addEventListener('pagehide', () => flushCloud(true));    // 關掉網頁前盡力再存一次（存不到也沒關係，下次開會從本機補上去）
-  game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup' || e.type === 'bossDefeated') cloudDirty = true; });
+  game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup' || e.type === 'bossDefeated' || e.type === 'levelSet') cloudDirty = true; });
   syncCloud();
 
   hub.on(ev => game.handleEvent(ev));

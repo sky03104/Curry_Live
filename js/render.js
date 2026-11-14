@@ -92,6 +92,14 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       floats.push({ v, text: `每人 +${e.share} 經驗　尾刀 ${e.killer} +${e.bonus}`, color: '#fff3c0', scale: 0.75, age: 0.2, life: 3 });
       return;
     }
+    if (e.type === 'levelSet') {          // 主播調整等級：白色光點、跳出新等級
+      const p = game.getPlayer(e.id);
+      v.hop = 1; v.hopH = 0.6;
+      if (p && v.pending === 0) { v.hp = p.hp; v.shownHp = p.hp; }
+      effects.rise(v.x, v.y, '#ffffff', 18, v.size * 0.4);
+      floats.push({ v, text: `調整為 Lv.${e.level}`, color: '#ffffff', scale: 1.1, age: 0, life: 1.6 });
+      return;
+    }
     if (e.type === 'levelup') {           // 升級：金色光柱、光點往上飄、跳出等級
       const p = game.getPlayer(e.id);
       v.hop = 1; v.hopH = 0.9;

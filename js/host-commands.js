@@ -48,6 +48,7 @@ ML.createHostCommands = function (config) {
       if (t) state.cmds[action] = t; else delete state.cmds[action];
       save();
     },
+    isHost(user) { return !!(state.hostId && user && user.id === state.hostId); },
     // 這句留言是不是主播的指令？是就回傳對應的遊戲禮物代號，不是回傳 null
     match(user, text) {
       if (!state.hostId || !user || user.id !== state.hostId) return null;

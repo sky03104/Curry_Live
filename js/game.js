@@ -17,6 +17,7 @@ ML.createGame = function (config, heroes) {
     if (heroById.has(id)) nameTable.push([alias, heroById.get(id)]);
   }
   nameTable.sort((a, b) => b[0].length - a[0].length);
+  let hostCheck = null;      // 這個人是不是主播：(user) → true／false
   let hostMatch = null;      // 主播文字指令：(user, text) → 遊戲禮物代號或 null（由 host-commands.js 提供）
   let defaultHeroId = '';   // 還沒上場就送禮時自動上場的預設武將（空字串 = 不自動上場）
   // 這位實況主開放哪些武將：留言只比對開放的武將（已在場上的不受影響）。允許清單由 hero-settings.js 決定
@@ -170,6 +171,21 @@ ML.createGame = function (config, heroes) {
     notice(p.prof.level > 1 ? `${p.name} 的 ${hero.displayName}（Lv.${p.prof.level}）上場！` : `${p.name} 的 ${hero.displayName} 上場！`);
     return p;
   }
+
+  // 主播留言「等級 名字 數字」（指令字在 config.commands.setLevel）：把那位觀眾的等級調成那個數字。處理了（不管成功與否）回傳 true
+  function hostLevelCommand(text) {
+    const words = (config.commands.setLevel || []).slice().sort((a, b) => b.length - a.length);
+    const t = String(text).trim();
+    const w = words.find(w => t.startsWith(w));
+    if (!w) return false;
+    const m = t.slice(w.length).trim().match(/^(.*\S)\s+(\d{1,3})$/);   // 最後面一個數字是等級，前面是名字
+    if (!m) { notice(`格式：${w} 名字 等級（例如「${w} 小明 30」）`); return true; }
+    const hit = findProfileByName(m[1]);
+    if (!hit) { notice(`找不到「${m[1].length > 10 ? m[1].slice(0, 10) + '…' : m[1]}」`); return true; }
+    gameApi.setLevel(hit.id, Number(m[2]));
+    return true;
+  }
+  function findProfileByName(text) { return gameApi.findProfile(text); }
 
   // ---------- 換武將 ----------
   // 已在場上的觀眾可以換武將，血量照比例帶過去（剩三成血，換過去也是三成），所以不能靠換角補血。
@@ -357,9 +373,9 @@ ML.createGame = function (config, heroes) {
 
   function reviveRemaining(p) { return p.down ? Math.max(0, config.reviveSeconds - (time - p.downAt)) : 0; }
 
-  return {
+  const gameApi = {
     setHeroPool,
-    setHostMatcher(fn) { hostMatch = fn; },
+    setHostMatcher(fn, isHost) { hostMatch = fn; hostCheck = isHost || null; },
     setDefaultHero(id) { defaultHeroId = heroById.has(id) ? id : ''; },
     onFx(fn) { fxListeners.push(fn); },
     handleEvent(ev) {
@@ -370,6 +386,7 @@ ML.createGame = function (config, heroes) {
         // 主播的文字指令：主播本人留言設定好的字 = 送那個動作的禮物（不走一般留言處理）
         const hostGift = hostMatch && hostMatch(ev.user, ev.text);
         if (hostGift) { handleGift(ev.user, hostGift, 1); return; }
+        if (hostCheck && hostCheck(ev.user) && hostLevelCommand(ev.text)) return;   // 主播留言「等級 名字 30」：調整等級
         handleChat(ev.user, ev.text);
       }
       else if (ev.type === 'gift') handleGift(ev.user, ev.giftId, ev.count);
@@ -396,7 +413,7 @@ ML.createGame = function (config, heroes) {
       if (keepProgress) scores.forEach(s => { s.damage = 0; }); else scores.clear();
     },
     // 存檔用：交出每位觀眾目前的進度
-    exportProfiles() { return [...scores.values()].map(s => ({ id: s.id, name: s.name, level: s.level, xp: s.xp, kills: s.kills })); },
+    exportProfiles() { return [...scores.values()].map(s => ({ id: s.id, name: s.name, level: s.level, xp: s.xp, kills: s.kills, adj: s.adj || 0 })); },
     // 讀檔用：把之前存的進度放回來（傷害從 0 開始，所以不會出現在排行榜上，要重新上場才算）
     // merge = true（接上雲端存檔時用）：跟目前已有的進度合併，每位觀眾取比較高的那份，
     //   而且直接改現有的紀錄（場上正在打的武將也會立刻吃到新等級）；不是整個換掉。
@@ -406,9 +423,20 @@ ML.createGame = function (config, heroes) {
         if (!p || !p.id) continue;
         const level = Math.max(1, Math.min(max, Math.floor(p.level) || 1));
         const xp = level >= max ? 0 : Math.max(0, Math.floor(p.xp) || 0), kills = Math.max(0, Math.floor(p.kills) || 0);
-        const cur = scores.get(p.id);
+        const cur = scores.get(p.id), adj = Math.floor(Number(p.adj)) || 0;
         if (!cur || !merge) {
-          scores.set(p.id, { id: p.id, name: p.name || '', heroName: '', damage: 0, kills, level, xp });
+          scores.set(p.id, { id: p.id, name: p.name || '', heroName: '', damage: 0, kills, level, xp, adj });
+          continue;
+        }
+        if (adj !== (cur.adj || 0)) {   // 有一方是主播手動調整過的：最後一次調整的算數（可以調低）
+          if (adj > (cur.adj || 0)) {
+            const leveled = level !== cur.level;
+            cur.level = level; cur.xp = xp; cur.adj = adj;
+            const onStage = players.get(p.id);
+            if (leveled && onStage) refreshHp(onStage);
+          }
+          cur.kills = Math.max(cur.kills, kills);
+          if (!cur.name && p.name) cur.name = p.name;
           continue;
         }
         if (level > cur.level || (level === cur.level && xp > cur.xp)) {
@@ -422,6 +450,27 @@ ML.createGame = function (config, heroes) {
       }
     },
     announce(text) { notice(text); },
+    // 主播調整某位觀眾的等級（1～上限）。經驗值歸零；調低也算數（標記 adj，合併雲端時以最後一次調整為準）。回傳 { name, level } 或 null
+    setLevel(id, level) {
+      const s = scores.get(id);
+      if (!s) return null;
+      const lv = Math.max(1, Math.min(config.leveling.maxLevel, Math.floor(Number(level)) || 1));
+      s.level = lv; s.xp = 0; s.adj = Date.now();
+      const p = players.get(id);
+      if (p && !p.isBoss) refreshHp(p);
+      fx({ type: 'levelSet', id, level: lv });
+      notice(`${s.name || '觀眾'} 的等級被主播調整為 Lv.${lv}`);
+      return { name: s.name || '', level: lv };
+    },
+    // 用名字找觀眾（含已下場、沒在場上的）：完全一樣 → 去符號後一樣 → 開頭一樣 → 包含。找不到回傳 null
+    findProfile(text) {
+      const r = plain(text);
+      if (!r) return null;
+      const all = [...scores.values()].filter(s => s.name);
+      const step = [s => s.name === String(text).trim(), s => plain(s.name) === r, s => plain(s.name).startsWith(r), s => plain(s.name).includes(r)];
+      for (const f of step) { const hit = all.filter(f); if (hit.length) return hit.sort((a, b) => plain(a.name).length - plain(b.name).length)[0]; }
+      return null;
+    },
     getPlayers() { return [...players.values()]; },
     // BOSS 相關（畫面和面板用）
     getBoss() {
@@ -457,4 +506,5 @@ ML.createGame = function (config, heroes) {
         .sort((a, b) => b.damage - a.damage).slice(0, config.leaderboardSize);
     },
   };
+  return gameApi;
 };

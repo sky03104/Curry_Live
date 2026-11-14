@@ -24,6 +24,7 @@ ML.normalizeProfile = function (p) {
     xp: Math.max(0, Math.floor(Number(p.xp)) || 0),
     kills: Math.max(0, Math.floor(Number(p.kills)) || 0),
     seen: Math.floor(Number(p.seen)) || 0,
+    adj: Math.floor(Number(p.adj)) || 0,   // 主播手動調整等級的時間（0 = 沒調整過）；調整過的以最後一次調整為準，不會被「取高的」蓋回去
   };
 };
 ML.mergeProfiles = function (listA, listB) {
@@ -32,9 +33,14 @@ ML.mergeProfiles = function (listA, listB) {
     if (!raw || !raw.id) continue;
     const p = ML.normalizeProfile(raw), cur = map.get(p.id);
     if (!cur) { map.set(p.id, p); continue; }
+    if (cur.adj !== p.adj) {   // 其中一份有手動調整過：最後一次調整的那份整個算數（可以調低）
+      const w = cur.adj > p.adj ? cur : p;
+      map.set(p.id, { id: p.id, name: w.name || cur.name || p.name, level: w.level, xp: w.xp, kills: Math.max(cur.kills, p.kills), seen: Math.max(cur.seen, p.seen), adj: w.adj });
+      continue;
+    }
     const hi = (cur.level !== p.level ? cur.level > p.level : cur.xp >= p.xp) ? cur : p;   // 等級高的贏；同等級比經驗值
     map.set(p.id, { id: p.id, name: (p.seen >= cur.seen ? p.name || cur.name : cur.name || p.name),
-      level: hi.level, xp: hi.xp, kills: Math.max(cur.kills, p.kills), seen: Math.max(cur.seen, p.seen) });
+      level: hi.level, xp: hi.xp, kills: Math.max(cur.kills, p.kills), seen: Math.max(cur.seen, p.seen), adj: cur.adj });
   }
   return [...map.values()];
 };
@@ -137,12 +143,12 @@ ML.createCloudSave = function (config, params, slot, opts) {
   function finalize(merged, before) {
     const old = new Map(before.map(p => [p.id, p])), now = Date.now();
     let list = merged.map(p => { const o = old.get(p.id);
-      return (o && o.level === p.level && o.xp === p.xp && o.kills === p.kills) ? p : Object.assign({}, p, { seen: now }); });
+      return (o && o.level === p.level && o.xp === p.xp && o.kills === p.kills && o.adj === p.adj) ? p : Object.assign({}, p, { seen: now }); });
     list.sort((a, b) => b.seen - a.seen);
     while (list.length > 1 && JSON.stringify({ profiles: list }).length > MAX_CHARS) list.pop();
     return list;
   }
-  const sameContent = (a, b) => a.length === b.length && (() => { const m = new Map(b.map(p => [p.id, p])); return a.every(p => { const o = m.get(p.id); return o && o.level === p.level && o.xp === p.xp && o.kills === p.kills; }); })();
+  const sameContent = (a, b) => a.length === b.length && (() => { const m = new Map(b.map(p => [p.id, p])); return a.every(p => { const o = m.get(p.id); return o && o.level === p.level && o.xp === p.xp && o.kills === p.kills && o.adj === p.adj; }); })();
 
   // ---------- 寫入（會先跟雲端上的合併，衝突時重試）----------
   async function store(current, o) {
