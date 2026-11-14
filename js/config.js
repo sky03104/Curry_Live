@@ -189,7 +189,7 @@ window.GAME_CONFIG = {
         reward: { regenPerSecond: 10, seconds: 3600, label: '藍BUFF 效果：每秒回復 10 血' } },
       { id: 'boss_red',    displayName: '紅BUFF',   level: 5,  hasArt: true,  hp: 2500,  atk: 55,  def: 20,  xp: 600,  lastHitBonus: 200,  skillName: '烈焰荊棘', aoeName: '熔岩爆發', accent: '#ff5c4d',
         reward: { atkMultiplier: 2, seconds: 3600, label: '紅BUFF 效果：攻擊力加倍' } },
-      { id: 'boss_ape',    displayName: '太古巨猿', level: 30, hasArt: true,  hp: 36000, atk: 190, def: 110, xp: 9000, lastHitBonus: 3000, skillName: '遠古重擊', aoeName: '地動山搖', accent: '#ffb04a' },
+      { id: 'boss_ape',    displayName: '太古巨猿', level: 30, hasArt: true,  hp: 20000, atk: 190, def: 110, xp: 9000, lastHitBonus: 3000, skillName: '遠古重擊', aoeName: '地動山搖', accent: '#ffb04a' },
     ],
   },
 
