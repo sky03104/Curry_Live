@@ -219,11 +219,11 @@ window.GAME_CONFIG = {
   // ---------- 逐格動畫 ----------
   // 某隻武將有連續圖時，在這裡登記（圖是一排橫放、每格一樣大，腳底對齊；做法見 tools/make_anim_sheet.py，它會印出這些數字）。
   //   eat：回血時播一次　idle：每次走到定點停下來時播一次（還沒有圖就先不寫）
-  //   frames 幾格／cw ch 每格寬高（像素）／ground 腳底在第幾列／fps 每秒播幾格
+  //   frames 幾格／cw ch 每格寬高（像素）／ground 腳底在第幾列／fps 每秒播幾格／repeat 連續播幾輪（預設 1）
   heroAnims: {
     michelin: {
       eat: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3 },
-      idle: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭
+      idle: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3, repeat: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭
     },
   },
 
