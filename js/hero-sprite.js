@@ -84,6 +84,11 @@ ML.createHeroSprite = function (heroes, config, basePath) {
   return {
     ready,
     preload(hero) { load(hero); Object.keys((config.heroAnims || {})[hero.heroId] || {}).forEach(n => loadSheet(hero.heroId, n)); },   // 先去下載（上場時呼叫，讓第一次畫的時候圖已經在了）
+    // 這隻武將有幾組待機動畫（idle、idle2、idle3…，依序）；停下來時輪流播
+    idleNames(heroId) {
+      const a = (config.heroAnims || {})[heroId] || {};
+      return Object.keys(a).filter(k => /^idle\d*$/.test(k)).sort((x, y) => (parseInt(x.slice(4)) || 1) - (parseInt(y.slice(4)) || 1));
+    },
     // 這隻武將有沒有這個動作、圖準備好了沒；回傳 { 秒數 } 或 null
     animInfo(heroId, name) {
       const m = animMeta(heroId, name);

@@ -1,6 +1,6 @@
 """把「綠底、多格排在一張圖上」的連續動作圖，轉成遊戲用的逐格動畫條（透明背景、一排橫放）。
 
-用法：python3 tools/make_anim_sheet.py <原圖> <輸出檔名> [--grid 4x2] [--faces right|left] [--match-height 328]
+用法：python3 tools/make_anim_sheet.py <原圖> <輸出檔名> [--grid 4x2] [--faces right|left] [--match-height 328] [--equalize area]
 範例：python3 tools/make_anim_sheet.py 米其林吃骨頭.jpg assets/heroes/michelin_eat.png --grid 4x2 --faces right
 
 做的事：
@@ -8,7 +8,8 @@
   2. 不是按格線切，而是「找連在一起的像素」（骨頭會跨進隔壁格，按格線切會切到）。
      每個連通塊依重心歸到哪一格；每格最大的那塊是狗，其他（骨頭、碎屑）跟著那一格。
   3. 每格以「狗的腳底」對齊、「狗的中心」對齊；原圖面向右的會左右翻成面向左（遊戲預設面向左）。
-  4. 全部格子用同一個縮放比例（讓站著的狗跟 assets/heroes/ 的單張圖一樣大），排成一排。
+  4. （選用 --equalize area）每格狗的畫面大小常常不一樣（例如第二排比第一排大一圈），加這個選項會讓每格狗的「面積」拉到一樣大，播放時就不會忽大忽小。
+  5. 全部格子用同一個縮放比例（讓站著的狗跟 assets/heroes/ 的單張圖一樣大），排成一排。
 輸出後會印出要貼進 js/config.js 的 heroAnims 設定（格寬、格高、腳底在哪一列）。
 需要：pip install pillow numpy
 """
@@ -19,7 +20,7 @@ from PIL import Image
 def parse():
     a = sys.argv[1:]
     if len(a) < 2: print(__doc__); sys.exit(1)
-    opt = {'grid': '4x2', 'faces': 'right', 'match-height': '328'}
+    opt = {'grid': '4x2', 'faces': 'right', 'match-height': '328', 'equalize': ''}
     pos = []
     i = 0
     while i < len(a):
@@ -77,7 +78,13 @@ def main():
         img = Image.fromarray(crop, 'RGBA')
         dcx = (dog['x0'] + dog['x1']) / 2 - x0; ground = dog['y1'] - y0
         if opt['faces'] == 'right': img = img.transpose(Image.FLIP_LEFT_RIGHT); dcx = img.width - dcx
-        parts.append({'img': img, 'dcx': dcx, 'ground': ground, 'dogh': dog['y1'] - dog['y0']})
+        parts.append({'img': img, 'dcx': dcx, 'ground': ground, 'dogh': dog['y1'] - dog['y0'], 'area': dog['size']})
+    if opt['equalize'] == 'area':   # 每格先縮放到「狗的面積」一樣大（限制在 0.8～1.25 倍，避免姿勢差太多時縮過頭）
+        med = sorted(p['area'] for p in parts)[len(parts) // 2]
+        for p in parts:
+            f = max(0.8, min(1.25, (med / p['area']) ** 0.5))
+            p['img'] = p['img'].resize((round(p['img'].width * f), round(p['img'].height * f)), Image.LANCZOS)
+            p['dcx'] *= f; p['ground'] *= f; p['dogh'] *= f
     stand = sorted(p['dogh'] for p in parts)[len(parts) // 2]       # 用中間值當「站著的狗」的高度
     s = float(opt['match-height']) / stand
     for p in parts:
