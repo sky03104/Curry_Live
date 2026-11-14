@@ -385,7 +385,7 @@ ML.createGame = function (config, heroes) {
       if (ev.type === 'chat') {
         // 主播的文字指令：主播本人留言設定好的字 = 送那個動作的禮物（不走一般留言處理）
         const hostGift = hostMatch && hostMatch(ev.user, ev.text);
-        if (hostGift) { handleGift(ev.user, hostGift, 1); return; }
+        if (hostGift) { handleGift(ev.user, hostGift.giftId, hostGift.count || 1); return; }
         if (hostCheck && hostCheck(ev.user) && hostLevelCommand(ev.text)) return;   // 主播留言「等級 名字 30」：調整等級
         handleChat(ev.user, ev.text);
       }
