@@ -114,11 +114,13 @@
   // 收到真的 TikTok 禮物時，順便記住它的圖片（禮物提示列要用）
   hub.on(ev => { if (ev.type === 'tiktokGift') giftSettings.rememberIcon(ev.gift.name || ('#' + ev.gift.id), ev.gift.icon); });
 
+  // 自動更新：發現 version.json 的版本跟這個畫面不同，在安靜時重新整理（只有直播畫面）；更新前先把等級存好，更新後把場上武將放回來
+  const updater = ML.createUpdater(config, params, game, { beforeReload: () => { dirty = true; flushSave(); cloudDirty = true; flushCloud(true); } });
   // 網址加 ?obs=1 → 只有透明遊戲畫面（給 OBS）；沒加 → 顯示假事件面板
   if (params.get('obs') === '1') {
     document.body.classList.add('obs');
   } else {
-    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { heroSettings, hostCmd, saveSettings, save, flushSave, count: saved.length, cloud, syncCloud, saveNow });
+    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { updater, heroSettings, hostCmd, saveSettings, save, flushSave, count: saved.length, cloud, syncCloud, saveNow });
   }
   // 接真的 TikTok，兩種方式擇一：
   //   A. TikFinity 電腦版（建議）：網址加 ?tikfinity=1

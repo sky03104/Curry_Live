@@ -10,7 +10,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
 
   root.innerHTML = `
     <div class="topbar">
-      <h1>直播亂鬥 控制面板 <small>觀眾看不到</small></h1>
+      <h1>直播亂鬥 控制面板 <small>觀眾看不到</small> <small id="p-ver" style="margin-left:8px"></small></h1>
       <div class="topbtns"><button id="p-openall">全部展開</button><button id="p-closeall">全部收合</button></div>
     </div>
 
@@ -430,6 +430,8 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   $('#hc-cmds').onchange = e => { const n = e.target.closest('[data-hcn]'); if (!n) return; hc.setCount(n.dataset.hcn, n.value); n.value = hc.countOf(n.dataset.hcn); hcWarn(); hcSync(); renderGiftSettings(); };
   $('#hc-cmds').oninput = e => { const i = e.target.closest('[data-hc]'); if (!i) return; hc.setCmd(i.dataset.hc, i.value); hcWarn(); hcWho(); hcSync(); renderGiftSettings(); };
   hcRows(); hcWho(); hcPick(); hcWarn();
+  // 版本號：面板這個視窗載入時的版本；發現有新版就提醒（直播畫面會自己更新，面板要自己重新整理）
+  if (saving.updater) { const showVer = () => { const u = saving.updater; $('#p-ver').textContent = u.pending ? `版本 ${u.current} ⚠ 有新版 ${u.latest}，請重新整理本頁` : `版本 ${u.current}`; }; showVer(); setInterval(showVer, 5000); }
   hub.on(ev => {
     if (ev.type === 'chat' && ev.user && ev.user.id) { recent.delete(ev.user.id); recent.set(ev.user.id, ev.user.name || ev.user.id); while (recent.size > 15) recent.delete(recent.keys().next().value); hcPick(); }
   });

@@ -167,7 +167,7 @@ ML.createGame = function (config, heroes) {
   }
 
   // 讓一位觀眾帶著某隻武將上場（留言武將名、或還沒上場就送禮時自動上場都走這裡）。成功回傳場上的武將，不能上場（剛烙跑、場上滿了）回傳 null
-  function joinHero(user, hero) {
+  function joinHero(user, hero, quiet) {
     const wait = (config.leaveRejoinSeconds || 0) - (time - (left.has(user.id) ? left.get(user.id) : -1e9));
     if (wait > 0) { notice(`${user.name} 剛烙跑，還要 ${Math.ceil(wait)} 秒才能再上場`); return null; }
     if ([...players.values()].filter(o => !o.isBoss).length >= config.maxOnStage) { notice(`場上已滿，${user.name} 請稍候`); return null; }
@@ -176,6 +176,7 @@ ML.createGame = function (config, heroes) {
     const p = { id: user.id, name: user.name, hero, prof, maxHp: 0, hp: 0, down: false, downAt: 0, lockId: null, lastActive: time };
     p.maxHp = p.hp = stats(p).maxHp;
     players.set(user.id, p);
+    if (quiet) return p;   // 自動更新後把場上武將放回來：不吵（不跳上場訊息與特效）
     fx({ type: 'join', id: p.id });
     notice(p.prof.level > 1 ? `${p.name} 的 ${hero.displayName}（Lv.${p.prof.level}）上場！` : `${p.name} 的 ${hero.displayName} 上場！`);
     return p;
@@ -507,6 +508,21 @@ ML.createGame = function (config, heroes) {
       return null;
     },
     getPlayers() { return [...players.values()]; },
+    // 自動更新網頁前把場上的武將記下來、更新後放回去（只有一般武將，BOSS 不存）
+    exportRoster() { return [...players.values()].filter(p => !p.isBoss).map(p => ({ id: p.id, name: p.name, heroId: p.hero.heroId, hp: p.maxHp ? p.hp / p.maxHp : 1, down: !!p.down })); },
+    restoreRoster(list) {
+      let n = 0;
+      for (const r of list || []) {
+        const hero = heroById.get(r.heroId);
+        if (!hero || players.has(r.id)) continue;
+        const p = joinHero({ id: r.id, name: r.name }, hero, true);
+        if (!p) continue;
+        p.hp = Math.max(1, Math.round(p.maxHp * Math.min(1, Math.max(0, Number(r.hp) || 1))));
+        if (r.down) { p.down = true; p.hp = 0; p.downAt = time; }
+        n++;
+      }
+      return n;
+    },
     // BOSS 相關（畫面和面板用）
     getBoss() {
       const b = players.get(BOSS_ID);
