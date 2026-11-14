@@ -34,6 +34,21 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       </div>
     </details>
 
+    <details class="card" data-k="hostcmd">
+      <summary><span class="ico">🎙️</span>主播文字指令<em id="hc-state"></em></summary>
+      <div class="body">
+        <div class="hint">主播不能送禮物給自己，所以改成：<b>主播自己在直播間留言設定好的那句字</b>，效果就跟送那個動作的禮物一樣。只有「主播本人」留言才會觸發，別人打一樣的字沒反應。整句要剛好一樣（前後空白不算，英文不分大小寫）。</div>
+        <div class="sub">① 告訴遊戲哪一位是主播</div>
+        <div class="hint">先用主播的帳號在直播間<b>隨便留言一次</b>，再從下面選自己（用帳號代號比對，不會被取一樣暱稱的人冒充）。</div>
+        <div class="row"><select id="hc-pick"></select><button id="hc-set" class="main" style="flex:none">我就是主播</button></div>
+        <div class="hc-who" id="hc-who"></div>
+        <div class="sub">② 每個動作的指令文字（留空 = 不用）</div>
+        <div id="hc-cmds"></div>
+        <div class="hint" id="hc-warn"></div>
+        <div class="hint">⚠ 直播畫面要重貼網址才會生效。主播還沒上場時留言指令，會自動帶預設武將上場（跟送禮一樣）。</div>
+      </div>
+    </details>
+
     <details class="card" data-k="heroes">
       <summary><span class="ico">🧙</span>可選武將<em id="hs-count"></em></summary>
       <div class="body">
@@ -244,7 +259,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     if (seen.size) $('#gs-seen').innerHTML = [...seen.entries()].reverse().map(([key, g]) =>
       `<div class="seen"><span title="${esc(g.label)}">${esc(g.label)}</span><select data-seen="${esc(key)}">${options(giftSettings.actionOf(key))}</select></div>`).join('');
     root.querySelector(`input[name="gs-other"][value="${giftSettings.ignoreUnlisted ? 'ignore' : 'tier'}"]`).checked = true;
-    $('#gs-url').value = giftSettings.liveUrl({ save: $('#sv-slot').value.trim(), cloud: saving.cloud.enabled ? saving.cloud.token : '', arena: renderer.arenas.get() === 'none' ? '' : renderer.arenas.get(), ...saving.heroSettings.urlParams() });
+    $('#gs-url').value = giftSettings.liveUrl({ save: $('#sv-slot').value.trim(), cloud: saving.cloud.enabled ? saving.cloud.token : '', arena: renderer.arenas.get() === 'none' ? '' : renderer.arenas.get(), ...saving.heroSettings.urlParams(), ...saving.hostCmd.urlParams() });
   }
   // 一個動作只對應一個禮物：選了新的，就取代這個動作原本的
   function setActionGift(action, name) {
@@ -328,6 +343,18 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     log.prepend(line);
     while (log.children.length > 40) log.lastChild.remove();
   }
+  // 主播文字指令的設定畫面
+  const hc = saving.hostCmd, recent = new Map();   // 最近留言的人：代號 → 名字
+  const hcWho = () => { $('#hc-who').textContent = hc.hostId ? `目前主播：${hc.hostName || '（沒有名字）'}（代號 ${hc.hostId.slice(0, 14)}${hc.hostId.length > 14 ? '…' : ''}）` : '目前還沒設定主播，指令不會生效。'; $('#hc-state').textContent = hc.hostId && Object.keys(hc.cmds).length ? '已設定' : ''; };
+  const hcPick = () => { const cur = $('#hc-pick').value; $('#hc-pick').innerHTML = [...recent.entries()].reverse().map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join('') || '<option value="">（還沒有人留言）</option>'; if (recent.has(cur)) $('#hc-pick').value = cur; };
+  const hcRows = () => { $('#hc-cmds').innerHTML = hc.actions.map(a => `<div class="hc-row"><b>${esc(actionLabel(a))}</b><input data-hc="${a}" maxlength="40" placeholder="例如：打他" value="${esc(hc.cmds[a] || '')}"></div>`).join(''); };
+  const hcWarn = () => { const d = hc.duplicates(); $('#hc-warn').textContent = d.length ? `⚠ ${d.map(actionLabel).join('、')} 的指令文字跟前面的動作重複，這幾個不會觸發。` : ''; };
+  $('#hc-set').onclick = () => { const id = $('#hc-pick').value; if (!id) return; hc.setHost(id, recent.get(id) || ''); hcWho(); renderGiftSettings(); };
+  $('#hc-cmds').oninput = e => { const i = e.target.closest('[data-hc]'); if (!i) return; hc.setCmd(i.dataset.hc, i.value); hcWarn(); hcWho(); renderGiftSettings(); };
+  hcRows(); hcWho(); hcPick(); hcWarn();
+  hub.on(ev => {
+    if (ev.type === 'chat' && ev.user && ev.user.id) { recent.delete(ev.user.id); recent.set(ev.user.id, ev.user.name || ev.user.id); while (recent.size > 15) recent.delete(recent.keys().next().value); hcPick(); }
+  });
   hub.on(ev => {
     if (ev.type === 'chat') addLog(`💬 ${ev.user.name}：${ev.text}`);
     else if (ev.type === 'gift') addLog(`🎁 ${ev.user.name} 送出 ${(config.gifts.find(g => g.id === ev.giftId) || {}).name || ev.giftId} ×${ev.count}`);

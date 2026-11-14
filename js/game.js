@@ -17,6 +17,7 @@ ML.createGame = function (config, heroes) {
     if (heroById.has(id)) nameTable.push([alias, heroById.get(id)]);
   }
   nameTable.sort((a, b) => b[0].length - a[0].length);
+  let hostMatch = null;      // 主播文字指令：(user, text) → 遊戲禮物代號或 null（由 host-commands.js 提供）
   let defaultHeroId = '';   // 還沒上場就送禮時自動上場的預設武將（空字串 = 不自動上場）
   // 這位實況主開放哪些武將：留言只比對開放的武將（已在場上的不受影響）。允許清單由 hero-settings.js 決定
   function setHeroPool(ids) {
@@ -358,13 +359,19 @@ ML.createGame = function (config, heroes) {
 
   return {
     setHeroPool,
+    setHostMatcher(fn) { hostMatch = fn; },
     setDefaultHero(id) { defaultHeroId = heroById.has(id) ? id : ''; },
     onFx(fn) { fxListeners.push(fn); },
     handleEvent(ev) {
       // 任何留言或送禮都算「有動作」，用來判斷這位觀眾還在不在
       const me = ev.user && players.get(ev.user.id);
       if (me) me.lastActive = time;
-      if (ev.type === 'chat') handleChat(ev.user, ev.text);
+      if (ev.type === 'chat') {
+        // 主播的文字指令：主播本人留言設定好的字 = 送那個動作的禮物（不走一般留言處理）
+        const hostGift = hostMatch && hostMatch(ev.user, ev.text);
+        if (hostGift) { handleGift(ev.user, hostGift, 1); return; }
+        handleChat(ev.user, ev.text);
+      }
       else if (ev.type === 'gift') handleGift(ev.user, ev.giftId, ev.count);
     },
     // 每一格畫面呼叫一次，dt = 經過的秒數

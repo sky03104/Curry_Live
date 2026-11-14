@@ -13,6 +13,9 @@
   const heroSettings = ML.createHeroSettings(heroes, params);
   game.setHeroPool(heroSettings.enabled);
   game.setDefaultHero(heroSettings.defaultId);   // 還沒上場就送禮的觀眾，自動帶著這隻上場
+  // 主播文字指令：主播本人留言設定好的字，效果等於送那個動作的禮物
+  const hostCmd = ML.createHostCommands(config, params);
+  game.setHostMatcher((user, text) => hostCmd.match(user, text));
   const sprite = ML.createHeroSprite(heroes.concat(game.bossHeroes()), config, 'assets/heroes');   // BOSS 的圖也要載入
   // 場地：直播畫面讀網址的 &arena=；面板視窗讀這個瀏覽器記住的選擇（方便預覽）
   const arenas = ML.createArenas();
@@ -96,7 +99,7 @@
   if (params.get('obs') === '1') {
     document.body.classList.add('obs');
   } else {
-    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { heroSettings, save, flushSave, count: saved.length, cloud, syncCloud, saveNow });
+    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { heroSettings, hostCmd, save, flushSave, count: saved.length, cloud, syncCloud, saveNow });
   }
   // 接真的 TikTok，兩種方式擇一：
   //   A. TikFinity 電腦版（建議）：網址加 ?tikfinity=1
