@@ -240,6 +240,9 @@ window.GAME_CONFIG = {
       eat: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3 },
       idle: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3, repeat: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭
       idle2: { src: 'michelin_snack.png', frames: 8, cw: 465, ch: 355, ground: 351, fps: 3, repeat: 3 },   // 第二組待機：吃漢堡喝奶茶。每次停下來隨機挑 idle（啃骨頭）或 idle2（吃漢堡喝奶茶），機率一樣（idle3、idle4 依此類推）
+      // 攻擊：低頭衝撞頂飛（8 格，第 5 格撞擊；普攻約 0.6 秒、技能約 0.7 秒，撞到那一格對上命中時間）
+      attack: { src: 'michelin_attack.png', frames: 8, cw: 581, ch: 361, ground: 358, fps: 13 },
+      skill: { src: 'michelin_attack.png', frames: 8, cw: 581, ch: 361, ground: 358, fps: 11 },
     },
     // 魚哥：一組南瓜桶大揮擊。attack（普攻，約 0.67 秒，第 5 格打中配合衝撞）／skill（技能，衝撞那一刻播）／idle（停下來時播一次）
     yuge: {
@@ -260,6 +263,9 @@ window.GAME_CONFIG = {
       eat: { src: 'dabao_drumstick.png', frames: 8, cw: 379, ch: 360, ground: 350, fps: 3 },   // 回血：吃大雞腿（一輪）
       idle: { src: 'dabao_eat.png', frames: 8, cw: 384, ch: 387, ground: 383, fps: 3, repeat: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭，連播 3 輪（跟米其林一樣）
       idle2: { src: 'dabao_drumstick.png', frames: 8, cw: 379, ch: 360, ground: 350, fps: 3, repeat: 3 },   // 第二組待機：吃大雞腿。停下來時隨機挑 idle（啃骨頭）或 idle2（吃雞腿）
+      // 攻擊：蓄力後嘴裡射出金色光球（原圖 9 格，其中兩格少了狗／被切掉，只用 7 格；第 4 格光球射出）
+      attack: { src: 'dabao_attack.png', frames: 7, cw: 819, ch: 413, ground: 404, fps: 10 },
+      skill: { src: 'dabao_attack.png', frames: 7, cw: 819, ch: 413, ground: 404, fps: 9 },
     },
   },
 

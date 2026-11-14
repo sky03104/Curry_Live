@@ -1,6 +1,6 @@
 """把「綠底、多格排在一張圖上」的連續動作圖，轉成遊戲用的逐格動畫條（透明背景、一排橫放）。
 
-用法：python3 tools/make_anim_sheet.py <原圖> <輸出檔名> [--grid 4x2] [--faces right|left] [--match-height 328] [--equalize area] [--erase-grid 6] [--row-counts 3,3,4] [--cut 768:512-1024] [--cx x1,x2,.. --feet y1,y2,.. --lift l1,l2,.. --scale 0.885]
+用法：python3 tools/make_anim_sheet.py <原圖> <輸出檔名> [--grid 4x2] [--faces right|left] [--match-height 328] [--equalize area] [--erase-grid 6] [--row-counts 3,3,4] [--flip 3,4,5] [--pick 1,2,3,4,6,8,9] [--cut 768:512-1024] [--cx x1,x2,.. --feet y1,y2,.. --lift l1,l2,.. --scale 0.885]
 範例：python3 tools/make_anim_sheet.py 米其林吃骨頭.jpg assets/heroes/michelin_eat.png --grid 4x2 --faces right
 
 做的事：
@@ -21,7 +21,7 @@ from PIL import Image
 def parse():
     a = sys.argv[1:]
     if len(a) < 2: print(__doc__); sys.exit(1)
-    opt = {'grid': '4x2', 'faces': 'right', 'match-height': '328', 'equalize': '', 'erase-grid': '0', 'row-counts': '', 'cx': '', 'feet': '', 'lift': '', 'scale': '', 'cut': ''}
+    opt = {'grid': '4x2', 'faces': 'right', 'match-height': '328', 'equalize': '', 'erase-grid': '0', 'row-counts': '', 'cx': '', 'feet': '', 'lift': '', 'scale': '', 'cut': '', 'flip': '', 'pick': ''}
     pos = []
     i = 0
     while i < len(a):
@@ -77,6 +77,7 @@ def main():
     frames = [[] for _ in range(sum(rc) if rc else cols * rows)]
     lst = lambda k: [float(x) for x in opt[k].split(',')] if opt[k] else None
     CXS, FEET, LIFT = lst('cx'), lst('feet'), lst('lift')   # 手動指定每格「身體中心 x」「腳底 y」「跳離地面多少」（原圖像素；武器／尾巴會讓自動判斷失準時用）
+    FLIPS = {int(x) for x in opt['flip'].split(',') if x}
     for c in comps:
         r = min(rows - 1, int(c['cy'] // ch))
         if CXS:   # 每個連通塊歸到「同一列裡、身體中心最近」的那一格（揮出去的武器、特效才不會被分到隔壁格）
@@ -86,7 +87,9 @@ def main():
         frames[k].append(c)
     parts = []
     for k, cs in enumerate(frames):
-        if not cs: sys.exit(f'第 {k + 1} 格找不到角色')
+        if not cs:
+            if opt['pick'] and (k + 1) not in [int(x) for x in opt['pick'].split(',')]: parts.append(None); continue
+            sys.exit(f'第 {k + 1} 格找不到角色')
         dog = max(cs, key=lambda c: c['size'])
         x0 = min(c['x0'] for c in cs); x1 = max(c['x1'] for c in cs); y0 = min(c['y0'] for c in cs); y1 = max(c['y1'] for c in cs)
         keep = np.isin(lab[y0:y1 + 1, x0:x1 + 1], [c['id'] for c in cs])
@@ -95,8 +98,11 @@ def main():
         dcx = (dog['x0'] + dog['x1']) / 2 - x0; ground = dog['y1'] - y0
         if CXS: dcx = CXS[k] - x0
         if FEET: ground = FEET[k] - y0
-        if opt['faces'] == 'right': img = img.transpose(Image.FLIP_LEFT_RIGHT); dcx = img.width - dcx
+        fl = (opt['faces'] == 'right') != ((k + 1) in FLIPS)   # --flip：個別幾格（從 1 算）方向跟其他格相反時，單獨翻面
+        if fl: img = img.transpose(Image.FLIP_LEFT_RIGHT); dcx = img.width - dcx
         parts.append({'img': img, 'dcx': dcx, 'ground': ground, 'dogh': dog['y1'] - dog['y0'], 'area': dog['size']})
+    if opt['pick']:   # 只留指定的格（從 1 算，依給的順序）；沒被選的格（例如少了角色、被切掉）不用管、也不會報錯
+        parts = [parts[int(x) - 1] for x in opt['pick'].split(',')]
     if opt['equalize'] == 'area':   # 每格先縮放到「狗的面積」一樣大（限制在 0.8～1.25 倍，避免姿勢差太多時縮過頭）
         med = sorted(p['area'] for p in parts)[len(parts) // 2]
         for p in parts:
