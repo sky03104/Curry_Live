@@ -270,15 +270,20 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const items = getLegend ? getLegend() : [];
     let legend = null;
     if (items.length) {
-      const base = { rowH: 44, gap: 4, icon: 36 };
+      const base = { rowH: 44, gap: 4, icon: 36, colGap: 8 };
       const wOf = it => 8 + base.icon + 8 + it.label.length * 17 + 14;          // 內距 + 圖片 + 間距 + 動作名稱 + 內距
-      const natW = Math.max(...items.map(wOf)), natH = items.length * base.rowH + (items.length - 1) * base.gap;
+      // 兩排直的：左邊是一般動作（普攻、全場、技能、回血），最右邊是招換 BOSS（紫色底）；只有一種就只畫一排
+      const cols = [items.filter(i => !i.boss), items.filter(i => i.boss)].filter(c => c.length)
+        .map(list => ({ list, w: Math.max(...list.map(wOf)) }));
+      const natW = cols.reduce((a, c) => a + c.w, 0) + (cols.length - 1) * base.colGap;
+      const natH = Math.max(...cols.map(c => c.list.length)) * (base.rowH + base.gap) - base.gap;
       const stackBottom = lb2 ? lb2.y + lb2.h : lb.y + lb.h;                    // 右上角排行榜們的最下緣
       const avail = H - 16 - (wide ? stackBottom + 12 + 5 * 24 : 120);          // 橫式：排行榜和訊息文字下面剩多少；直式：隨便留 120
-      const scale = clamp(Math.min(1, avail / natH), 0.5, 1);
+      let scale = clamp(Math.min(1, avail / natH), 0.5, 1);
+      if (wide) scale = Math.min(scale, lbW / natW);                            // 橫式：寬度不能超過右邊排行榜那一欄，免得蓋到場地
       const w = natW * scale, h = natH * scale;
-      legend = { items, scale, base, wOf, w, h, x: W - 16 - w, y: H - 16 - h };
-      if (!wide) arena.w -= w + 8;                                              // 直式：場地讓出右邊這一條
+      legend = { cols, scale, base, w, h, x: W - 16 - w, y: H - 16 - h };
+      if (!wide) arena.w -= w + 8;                                              // 直式：場地讓出右邊這一塊
     }
     const wander = config.wander && config.wander.enabled;
     // BOSS：又大又固定，站在場地中間偏下；一般武將會被推開、不會疊在它身上
@@ -646,21 +651,26 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
 
   function drawLegend(lg) {
     const k = lg.scale, bs = lg.base, h = bs.rowH * k;
-    lg.items.forEach((it, i) => {
-      const y = lg.y + i * (bs.rowH + bs.gap) * k, x = lg.x;
-      ctx.fillStyle = it.boss ? 'rgba(48,22,84,0.84)' : 'rgba(22,26,30,0.78)';   // 招換 BOSS 的底色偏紫
-      ctx.beginPath(); ctx.roundRect(x, y, lg.w, h, 10 * k); ctx.fill();
-      ctx.strokeStyle = it.boss ? 'rgba(194,123,255,0.8)' : 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
-      const size = bs.icon * k, ix = x + 8 * k, iy = y + (h - size) / 2;
-      const img = giftIcon(it.icon);
-      if (img) ctx.drawImage(img, ix, iy, size, size);
-      else {   // 還沒有圖片：畫一個小方框。指定了禮物就寫名稱前兩個字；用預設鑽石數的 BOSS 就寫「500 鑽」
-        ctx.fillStyle = 'rgba(255,255,255,0.14)';
-        ctx.beginPath(); ctx.roundRect(ix, iy, size, size, 7 * k); ctx.fill();
-        if (it.hint) { text(it.hint, ix + size / 2, iy + size * 0.38, 14 * k, '#fff'); text('鑽', ix + size / 2, iy + size * 0.76, 10 * k, '#d9a8ff', 'center', false); }
-        else text(it.name.replace(/^#/, '').slice(0, 2), ix + size / 2, iy + size / 2, 13 * k, '#fff', 'center', false);
-      }
-      text(it.label, ix + size + 8 * k, y + h / 2, 17 * k, it.boss ? '#e6c8ff' : '#ffd35c', 'left');
+    let cx = lg.x;
+    lg.cols.forEach(col => {
+      const cw = col.w * k;
+      col.list.forEach((it, i) => {
+        const y = lg.y + lg.h - (col.list.length - i) * (bs.rowH + bs.gap) * k + bs.gap * k, x = cx;   // 每一排都從最底下往上疊（貼齊右下角）
+        ctx.fillStyle = it.boss ? 'rgba(48,22,84,0.84)' : 'rgba(22,26,30,0.78)';   // 招換 BOSS 的底色偏紫
+        ctx.beginPath(); ctx.roundRect(x, y, cw, h, 10 * k); ctx.fill();
+        ctx.strokeStyle = it.boss ? 'rgba(194,123,255,0.8)' : 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+        const size = bs.icon * k, ix = x + 8 * k, iy = y + (h - size) / 2;
+        const img = giftIcon(it.icon);
+        if (img) ctx.drawImage(img, ix, iy, size, size);
+        else {   // 還沒有圖片：畫一個小方框。指定了禮物就寫名稱前兩個字；用預設鑽石數的 BOSS 就寫「500 鑽」
+          ctx.fillStyle = 'rgba(255,255,255,0.14)';
+          ctx.beginPath(); ctx.roundRect(ix, iy, size, size, 7 * k); ctx.fill();
+          if (it.hint) { text(it.hint, ix + size / 2, iy + size * 0.38, 14 * k, '#fff'); text('鑽', ix + size / 2, iy + size * 0.76, 10 * k, '#d9a8ff', 'center', false); }
+          else text(it.name.replace(/^#/, '').slice(0, 2), ix + size / 2, iy + size / 2, 13 * k, '#fff', 'center', false);
+        }
+        text(it.label, ix + size + 8 * k, y + h / 2, 17 * k, it.boss ? '#e6c8ff' : '#ffd35c', 'left');
+      });
+      cx += cw + bs.colGap * k;
     });
   }
 
