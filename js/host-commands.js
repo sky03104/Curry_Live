@@ -71,7 +71,7 @@ ML.createHostCommands = function (config) {
       const t = norm(text);
       if (!t) return null;
       const a = giftActions.find(a => state.cmds[a] && norm(state.cmds[a]) === t);
-      if (a) return { giftId: actionToGift[a], count: state.counts[a] || 1 };
+      if (a) return { giftId: actionToGift[a], count: state.counts[a] || 1, label: label(a) };
       // 復活：「復活」＝讓主播自己的武將馬上復活；「復活 小明」＝復活那位觀眾；「復活 全部」＝所有倒地的人
       const rv = state.cmds[REVIVE] && norm(state.cmds[REVIVE]);
       if (rv && (t === rv || t.startsWith(rv + ' ') || t.startsWith(rv + '\u3000'))) return { revive: String(text).trim().slice(rv.length).trim() };

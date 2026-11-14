@@ -46,6 +46,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div class="hint">右邊的「次」＝一次留言算幾個禮物（傷害、回血乘上次數），不用同一句打好幾遍。一般動作最多 1000 次（1 鑽的玫瑰可能一次送很多個），招換 BOSS 最多 3 次。</div>
         <div id="hc-cmds"></div>
         <div class="hint" id="hc-warn"></div>
+        <div class="hint" id="hc-urlstate"></div>
         <div class="hint">⚠ 直播畫面要重貼網址才會生效。主播還沒上場時留言指令，會自動帶預設武將上場（跟送禮一樣）。</div>
       </div>
     </details>
@@ -385,9 +386,10 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   const hcRows = () => { $('#hc-cmds').innerHTML = hc.actions.map(a => hc.isRevive(a)
     ? `<div class="hc-row"><b>${esc(hc.label(a))}</b><input data-hc="${a}" maxlength="40" placeholder="例如：復活" value="${esc(hc.cmds[a] || '')}"></div><div class="hint" style="margin:-2px 0 6px 98px">打這句＝你的武將馬上復活；後面加名字（「復活 小明」）＝復活那位觀眾；「復活 全部」＝所有倒地的人。不用等倒數。</div>`
     : `<div class="hc-row"><b>${esc(hc.label(a))}</b><input data-hc="${a}" maxlength="40" placeholder="例如：打他" value="${esc(hc.cmds[a] || '')}"><input type="number" class="hc-n" data-hcn="${a}" min="1" max="${hc.maxCount(a)}" value="${hc.countOf(a)}" title="次數：一次算幾個（最多 ${hc.maxCount(a)}）"><span class="hc-x">次</span></div>`).join(''); };
-  const hcWarn = () => { const d = hc.duplicates(); $('#hc-warn').textContent = d.length ? `⚠ ${d.map(hc.label).join('、')} 的指令文字跟前面的動作重複，這幾個不會觸發。` : ''; };
+  const hcUrlState = () => { const n = Object.keys(hc.cmds).length, c = Object.keys(hc.urlParams().cnt ? JSON.parse(hc.urlParams().cnt) : {}).length; $('#hc-urlstate').innerHTML = hc.hostId ? `📋 目前「直播用網址」帶著：主播 ✔、指令 ${n} 個、次數設定 ${c} 個。<b>改完要重貼網址</b>；直播時主播打指令，畫面訊息區會寫「主播指令：普攻 ×10」，寫 ×1 就代表直播軟體裡還是舊網址。` : ''; };
+  const hcWarn = () => { hcUrlState(); const d = hc.duplicates(); $('#hc-warn').textContent = d.length ? `⚠ ${d.map(hc.label).join('、')} 的指令文字跟前面的動作重複，這幾個不會觸發。` : ''; };
   $('#hc-set').onclick = () => { const id = $('#hc-pick').value; if (!id) return; hc.setHost(id, recent.get(id) || ''); hcWho(); renderGiftSettings(); };
-  $('#hc-cmds').onchange = e => { const n = e.target.closest('[data-hcn]'); if (!n) return; hc.setCount(n.dataset.hcn, n.value); n.value = hc.countOf(n.dataset.hcn); renderGiftSettings(); };
+  $('#hc-cmds').onchange = e => { const n = e.target.closest('[data-hcn]'); if (!n) return; hc.setCount(n.dataset.hcn, n.value); n.value = hc.countOf(n.dataset.hcn); hcWarn(); renderGiftSettings(); };
   $('#hc-cmds').oninput = e => { const i = e.target.closest('[data-hc]'); if (!i) return; hc.setCmd(i.dataset.hc, i.value); hcWarn(); hcWho(); renderGiftSettings(); };
   hcRows(); hcWho(); hcPick(); hcWarn();
   hub.on(ev => {
