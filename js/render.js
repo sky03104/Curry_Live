@@ -281,6 +281,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     // 禮物提示列：告訴觀眾「送哪個禮物會觸發哪個動作」。
     // （2026-11-13 咖哩要求移到畫面右下角；2026-11-14 再要求改成「一排直的」：一個動作一列，從右下角往上疊。
     //   空間不夠（排行榜佔了很多、或畫面很扁）就整排縮小，最小縮到一半。）
+    const arenaFullW = arena.w;   // 還沒被禮物提示列擠窄的場地寬度（武將走動範圍用：提示列上方的空地也可以走）
     const items = getLegend ? getLegend() : [];
     let legend = null;
     if (items.length) {
@@ -337,8 +338,12 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         if (!wander) { v.tx = tx; v.ty = ty; }   // 不走動：固定站在格子上
       });
       // 可走動範圍：四邊往內縮，確保名字、血條、腳下的字不會跑出畫面
-      bounds = { x0: arena.x + size * 0.6, x1: arena.x + arena.w - size * 0.6,
-                 y0: arena.y + size * 0.65 + 50, y1: arena.y + arena.h - size * 0.5 - 56 };
+      // 橫式：禮物提示列只是右下角的一塊障礙，它上方的空地武將也可以走（2026-11-14 咖哩要求），所以右界用沒被擠窄的寬度，
+      // 走到提示列正上方那一段時，往下的界線改成「提示列的上緣」（見 capY）
+      const xr = wide ? arena.x + arenaFullW : arena.x + arena.w;
+      bounds = { x0: arena.x + size * 0.6, x1: xr - size * 0.6,
+                 y0: arena.y + size * 0.65 + 50, y1: arena.y + arena.h - size * 0.5 - 56,
+                 size, lg: wide && legend ? { x: legend.x, y: legend.y } : null };
       // 畫面很小時上下可能擠到沒有空間（下限比上限還高）：這時就讓大家排在同一條水平線上、只左右走
       if (bounds.y0 > bounds.y1) bounds.y0 = bounds.y1 = (bounds.y0 + bounds.y1) / 2;
       if (bounds.x0 > bounds.x1) bounds.x0 = bounds.x1 = (bounds.x0 + bounds.x1) / 2;
@@ -397,6 +402,11 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     v.anim = { name, t: 0, dur: info.dur, fight: name === 'attack' || name === 'skill' };   // 出招動畫（attack／skill）衝撞時也繼續播
     v.hold = Math.max(v.hold || 0, info.dur + 0.3);
   }
+  // 走到禮物提示列正上方時，不能再往下鑽進去：y 最多到提示列上緣（腳下還有兩行字要留位置）
+  function capY(b, x, y) {
+    if (!b.lg || x + b.size * 0.6 <= b.lg.x - 8) return y;
+    return Math.max(b.y0, Math.min(y, b.lg.y - b.size * 0.5 - 56 - 6));
+  }
   function roam(dt) {
     const cfg = config.wander, b = bounds;
     const list = [...views.values()].filter(v => v.x !== null);
@@ -411,7 +421,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         const reach = cfg.stepMax * v.size;   // 一次最多走多遠
         let best = null;
         for (let c = 0; c < 10; c++) {
-          const x = clamp(v.x + (Math.random() * 2 - 1) * reach, b.x0, b.x1), y = clamp(v.y + (Math.random() * 2 - 1) * reach, b.y0, b.y1);
+          const x = clamp(v.x + (Math.random() * 2 - 1) * reach, b.x0, b.x1), y = capY(b, x, clamp(v.y + (Math.random() * 2 - 1) * reach, b.y0, b.y1));
           if (Math.hypot(x - v.x, y - v.y) < v.size * 0.4) continue;       // 太近了，等於沒走
           let room = 9;
           for (const o of list) if (o !== v) room = Math.min(room, gap(x, y, (o.goal || o).x, (o.goal || o).y, o.boss ? (v.size + o.size) / 2 : v.size));
@@ -439,7 +449,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       a.x -= dx * push * wa; a.y -= dy * push * wa; c.x += dx * push * (1 - wa); c.y += dy * push * (1 - wa);
     }
     for (const v of list) {
-      if (!v.down && !v.boss) { v.x = clamp(v.x, b.x0, b.x1); v.y = clamp(v.y, b.y0, b.y1); }
+      if (!v.down && !v.boss) { v.x = clamp(v.x, b.x0, b.x1); v.y = capY(b, v.x, clamp(v.y, b.y0, b.y1)); }
       if (!v.want) continue;
       // 這一格實際有沒有前進？有前進才算「走路中」（才會一顛一顛）。
       // 一直被擋住走不動超過半秒，就放棄這個目的地、休息一下再換地方，不會卡在原地踏步。
