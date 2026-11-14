@@ -272,9 +272,10 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const lb = { x: W - lbW - 16, y: 16, w: lbW, h: lbH };
     // 對 BOSS 的傷害排行榜：放在傷害排行榜正下方，場上有 BOSS 才出現（2026-11-14 咖哩要求）
     const bl = game.getBossLeaderboard();
-    const lb2 = bl ? { x: lb.x, y: lb.y + lb.h + 10, w: lb.w, h: 50 + Math.max(1, bl.rows.length) * 32, data: bl } : null;
-    const top = lb2 ? lb2.y + lb2.h - lb.y : lbH;   // 排行榜們（一個或兩個）合起來佔的高度
-    const arena = wide ? { x: 16, y: 16, w: W - lbW - 48, h: H - 32 }
+    // 橫式：放在傷害排行榜「左邊」、頂端對齊（2026-11-14 咖哩要求，直播畫面下方版面不夠）；直式：維持放在正下方
+    const lb2 = bl ? { x: wide ? lb.x - 10 - lb.w : lb.x, y: wide ? lb.y : lb.y + lb.h + 10, w: lb.w, h: 50 + Math.max(1, bl.rows.length) * 32, data: bl } : null;
+    const top = lb2 && !wide ? lb2.y + lb2.h - lb.y : lbH;   // 排行榜們（一個或兩個）合起來佔的高度
+    const arena = wide ? { x: 16, y: 16, w: W - lbW - 48 - (lb2 ? lb2.w + 10 : 0), h: H - 32 }   // 橫式：對 BOSS 排行榜出現時，場地也往左讓出它那一塊
                        : { x: 16, y: top + 32, w: W - 32, h: H - top - 48 - 100 };   // 直式：底下留 100 給訊息
     // 禮物提示列：告訴觀眾「送哪個禮物會觸發哪個動作」。
     // （2026-11-13 咖哩要求移到畫面右下角；2026-11-14 再要求改成「一排直的」：一個動作一列，從右下角往上疊。
@@ -292,7 +293,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         .map(list => ({ list, w: Math.max(...list.map(wOf)) }));
       const natW = cols.reduce((a, c) => a + c.w, 0) + (cols.length - 1) * base.colGap;
       const natH = Math.max(...cols.map(c => c.list.length)) * (base.rowH + base.gap) - base.gap;
-      const stackBottom = lb2 ? lb2.y + lb2.h : lb.y + lb.h;                    // 右上角排行榜們的最下緣
+      const stackBottom = lb2 ? Math.max(lb.y + lb.h, lb2.y + lb2.h) : lb.y + lb.h;                    // 右上角排行榜們的最下緣
       const avail = H - 16 - (wide ? stackBottom + 12 + (H >= 700 ? 4 * 24 : 0) : 120);   // 橫式：排行榜下面剩多少（畫面夠高才多留 4 行訊息的位置，扁的畫面把空間都給提示列）
       const minScale = Math.max(0.8, Math.min(1.1, 14 / (viewK * base.font)));   // 畫面被等比例縮小時（例如直播橫幅），提示列的字要補回來：在螢幕上至少約 14 像素高
       const scale = clamp(avail / natH, minScale, 1.1);   // 最大 1.1 倍（再大會蓋住畫面）
@@ -785,13 +786,13 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     drawLeaderboard(lb);
     if (lb2) drawBossLeaderboard(lb2);
     if (legend) drawLegend(legend);
-    drawBossQueue(arena, lb);
+    drawBossQueue(arena, lb2 && W >= H ? lb2 : lb);
 
     // 訊息：橫式放在排行榜下方，直式放在畫面最底下（都不會蓋到武將）
     const wide = W >= H;
     toasts.forEach((t, i) => {
       ctx.globalAlpha = t.age > 4 ? 5 - t.age : 1;
-      if (wide) text(t.text, lb.x + 4, (lb2 ? lb2.y + lb2.h : lb.y + lb.h) + 22 + i * 24, 14, '#fff', 'left');
+      if (wide) text(t.text, lb.x + 4, (lb2 && !wide ? lb2.y + lb2.h : lb.y + lb.h) + 22 + i * 24, 14, '#fff', 'left');
       else text(t.text, 20, H - 16 - (toasts.length - 1 - i) * 24, 15, '#fff', 'left');
       ctx.globalAlpha = 1;
     });
