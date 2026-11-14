@@ -139,7 +139,7 @@
   - 布丁（2026-11-13 咖哩第三隻）：黃金獵犬披戰甲，`heroId: pudding`，統帥（技能演出＝光環＋光柱），血 746／攻 55／防 34（統帥平均），技能「暖心號令」。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。去背時原圖左上的名牌被當成雜點去掉；尾巴顏色接近白底，被 AI 去背削掉一部分。
   - 圖：咖哩提供的原圖是白底，用 `tools/cutout_hero.py` 去背（AI 去背 rembg，連腳下陰影一起去掉）並縮成 312x396 放在 `assets/heroes/michelin.png`。
     之後要再加角色：照 `data/extra-heroes.js` 檔頭的四個步驟做。
-  - 魚哥（2026-11-14 咖哩第四隻）：南瓜裝小女孩拿南瓜桶揮擊，`heroId: yuge`，猛將（技能演出＝衝撞地裂），血 928／攻 52／防 47（同米其林），技能「南瓜重擊」。名字以外的設定是 Claude 先定的。圖是咖哩提供的白底原圖（`tools/cutout_hero.py` 去背），動畫是一組 8 格南瓜桶大揮擊（`assets/heroes/yuge_attack.png`，Gemini 生成、`make_anim_sheet.py --grid 4x2 --faces left --match-height 396 --equalize area`）。**出招動畫是新機制**：`heroAnims` 裡寫 `attack`（普攻出招時播，約 0.67 秒，第 5 格打中對齊 0.31 秒的命中時間）／`skill`（技能衝撞那一刻播）；這兩種衝撞時不會被中斷（`v.anim.fight`），沒登記的武將完全不受影響。魚哥的 `idle` 也先用同一組（播一次）。還沒有走路動畫。驗證：瀏覽器測過普攻、技能都有播、無錯誤；⚠️ 沒在直播軟體裡看過，名冊圖與玩法說明圖還沒重新產生。
+  - 魚哥（2026-11-14 咖哩第四隻）：南瓜裝小女孩拿南瓜桶揮擊，`heroId: yuge`，猛將（技能演出＝衝撞地裂），血 928／攻 52／防 47（同米其林），技能「南瓜重擊」。名字以外的設定是 Claude 先定的。圖是咖哩提供的白底原圖（`tools/cutout_hero.py` 去背），動畫是一組 8 格南瓜桶大揮擊（`assets/heroes/yuge_attack.png`，Gemini 生成、`make_anim_sheet.py --grid 4x2 --faces left --match-height 396 --equalize area`）。**出招動畫是新機制**：`heroAnims` 裡寫 `attack`（普攻出招時播，約 0.67 秒，第 5 格打中對齊 0.31 秒的命中時間）／`skill`（技能衝撞那一刻播）；這兩種衝撞時不會被中斷（`v.anim.fight`），沒登記的武將完全不受影響。魚哥的 `idle` 也先用同一組（播一次）。**走路動畫（`walk`，2026-11-14 新機制）**：`heroAnims.<id>.walk` 有登記的武將，移動時一直循環播（`hero-sprite.js` 的 draw，被打、播別的動畫時不播），圖 `assets/heroes/yuge_walk.png`（原圖面向右，用 `--faces right` 翻成面向左；8 格，每秒 10 格）。驗證：瀏覽器測過普攻、技能、走路都有播、無錯誤；⚠️ 沒在直播軟體裡看過，名冊圖與玩法說明圖還沒重新產生。
   - 觀眾第一次上場是「留言裡含武將名就算」，所以聊天提到「米其林餐廳」之類的詞也會讓還沒上場的人帶著米其林上場。
 - 同步方式：`python3 tools/sync_from_curry_games.py`（需要 Pillow），會重新產生 `data/heroes.js`，
   並把全身圖縮成 312x396 放到 `assets/heroes/`（原圖每張約 0.5MB，縮小後整包約 7MB）。

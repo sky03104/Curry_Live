@@ -245,6 +245,7 @@ window.GAME_CONFIG = {
     yuge: {
       attack: { src: 'yuge_attack.png', frames: 8, cw: 504, ch: 422, ground: 418, fps: 12 },
       skill: { src: 'yuge_attack.png', frames: 8, cw: 504, ch: 422, ground: 418, fps: 10 },
+      walk: { src: 'yuge_walk.png', frames: 8, cw: 236, ch: 417, ground: 413, fps: 10 },   // 走路循環（移動時一直播）
       idle: { src: 'yuge_attack.png', frames: 8, cw: 504, ch: 422, ground: 418, fps: 5 },
     },
     dabao: {
