@@ -17,6 +17,14 @@ ML.createGame = function (config, heroes) {
     if (heroById.has(id)) nameTable.push([alias, heroById.get(id)]);
   }
   nameTable.sort((a, b) => b[0].length - a[0].length);
+  // 這位實況主開放哪些武將：留言只比對開放的武將（已在場上的不受影響）。允許清單由 hero-settings.js 決定
+  function setHeroPool(ids) {
+    const ok = new Set(ids);
+    nameTable.length = 0;
+    for (const h of heroes) if (ok.has(h.heroId)) nameTable.push([h.displayName, h]);
+    for (const [alias, id] of Object.entries(config.heroAliases || {})) if (ok.has(id) && heroById.has(id)) nameTable.push([alias, heroById.get(id)]);
+    nameTable.sort((a, b) => b[0].length - a[0].length);
+  }
 
   function fx(e) { fxListeners.forEach(fn => fn(e)); }
   function notice(text) { fx({ type: 'notice', text }); }
@@ -337,6 +345,7 @@ ML.createGame = function (config, heroes) {
   function reviveRemaining(p) { return p.down ? Math.max(0, config.reviveSeconds - (time - p.downAt)) : 0; }
 
   return {
+    setHeroPool,
     onFx(fn) { fxListeners.push(fn); },
     handleEvent(ev) {
       // 任何留言或送禮都算「有動作」，用來判斷這位觀眾還在不在

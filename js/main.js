@@ -9,6 +9,9 @@
 
   const hub = ML.createEventHub();
   const game = ML.createGame(config, heroes);
+  // 可選武將：這位實況主開放哪些武將（網址 &heroes= / &skip=，沒有就用這個瀏覽器記住的）
+  const heroSettings = ML.createHeroSettings(heroes, params);
+  game.setHeroPool(heroSettings.enabled);
   const sprite = ML.createHeroSprite(heroes.concat(game.bossHeroes()), config, 'assets/heroes');   // BOSS 的圖也要載入
   // 場地：直播畫面讀網址的 &arena=；面板視窗讀這個瀏覽器記住的選擇（方便預覽）
   const arenas = ML.createArenas();
@@ -92,7 +95,7 @@
   if (params.get('obs') === '1') {
     document.body.classList.add('obs');
   } else {
-    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { save, flushSave, count: saved.length, cloud, syncCloud, saveNow });
+    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { heroSettings, save, flushSave, count: saved.length, cloud, syncCloud, saveNow });
   }
   // 接真的 TikTok，兩種方式擇一：
   //   A. TikFinity 電腦版（建議）：網址加 ?tikfinity=1
