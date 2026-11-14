@@ -1,6 +1,6 @@
 """把「綠底、多格排在一張圖上」的連續動作圖，轉成遊戲用的逐格動畫條（透明背景、一排橫放）。
 
-用法：python3 tools/make_anim_sheet.py <原圖> <輸出檔名> [--grid 4x2] [--faces right|left] [--match-height 328] [--equalize area] [--erase-grid 6]
+用法：python3 tools/make_anim_sheet.py <原圖> <輸出檔名> [--grid 4x2] [--faces right|left] [--match-height 328] [--equalize area] [--erase-grid 6] [--row-counts 3,3,4] [--cut 768:512-1024] [--cx x1,x2,.. --feet y1,y2,.. --lift l1,l2,.. --scale 0.885]
 範例：python3 tools/make_anim_sheet.py 米其林吃骨頭.jpg assets/heroes/michelin_eat.png --grid 4x2 --faces right
 
 做的事：
@@ -21,7 +21,7 @@ from PIL import Image
 def parse():
     a = sys.argv[1:]
     if len(a) < 2: print(__doc__); sys.exit(1)
-    opt = {'grid': '4x2', 'faces': 'right', 'match-height': '328', 'equalize': '', 'erase-grid': '0'}
+    opt = {'grid': '4x2', 'faces': 'right', 'match-height': '328', 'equalize': '', 'erase-grid': '0', 'row-counts': '', 'cx': '', 'feet': '', 'lift': '', 'scale': '', 'cut': ''}
     pos = []
     i = 0
     while i < len(a):
@@ -66,12 +66,23 @@ def main():
     if n > 0:   # 把格線附近塗成透明（等於背景）
         for k in range(1, cols): x = round(k * W / cols); rgba[:, max(0, x - n):x + n, 3] = 0
         for k in range(1, rows): y = round(k * H / rows); rgba[max(0, y - n):y + n, :, 3] = 0
+    for part in [x for x in opt['cut'].split(',') if x]:   # 兩格的東西（尾巴、武器）黏在一起時，沿 x 位置、在指定的 y 範圍切開一條 3 像素的縫（x:y0-y1）
+        x, yr = part.split(':'); y0_, y1_ = map(int, yr.split('-')); x = int(x)
+        rgba[y0_:y1_, max(0, x - 1):x + 2, 3] = 0
     lab, comps = components(rgba[..., 3] > 40)
     comps = [c for c in comps if c['size'] >= 20]
+    rc = [int(x) for x in opt['row-counts'].split(',')] if opt['row-counts'] else None   # 每一列的格數不一樣時（例如 3,3,4），每列各自平分寬度
+    if rc: rows = len(rc)
     cw, ch = W / cols, H / rows
-    frames = [[] for _ in range(cols * rows)]
+    frames = [[] for _ in range(sum(rc) if rc else cols * rows)]
+    lst = lambda k: [float(x) for x in opt[k].split(',')] if opt[k] else None
+    CXS, FEET, LIFT = lst('cx'), lst('feet'), lst('lift')   # 手動指定每格「身體中心 x」「腳底 y」「跳離地面多少」（原圖像素；武器／尾巴會讓自動判斷失準時用）
     for c in comps:
-        k = min(rows - 1, int(c['cy'] // ch)) * cols + min(cols - 1, int(c['cx'] // cw))
+        r = min(rows - 1, int(c['cy'] // ch))
+        if CXS:   # 每個連通塊歸到「同一列裡、身體中心最近」的那一格（揮出去的武器、特效才不會被分到隔壁格）
+            k = min(range(r * cols, r * cols + cols), key=lambda j: abs(c['cx'] - CXS[j]))
+        elif rc: k = sum(rc[:r]) + min(rc[r] - 1, int(c['cx'] // (W / rc[r])))
+        else: k = r * cols + min(cols - 1, int(c['cx'] // cw))
         frames[k].append(c)
     parts = []
     for k, cs in enumerate(frames):
@@ -82,6 +93,8 @@ def main():
         crop = rgba[y0:y1 + 1, x0:x1 + 1].copy(); crop[..., 3] = np.where(keep, crop[..., 3], 0)
         img = Image.fromarray(crop, 'RGBA')
         dcx = (dog['x0'] + dog['x1']) / 2 - x0; ground = dog['y1'] - y0
+        if CXS: dcx = CXS[k] - x0
+        if FEET: ground = FEET[k] - y0
         if opt['faces'] == 'right': img = img.transpose(Image.FLIP_LEFT_RIGHT); dcx = img.width - dcx
         parts.append({'img': img, 'dcx': dcx, 'ground': ground, 'dogh': dog['y1'] - dog['y0'], 'area': dog['size']})
     if opt['equalize'] == 'area':   # 每格先縮放到「狗的面積」一樣大（限制在 0.8～1.25 倍，避免姿勢差太多時縮過頭）
@@ -91,12 +104,16 @@ def main():
             p['img'] = p['img'].resize((round(p['img'].width * f), round(p['img'].height * f)), Image.LANCZOS)
             p['dcx'] *= f; p['ground'] *= f; p['dogh'] *= f
     stand = sorted(p['dogh'] for p in parts)[len(parts) // 2]       # 用中間值當「站著的狗」的高度
-    s = float(opt['match-height']) / stand
+    s = float(opt['scale']) if opt['scale'] else float(opt['match-height']) / stand
     for p in parts:
         p['img'] = p['img'].resize((round(p['img'].width * s), round(p['img'].height * s)), Image.LANCZOS)
         p['dcx'] *= s; p['ground'] *= s
+    for i, p in enumerate(parts):
+        p['down'] = p['img'].height - p['ground']
+        p['lift'] = (LIFT[i] * s) if LIFT else 0          # 跳在空中：整個往上抬
+        p['ground'] += p['lift']
     left = max(p['dcx'] for p in parts); right = max(p['img'].width - p['dcx'] for p in parts)
-    up = max(p['ground'] for p in parts); down = max(p['img'].height - p['ground'] for p in parts)
+    up = max(p['ground'] for p in parts); down = max(p['down'] for p in parts)
     CW = int(round(max(left, right) * 2)) + 4; CH = int(round(up + down)) + 4; G = int(round(up)) + 2
     sheet = Image.new('RGBA', (CW * len(parts), CH), (0, 0, 0, 0))
     for i, p in enumerate(parts):
