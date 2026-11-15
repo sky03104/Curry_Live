@@ -112,6 +112,12 @@ ML.createGiftSettings = function (config, params) {
         return tier ? { action: a, label: config.actions[a].label, name: '', icon: '', hint: String(tier.atLeast), boss } : null;
       }).filter(Boolean);
     },
+    // 賽跑模式的提示列：助力（玫瑰）、干擾（GG）＋一行提醒。名稱來自 config.race.giftNames，圖片有人送過才有
+    raceLegend() {
+      const gn = (config.race || {}).giftNames || {};
+      const row = (action, label, names) => { const icon = names.map(n => this.iconOf(n)).find(Boolean) || ''; return { action, label, name: names[0], icon, hint: names[0], boss: false }; };
+      return [row('raceBoost', '助力', gn.boost || ['玫瑰']), row('raceHinder', '干擾', gn.hinder || ['GG']), { action: 'raceTip', label: '先留言 @參賽者', name: '', icon: '', boss: false }];
+    },
     // 產生要貼進直播軟體的網址
     // extra：要另外加進網址的參數（例如存檔名稱 { save: '第二季' }）
     liveUrl(extra) {

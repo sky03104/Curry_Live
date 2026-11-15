@@ -363,7 +363,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     //   空間不夠（排行榜佔了很多、或畫面很扁）就整排縮小，最小縮到一半。）
     toastBox = null;
     const arenaFullW = arena.w;   // 還沒被禮物提示列擠窄的場地寬度（武將走動範圍用：提示列上方的空地也可以走）
-    const items = getLegend && game.getMode() !== 'race' ? getLegend() : [];   // 賽跑模式：普攻、技能、招換 BOSS 都停用，右下角的指令提示列先隱藏
+    const items = getLegend ? getLegend(game.getMode() === 'race' ? 'race' : '') : [];   // 賽跑模式：右下角改顯示助力（玫瑰）、干擾（GG）的禮物指令
     let legend = null;
     if (items.length) {
       // 2026-11-14 咖哩用手機看說「還是霧霧的」：直播影片壓縮會把彩色的字糊掉（顏色資訊被壓得很粗，只有明暗保得住），
@@ -415,12 +415,13 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     raceGeo = null;
     if (raceR) {
       // 賽跑：橢圓跑道在場地中央偏下；參賽者照進度沿跑道跑，沒參賽的留在中間的內場
-      const n = Math.max(3, raceR.count), es = clamp(Math.min(arena.h * 0.2, arena.w * 0.07), 34, 80);
-      const halfH = Math.max(50, arena.h * 0.5 - 40 - es * 0.5);   // 跑道（含寬度）上下最多能佔的半高
+      const n = Math.max(3, raceR.count), es = clamp(Math.min(arena.h * 0.22, arena.w * 0.08), 34, 90);
+      const topPad = 46, botPad = 26, midH = (arena.h - topPad - botPad) / 2;   // 上面留給資訊列、下面留給「起跑線」字樣，其餘都給跑道
+      const halfH = Math.max(50, midH - es * 0.45);   // 跑道（含寬度）上下最多能佔的半高
       const band = Math.min(clamp(es * 0.16, 5, 11) * Math.min(8, n) + es * 0.5, halfH * 0.75);   // 跑道不要太寬，不然中間的內場會變得很窄；選手在不同的道上會有一點上下重疊，沒關係
       const laneGap = Math.max(4, (band - es * 0.5) / Math.min(8, n));
-      const cx = arena.x + arena.w / 2, cy = arena.y + arena.h * 0.56 + 8;
-      const rx = Math.max(band * 0.6 + 10, arena.w * 0.5 - band / 2 - es * 0.8), ry = Math.max(band * 0.55 + 4, halfH - band / 2);
+      const cx = arena.x + arena.w / 2, cy = arena.y + topPad + midH;
+      const rx = Math.max(band * 0.6 + 10, arena.w * 0.5 - band / 2 - es * 0.55), ry = Math.max(band * 0.55 + 4, halfH - band / 2);
       // 弧長對照表：進度（0～1，照路程算）換成橢圓上的角度，這樣在直道和彎道上的視覺速度才一樣
       const N = 240, tab = [0]; let px = rx, py = 0;
       for (let i = 1; i <= N; i++) { const th = i / N * Math.PI * 2, x = rx * Math.cos(th), y = ry * Math.sin(th); tab.push(tab[i - 1] + Math.hypot(x - px, y - py)); px = x; py = y; }
