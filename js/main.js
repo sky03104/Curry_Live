@@ -21,7 +21,7 @@
   const arenas = ML.createArenas();
   let savedArena = ''; try { savedArena = localStorage.getItem('curryLive.arena') || ''; } catch (e) { /* 讀不到就用預設 */ }
   arenas.set(params.get('arena') || (params.get('obs') === '1' ? 'none' : savedArena));
-  const renderer = ML.createRenderer(document.getElementById('stage'), game, config, sprite, ML.createEffects(), () => giftSettings.legend(), arenas);
+  const renderer = ML.createRenderer(document.getElementById('stage'), game, config, sprite, ML.createEffects(), m => (m === 'race' ? giftSettings.raceLegend() : giftSettings.legend()), arenas);
 
   // ---------- 存檔：觀眾的等級、經驗值、擊倒數 ----------
   const save = ML.createSave(config, params);

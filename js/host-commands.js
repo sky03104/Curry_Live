@@ -77,6 +77,9 @@ ML.createHostCommands = function (config) {
     // 主播按鈕（面板上點一下）：跟留言指令一樣的結果格式，但不用比對文字。action 是動作代號（attack、skill、boss1…或 revive），arg 是復活的對象（空白＝自己、「全部」）
     press(action, count, arg) {
       if (action === REVIVE) return { revive: String(arg || '').slice(0, 40) };
+      if (action === 'raceOpen') return { race: 'open', label: '開放報名' };
+      if (action === 'raceStart') return { race: 'start', label: '提早開跑' };
+      if (action === 'raceCancel') return { race: 'cancel', label: '取消比賽' };
       if (action === 'modeTeam') return { setMode: 'team', label: '陣營模式' };         // 只有按鈕有：切換玩法模式
       if (action === 'modeBrawl') return { setMode: 'brawl', label: '亂鬥模式' };
       if (action === 'matchRestart') return { restartMatch: true, label: '重開陣營賽' };

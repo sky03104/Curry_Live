@@ -24,6 +24,7 @@
       lastKey = key;
       $('#pad').innerHTML = `<div class="grp"><b>一般</b><div class="row">${gen.join('')}</div></div>
         <div class="grp"><b>復活</b><div class="row">${b('rv', 'revive', '復活自己')}${b('rv', 'revive', '復活全部', '全部')}</div></div>
+        <div class="grp"><b>賽跑</b><div class="row">${b('mode', 'raceOpen', '開放報名')}${b('rv', 'raceStart', '提早開跑')}${b('rv', 'raceCancel', '取消比賽')}</div></div>
         <div class="grp"><b>玩法模式</b><div class="row">${b('mode', 'modeTeam', '切換陣營模式')}${b('mode', 'modeBrawl', '切換亂鬥模式')}${b('rv', 'matchRestart', '重開陣營賽')}</div></div>
         <div class="grp"><b>招換</b><div class="row">${boss.join('')}</div></div>`;
     }
