@@ -43,6 +43,12 @@ window.GAME_CONFIG = {
       chanceMin: 0.05, chanceMax: 0.95,
       obstacles: [{ icon: '🚧', name: '柵欄' }, { icon: '🪨', name: '落石' }, { icon: '🌊', name: '水坑' }, { icon: '🔥', name: '火圈' }, { icon: '🧱', name: '高牆' }],
     },
+    // 障礙賽專用的 10 種賽道（形狀與外觀在 js/race-tracks.js，id 都以 h_ 開頭）：開放障礙賽時從這裡隨機挑，不會連續兩場同一種
+    hurdleTracks: [
+      { id: 'h_jungle', name: '叢林蜿蜒' }, { id: 'h_canyon', name: '峽谷之字' }, { id: 'h_snow', name: '雪山山脊' }, { id: 'h_castle', name: '古堡十字' },
+      { id: 'h_candy', name: '糖果齒輪' }, { id: 'h_space', name: '隕石帶' }, { id: 'h_volcano', name: '火山月牙' }, { id: 'h_river', name: '蛇形水道' },
+      { id: 'h_terrace', name: '梯田階梯' }, { id: 'h_circus', name: '馬戲六角' },
+    ],
     // 賽道：每次開放報名時隨機挑一種（不會連續兩場同一種）。形狀與外觀畫在 js/race-tracks.js，這裡只列 id 和名字
     tracks: [
       { id: 'oval', name: '橢圓田徑場' }, { id: 'kart', name: '賽車場' }, { id: 'eight', name: '八字沙漠' }, { id: 'flower', name: '花瓣花園' },
