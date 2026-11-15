@@ -24,7 +24,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
   let quake = 0;             // 整個畫面震動的強度（重擊時）
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const after = (sec, fn) => timers.push({ t: sec, fn });
+  // 秒數若算出來不是數字（例如剛上場的人還沒排好位置、座標是空的），timer 會永遠不倒數也不執行，被打的人的 pending 就卡住、血條和走動都停住；所以一律保底成有限的秒數
+  const after = (sec, fn) => timers.push({ t: Number.isFinite(sec) ? sec : 0.9, fn });
 
   function text(str, x, y, size, color, align, bold) {
     ctx.font = `${bold === false ? '' : 'bold '}${size}px ${FONT}`;
@@ -1182,7 +1183,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     arenas,
     frame(dt) { update(dt); draw(); },
     // 自動測試用：讀出每隻武將目前的位置
-    debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down, face: v.face, moving: v.moving, anim: v.anim ? v.anim.name : '' })); },
+    debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down, face: v.face, moving: v.moving, anim: v.anim ? v.anim.name : '', pending: v.pending, hold: v.hold, race: v.race, hp: v.hp, shownHp: v.shownHp })); },
     debugBounds() { return bounds; },
     reset() { views.clear(); leavers = []; floats = []; rings = []; timers = []; toasts = []; dim = null; quake = 0; effects.clear(); },
   };
