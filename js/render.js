@@ -8,6 +8,7 @@ window.ML = window.ML || {};
 ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, arenas) {
   const ctx = canvas.getContext('2d');
   const FONT = '"Noto Sans TC","Microsoft JhengHei","PingFang TC","WenQuanYi Zen Hei",sans-serif';
+  let lastTeamMode = false;   // 上一次排位置時是不是陣營模式（模式一換就重排）
   const views = new Map();   // 觀眾代號 → 畫面上這隻武將的顯示狀態
   let floats = [];           // 飄起來的字（傷害數字、補血、技能名）
   let rings = [];            // 擴散的圓圈（全場攻擊、技能命中）
@@ -355,6 +356,10 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     }
     const wander = config.wander && config.wander.enabled;
     const teamMode = game.getMode() === 'team';
+    if (teamMode !== lastTeamMode) {   // 切換亂鬥／陣營模式：所有武將重新排位置（不然切回亂鬥後會留在原本地盤的位置、站成一排）
+      lastTeamMode = teamMode;
+      for (const v of views.values()) if (!v.boss && !v.fixed) { v.x = null; v.y = null; v.goal = null; v.tx = undefined; v.rest = undefined; }
+    }
     const tb = toastBox;
     // BOSS：又大又固定，站在場地中間偏下；一般武將會被推開、不會疊在它身上
     const bossV = views.get('boss');
