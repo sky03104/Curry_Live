@@ -367,7 +367,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     if (!teamMode) for (const v of views.values()) { v.zx0 = undefined; v.zx1 = undefined; }
     if (teamMode) {
       // 陣營模式：紅方主堡｜紅隊武將｜紅方塔｜藍方塔｜藍隊武將｜藍方主堡
-      const sB = clamp(Math.min(arena.h * 0.55, arena.w * 0.13), 54, 170), sT = sB * 0.72;
+      const sB = clamp(Math.min(arena.h * 0.5, arena.w * 0.15), 60, 170), sT = sB * 0.75;   // 2026-11-15 咖哩看直播覺得塔堡太小：放大
       const footY = arena.y + arena.h - 50, mid = arena.x + arena.w / 2;
       const place = { base_red: [arena.x + sB * 0.64, sB], tower_red: [mid - sT * 0.6, sT], tower_blue: [mid + sT * 0.6, sT], base_blue: [arena.x + arena.w - sB * 0.64, sB] };
       for (const st of game.getStructs()) {
@@ -803,16 +803,16 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     if (hitK > 0) { ctx.fillStyle = `rgba(255,255,255,${hitK * 0.55})`; ctx.fillRect(x - s * 0.55, fy - s, s * 1.1, s); }   // 被打閃白
     ctx.restore();
     // 血條（隊色）
-    const bw = Math.max(70, s * 1.1), bh = clamp(s * 0.1, 9, 15), bx = x - bw / 2, by = fy - s * (p.kind === 'tower' ? 1.45 : 1.55) - bh;
+    const bw = Math.max(80, s * 1.15), bh = clamp(s * 0.15, 13, 22), bx = x - bw / 2, by = fy - s * (p.kind === 'tower' ? 1.45 : 1.55) - bh;
     const ratio = clamp(v.shownHp / p.maxHp, 0, 1);
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(bx - 3, by - 3, bw + 6, bh + 6, (bh + 6) / 2); ctx.fill();
     ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
     if (ratio > 0.005) { ctx.fillStyle = col; ctx.beginPath(); ctx.roundRect(bx, by, Math.max(bh, bw * ratio), bh, bh / 2); ctx.fill(); }
     ctx.restore();
-    text(`${down ? 0 : Math.max(0, Math.ceil(v.shownHp))}`, x, by + bh / 2, Math.max(10, bh * 0.85), '#fff');
-    const fs = clamp(s * 0.2, 13, 22);
-    text(p.name, x, by - fs * 0.7, fs, col);
+    text(`${down ? 0 : Math.max(0, Math.ceil(v.shownHp))}`, x, by + bh / 2, Math.max(11, bh * 0.85), '#fff');
+    const fs = clamp(s * 0.26, 18, 28);   // 名字、說明字放大（直播橫幅縮得很小，原本幾乎看不清楚）
+    text(p.kind === 'tower' ? (p.team === 'red' ? '紅塔' : '藍塔') : p.name, x, by - fs * 0.7, fs, col);   // 兩座塔貼在一起，名字縮短才不會疊在一起
     if (p.kind === 'base' && !down) {
       const msg = st === 'open' ? '可以攻擊！' : st === 'tower' ? '先拆防禦塔' : '要先打倒全部武將';
       text(msg, x, fy + fs * 0.9, fs * 0.72, st === 'open' ? '#ffe27a' : '#cfe9ff');
