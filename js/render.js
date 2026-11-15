@@ -8,6 +8,8 @@ window.ML = window.ML || {};
 ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, arenas) {
   const ctx = canvas.getContext('2d');
   const FONT = '"Noto Sans TC","Microsoft JhengHei","PingFang TC","WenQuanYi Zen Hei",sans-serif';
+  let raceGeo = null;          // 賽跑：橢圓跑道的位置與大小（每格排位置時重算）
+  let lastModeName = 'brawl';  // 上一次排位置時的模式（亂鬥／陣營／賽跑），一換就重排所有武將
   let lastTeamMode = false;   // 上一次排位置時是不是陣營模式（模式一換就重排）
   const views = new Map();   // 觀眾代號 → 畫面上這隻武將的顯示狀態
   let floats = [];           // 飄起來的字（傷害數字、補血、技能名）
@@ -97,6 +99,18 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       floats.push({ v, text: '摧毀！', color: '#ffb347', scale: 1.5, age: 0, life: 2 });
       return;
     }
+    if (e.type === 'raceJoin') { v.hop = 1; v.hopH = 0.7; rings.push({ v, age: 0, life: 0.5, color: '#ffd35c', max: 1.6, width: 6 }); floats.push({ v, text: '參賽！', color: '#ffd35c', scale: 1.1, age: 0, life: 1.4 }); return; }
+    if (e.type === 'raceRest') { v.moving = false; startAnim(v, 'idle'); floats.push({ v, text: '💤', color: '#9ad0ff', scale: 1.1, age: 0, life: 1.6 }); return; }
+    if (e.type === 'raceBoost') {      // 玫瑰助力：花瓣往上飄、一圈光
+      for (let i = 0; i < Math.min(14, 4 + e.n * 2); i++) effects.emoji(v.x + (Math.random() - 0.5) * v.size, v.y, Math.random() < 0.5 ? '🌹' : '🌸', v.size * (0.25 + Math.random() * 0.2), (Math.random() - 0.5) * 80, -(80 + Math.random() * 120), 40, 1 + Math.random() * 0.5, (Math.random() - 0.5) * 6, v.y + v.size * 0.5);
+      rings.push({ v, age: 0, life: 0.6, color: '#ff8fb8', max: 1.8, width: 6 }); floats.push({ v, text: '加速！', color: '#ff8fb8', scale: 1, age: 0, life: 1.2 }); return;
+    }
+    if (e.type === 'raceHinder') {     // GG 干擾：頭上一朵烏雲
+      effects.emoji(v.x, v.y - v.size * 0.85, '☁️', v.size * 0.7, 0, 0, 0, 1.6, 0);
+      for (let i = 0; i < 4; i++) effects.emoji(v.x + (Math.random() - 0.5) * v.size * 0.6, v.y - v.size * 0.55, '💢', v.size * 0.28, (Math.random() - 0.5) * 60, 80 + Math.random() * 80, 200, 0.8, 0, v.y + v.size * 0.5);
+      v.shake = 0.8; floats.push({ v, text: '被干擾！', color: '#c9b3ff', scale: 1, age: 0, life: 1.2 }); return;
+    }
+    if (e.type === 'raceFinish') { v.moving = false; v.hop = 1; v.hopH = 1.2; effects.sparks(v.x, v.y, '#ffd35c', 30, 520, 6, 0.9); floats.push({ v, text: '完賽！', color: '#ffd35c', scale: 1.3, age: 0, life: 1.8 }); return; }
     if (e.type === 'teamJoin') {           // 選隊／換隊：隊色光圈
       const tcol = (config.team.colors || {})[e.team] || '#fff';
       v.hop = 1; v.hopH = 0.6;
@@ -334,7 +348,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const n = list.length;
     const wide = W >= H;
     const lbW = wide ? clamp(W * 0.26, 260, 340) : W - 32;
-    const lbRows = Math.max(1, game.getLeaderboard().length);
+    const lbRows = game.getMode() === 'race' ? 5 : Math.max(1, game.getLeaderboard().length);   // 賽跑時右上角改顯示前 5 名
     const lbH = 50 + lbRows * 32;
     const lb = { x: W - lbW - 16, y: 16, w: lbW, h: lbH };
     // 對 BOSS 的傷害排行榜：放在傷害排行榜正下方，場上有 BOSS 才出現（2026-11-14 咖哩要求）
@@ -378,6 +392,11 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     }
     const wander = config.wander && config.wander.enabled;
     const teamMode = game.getMode() === 'team';
+    const modeNow = game.getMode();
+    if (modeNow !== lastModeName) {   // 任何模式切換（含賽跑）：所有武將重新排位置
+      lastModeName = modeNow;
+      for (const v of views.values()) if (!v.boss && !v.fixed) { v.x = null; v.y = null; v.goal = null; v.tx = undefined; v.rest = undefined; v.race = false; }
+    }
     if (teamMode !== lastTeamMode) {   // 切換亂鬥／陣營模式：所有武將重新排位置（不然切回亂鬥後會留在原本地盤的位置、站成一排）
       lastTeamMode = teamMode;
       for (const v of views.values()) if (!v.boss && !v.fixed) { v.x = null; v.y = null; v.goal = null; v.tx = undefined; v.rest = undefined; }
@@ -391,8 +410,33 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       if (bossV.x === null) { bossV.x = tx; bossV.y = ty; bossV.size = bs; }
       bossV.tsize = bs; bossV.tx = tx; bossV.ty = ty;
     }
-    if (!teamMode) for (const v of views.values()) { v.zx0 = undefined; v.zx1 = undefined; }
-    if (teamMode) {
+    if (!teamMode) for (const v of views.values()) { v.zx0 = undefined; v.zx1 = undefined; v.zy0 = undefined; v.zy1 = undefined; }
+    const raceR = modeNow === 'race' ? game.getRace() : null;
+    raceGeo = null;
+    if (raceR) {
+      // 賽跑：橢圓跑道在場地中央偏下；參賽者照進度沿跑道跑，沒參賽的留在中間的內場
+      const n = Math.max(3, raceR.count), es = clamp(Math.min(arena.h * 0.2, arena.w * 0.07), 34, 80);
+      const halfH = Math.max(50, arena.h * 0.5 - 40 - es * 0.5);   // 跑道（含寬度）上下最多能佔的半高
+      const band = Math.min(clamp(es * 0.16, 5, 11) * Math.min(8, n) + es * 0.5, halfH * 0.75);   // 跑道不要太寬，不然中間的內場會變得很窄；選手在不同的道上會有一點上下重疊，沒關係
+      const laneGap = Math.max(4, (band - es * 0.5) / Math.min(8, n));
+      const cx = arena.x + arena.w / 2, cy = arena.y + arena.h * 0.56 + 8;
+      const rx = Math.max(band * 0.6 + 10, arena.w * 0.5 - band / 2 - es * 0.8), ry = Math.max(band * 0.55 + 4, halfH - band / 2);
+      // 弧長對照表：進度（0～1，照路程算）換成橢圓上的角度，這樣在直道和彎道上的視覺速度才一樣
+      const N = 240, tab = [0]; let px = rx, py = 0;
+      for (let i = 1; i <= N; i++) { const th = i / N * Math.PI * 2, x = rx * Math.cos(th), y = ry * Math.sin(th); tab.push(tab[i - 1] + Math.hypot(x - px, y - py)); px = x; py = y; }
+      raceGeo = { cx, cy, rx, ry, band, laneGap, es, n, tab, total: tab[N] };
+      const ix = Math.max(10, (rx - band / 2 - es * 0.5) * 0.85), iy = Math.max(8, ry - band / 2 - es * 0.45);
+      for (const p of list) {
+        const v = views.get(p.id); if (!v) continue;
+        const entrant = raceR.entrants.some(e => e.id === p.id);
+        v.tsize = es * (entrant ? 1 : 0.85); v.race = entrant;
+        if (v.x === null) { v.x = cx; v.y = cy; v.size = v.tsize; }
+        if (entrant) { v.tx = undefined; v.zx0 = v.zx1 = v.zy0 = v.zy1 = undefined; }
+        else { v.zx0 = cx - ix; v.zx1 = cx + ix; v.zy0 = cy - iy; v.zy1 = cy + iy; v.tx = undefined; }
+      }
+      const xr = wide ? arena.x + arenaFullW : arena.x + arena.w;
+      bounds = { x0: arena.x + es * 0.6, x1: xr - es * 0.6, y0: arena.y, y1: arena.y + arena.h, size: es, lg: null };
+    } else if (teamMode) {
       // 陣營模式：紅方主堡｜紅隊武將｜紅方塔｜藍方塔｜藍隊武將｜藍方主堡
       const sB = clamp(Math.min(arena.h * 0.5, arena.w * 0.15), 60, 170), sT = sB * 0.75;   // 2026-11-15 咖哩看直播覺得塔堡太小：放大
       const footY = arena.y + arena.h - 50, mid = arena.x + arena.w / 2;
@@ -501,9 +545,111 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       if (v.lunge && (v.lunge.t += dt) >= v.lunge.dur) v.lunge = null;
     }
     if (config.wander && config.wander.enabled && bounds) roam(dt);
+    driveRace(dt);
     floats.forEach(f => f.age += dt); floats = floats.filter(f => f.age < (f.life || 1) && views.has(f.v.id));
     rings.forEach(r => r.age += dt); rings = rings.filter(r => r.age < r.life);
     toasts.forEach(t => t.age += dt); toasts = toasts.filter(t => t.age < toastLife);
+  }
+
+  // ---------- 賽跑：跑道幾何與參賽者的位置 ----------
+  // 路程比例（0～1）換成橢圓角度；從底部中央的起跑線出發，逆時針（先往右跑）
+  function raceTheta(g, frac) {
+    const f = ((frac % 1) + 1) % 1, s = f * g.total, tab = g.tab;
+    let lo = 0, hi = tab.length - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (tab[m] <= s) lo = m; else hi = m; }
+    const t = (s - tab[lo]) / Math.max(1e-6, tab[hi] - tab[lo]);
+    return Math.PI / 2 - (lo + t) / (tab.length - 1) * Math.PI * 2;
+  }
+  function racePoint(g, frac, lane) {
+    const th = raceTheta(g, frac), off = (lane - (g.n - 1) / 2) * g.laneGap;
+    return { x: g.cx + (g.rx + off) * Math.cos(th), y: g.cy + (g.ry + off) * Math.sin(th), th };
+  }
+  function driveRace(dt) {
+    const R = raceGeo && game.getMode() === 'race' ? game.getRace() : null;
+    if (!R) return;
+    const g = raceGeo, k = Math.min(1, dt * 12);
+    for (const e of R.entrants) {
+      const v = views.get(e.id);
+      if (!v) continue;
+      v.race = true;
+      const pad = e.lane * 0.011 * Math.max(0, 1 - e.progress * 25);   // 起跑前站在線後面一點（一格一格錯開），開跑後慢慢排進跑道
+      const P = racePoint(g, e.progress - pad, e.lane);
+      v.x += (P.x - v.x) * k; v.y += (P.y - v.size * 0.35 - v.y) * k;
+      if (Math.abs(Math.sin(P.th)) > 0.05) v.face = Math.sign(Math.sin(P.th));   // 在上緣往左跑、下緣往右跑，彎道上保持原方向
+      v.moving = e.state === 'run';
+      v.goal = null; v.hold = Math.max(v.hold || 0, 0.2);
+    }
+  }
+  function drawTrack() {
+    const g = raceGeo;
+    if (!g || game.getMode() !== 'race') return;
+    const R = game.getRace(); if (!R) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(70,150,86,0.30)'; ctx.beginPath(); ctx.ellipse(g.cx, g.cy, g.rx - g.band / 2, g.ry - g.band / 2, 0, 0, Math.PI * 2); ctx.fill();   // 內場草地
+    ctx.strokeStyle = 'rgba(204,134,76,0.70)'; ctx.lineWidth = g.band + 4; ctx.beginPath(); ctx.ellipse(g.cx, g.cy, g.rx, g.ry, 0, 0, Math.PI * 2); ctx.stroke();   // 跑道
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3;
+    for (const d of [-g.band / 2, g.band / 2]) { ctx.beginPath(); ctx.ellipse(g.cx, g.cy, g.rx + d, g.ry + d, 0, 0, Math.PI * 2); ctx.stroke(); }   // 內外白線
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = 1.5; ctx.setLineDash([8, 10]);
+    for (let i = 1; i < Math.min(8, g.n); i++) { const d = (i - 0.5 - (g.n - 1) / 2) * g.laneGap; ctx.beginPath(); ctx.ellipse(g.cx, g.cy, g.rx + d, g.ry + d, 0, 0, Math.PI * 2); ctx.stroke(); }   // 分道線
+    ctx.setLineDash([]);
+    const segs = config.race.segments || 8;   // 每一小段的記號：到這裡會擲骰決定要不要休息
+    for (let i = 1; i < segs; i++) { const th = raceTheta(g, i / segs); ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.arc(g.cx + g.rx * Math.cos(th), g.cy + g.ry * Math.sin(th), 3, 0, Math.PI * 2); ctx.fill(); }
+    // 起跑／終點線（黑白格）
+    const y0 = g.cy + g.ry - g.band / 2, y1 = g.cy + g.ry + g.band / 2, cell = Math.max(6, g.band / 6);
+    for (let i = 0; i * cell < y1 - y0; i++) for (let j = 0; j < 2; j++) { ctx.fillStyle = (i + j) % 2 ? '#111' : '#fff'; ctx.fillRect(g.cx - cell + j * cell, y0 + i * cell, cell, Math.min(cell, y1 - y0 - i * cell)); }
+    text('起跑線', g.cx, y1 + 14, 14, '#fff');
+    ctx.restore();
+  }
+  function drawRaceBadges() {
+    const g = raceGeo, R = g && game.getMode() === 'race' ? game.getRace() : null;
+    if (!R || R.phase === 'signup') return;
+    for (const e of R.entrants) {
+      const v = views.get(e.id); if (!v || v.x === null || !e.rank) continue;
+      const r = Math.max(9, v.size * 0.2), bx = v.x + v.size * 0.42, by = v.y - v.size * 0.5;
+      ctx.fillStyle = ['#ffd35c', '#dcdcdc', '#d99a6c'][e.rank - 1] || '#5a6a78'; ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+      text(String(e.rank), bx, by + 1, r * 1.25, e.rank <= 3 ? '#3a2a10' : '#fff');
+      if (e.state === 'done') text('🏁', bx + r * 1.6, by, r * 1.5, '#fff');
+    }
+  }
+  function drawRaceBoard(lb, R) {
+    ctx.fillStyle = 'rgba(22,26,30,0.78)'; ctx.beginPath(); ctx.roundRect(lb.x, lb.y, lb.w, lb.h, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+    text('🏁 賽跑名次', lb.x + lb.w / 2, lb.y + 24, 20, '#ffd35c');
+    const rows = R.phase === 'signup' ? R.entrants.map((e, i) => ({ id: e.id, rank: i + 1, e })) : R.ranks.map((id, i) => ({ id, rank: i + 1, e: R.entrants.find(x => x.id === id) }));
+    if (!rows.length) text('還沒有人報名', lb.x + lb.w / 2, lb.y + 62, 14, '#aaa', 'center', false);
+    rows.slice(0, 5).forEach((r, i) => {
+      const y = lb.y + 62 + i * 32, p = game.getPlayer(r.id);
+      text(R.phase === 'signup' ? '•' : String(r.rank), lb.x + 22, y, 18, ['#ffd35c', '#dcdcdc', '#d99a6c'][r.rank - 1] && R.phase !== 'signup' ? ['#ffd35c', '#dcdcdc', '#d99a6c'][r.rank - 1] : '#fff');
+      text(short(p ? p.name : '', 7), lb.x + 42, y, 16, '#fff', 'left');
+      const st = r.e.state === 'done' ? '完賽' : r.e.state === 'dnf' ? '棄權' : r.e.state === 'rest' ? '💤 休息' : r.e.state === 'ready' ? '準備' : Math.round(r.e.progress * 100) + '%';
+      text(st, lb.x + lb.w - 14, y, 16, r.e.state === 'rest' ? '#9ad0ff' : '#b8e8b0', 'right');
+    });
+  }
+  function drawRaceHud(arena) {
+    const R = game.getMode() === 'race' ? game.getRace() : null;
+    if (!R) return;
+    const cx = arena.x + arena.w / 2, y = arena.y + 18, mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+    let label = '';
+    if (R.phase === 'signup') label = `🏁 報名中 ${mmss(R.left)}　${R.count}/${R.max} 人　留言「我要參賽」`;
+    else if (R.phase === 'countdown') label = `🏁 ${R.count} 位選手準備起跑`;
+    else if (R.phase === 'run') label = `🏁 比賽中　⏱ ${mmss(R.t)}`;
+    else label = '🏁 比賽結束';
+    ctx.font = `bold 20px ${FONT}`;
+    const w = Math.min(arena.w - 10, ctx.measureText(label).width + 40);
+    ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.78)'; ctx.beginPath(); ctx.roundRect(cx - w / 2, y - 18, w, 36, 18); ctx.fill(); ctx.restore();
+    text(label, cx, y, 20, '#fff');
+    if (R.phase === 'countdown') {
+      const n = Math.ceil(R.cd);
+      ctx.save(); ctx.globalAlpha = 0.9; text(String(n), cx, arena.y + arena.h * 0.5, 140 - (R.cd % 1) * 30, '#ffd35c', 'center', true); ctx.restore();
+    } else if (R.phase === 'run' && R.t < 1.2) text('GO!', cx, arena.y + arena.h * 0.5, 120, '#7dffa0');
+    if (R.phase === 'result') {
+      const by = arena.y + arena.h * 0.42;
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(arena.x, by - 70, arena.w, 150); ctx.restore();
+      text('🏆 比賽結果', cx, by - 44, 36, '#ffd35c');
+      R.results.forEach((r, i) => { const p = game.getPlayer(r.id); text(`第 ${r.rank} 名　${short(p ? p.name : '', 8)}　+${r.xp} 經驗`, cx, by - 6 + i * 30, 24, ['#ffd35c', '#dcdcdc', '#d99a6c'][i]); });
+      if (!R.results.length) text('沒有人完賽', cx, by + 10, 24, '#fff');
+    }
   }
 
   // 待機時在場上隨意走動：走到一個隨機地點 → 停一下 → 再挑下一個地點
@@ -532,9 +678,10 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const list = [...views.values()].filter(v => v.x !== null);
     for (const v of list) {
       v.moving = false; v.want = 0; v.px = v.x; v.py = v.y;
-      if (v.zx0 !== undefined && (v.x < v.zx0 || v.x > v.zx1)) v.x += (clamp(v.x, v.zx0, v.zx1) - v.x) * Math.min(1, dt * 4);   // 陣營模式：被推出自己那隊的地盤就慢慢走回來
+      if (v.zx0 !== undefined && (v.x < v.zx0 || v.x > v.zx1)) v.x += (clamp(v.x, v.zx0, v.zx1) - v.x) * Math.min(1, dt * 4);
+      if (v.zy0 !== undefined && (v.y < v.zy0 || v.y > v.zy1)) v.y += (clamp(v.y, v.zy0, v.zy1) - v.y) * Math.min(1, dt * 4);   // 賽跑：沒參賽的被擠出內場就慢慢走回來   // 陣營模式：被推出自己那隊的地盤就慢慢走回來
       // 倒地、正在出招或挨打時不走動（BOSS 固定站著）
-      if (v.boss || v.fixed || v.down || v.lunge || v.pending > 0 || v.hold > 0) continue;
+      if (v.boss || v.fixed || v.race || v.down || v.lunge || v.pending > 0 || v.hold > 0) continue;
       if (!v.goal) {
         if ((v.rest = (v.rest === undefined ? Math.random() * cfg.restMax : v.rest) - dt) > 0) continue;
         // 隨機挑幾個候選地點，只考慮「走過去不會擠到別人」的，從中選最空的；
@@ -542,7 +689,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         const reach = cfg.stepMax * v.size;   // 一次最多走多遠
         let best = null;
         for (let c = 0; c < 10; c++) {
-          const x = clamp(v.x + (Math.random() * 2 - 1) * reach, v.zx0 !== undefined ? v.zx0 : b.x0, v.zx1 !== undefined ? v.zx1 : b.x1), y = capY(b, x, clamp(v.y + (Math.random() * 2 - 1) * reach, b.y0, b.y1));
+          const x = clamp(v.x + (Math.random() * 2 - 1) * reach, v.zx0 !== undefined ? v.zx0 : b.x0, v.zx1 !== undefined ? v.zx1 : b.x1), y = capY(b, x, clamp(v.y + (Math.random() * 2 - 1) * reach, v.zy0 !== undefined ? v.zy0 : b.y0, v.zy1 !== undefined ? v.zy1 : b.y1));
           if (Math.hypot(x - v.x, y - v.y) < v.size * 0.4) continue;       // 太近了，等於沒走
           let room = 9;
           for (const o of list) if (o !== v) room = Math.min(room, gap(x, y, (o.goal || o).x, (o.goal || o).y, o.boss || o.fixed ? (v.size + o.size) / 2 : v.size));
@@ -570,7 +717,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       a.x -= dx * push * wa; a.y -= dy * push * wa; c.x += dx * push * (1 - wa); c.y += dy * push * (1 - wa);
     }
     for (const v of list) {
-      if (!v.down && !v.boss && !v.fixed) { v.x = clamp(v.x, b.x0, b.x1); v.y = capY(b, v.x, clamp(v.y, b.y0, b.y1)); }
+      if (!v.down && !v.boss && !v.fixed && !v.race) { v.x = clamp(v.x, v.zx0 !== undefined ? Math.min(b.x0, v.zx0) : b.x0, v.zx1 !== undefined ? Math.max(b.x1, v.zx1) : b.x1); v.y = capY(b, v.x, clamp(v.y, v.zy0 !== undefined ? v.zy0 : b.y0, v.zy1 !== undefined ? v.zy1 : b.y1)); }
       if (!v.want) continue;
       // 這一格實際有沒有前進？有前進才算「走路中」（才會一顛一顛）。
       // 一直被擋住走不動超過半秒，就放棄這個目的地、休息一下再換地方，不會卡在原地踏步。
@@ -715,7 +862,9 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     else lean = clamp(v.kbx / size * 1.4, -0.35, 0.35) + (v.moving ? v.dir * 0.06 : 0);   // 走路時微微往前進方向傾
     sprite.draw(ctx, p.hero, x, y, size, { pose, poseTime: v.lunge ? v.lunge.t : time, flash: v.flash, lean, facing: v.faceShown, phase: v.phase, moving: v.moving, anim: v.anim });
 
-    // 血條
+    const raceMode = game.getMode() === 'race';
+    // 血條（賽跑時不畫血條、經驗條、BUFF 章，只留名字）
+    if (raceMode) ctx.globalAlpha = 0;
     const bw = Math.max(54, size * 0.95), bh = Math.max(7, size * 0.09);
     const bx = x - bw / 2, by = y - r - size * 0.05 - bh - 6;   // 全身圖比 size 高一點，血條跟著往上
     const ratio = clamp(v.shownHp / p.maxHp, 0, 1);
@@ -764,6 +913,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       }
     }
 
+    if (raceMode) ctx.globalAlpha = 1;
     // 觀眾名字（血條上方）、武將名（腳下）
     // 名字前面加等級，例如「Lv.5 小明」
     ctx.font = `bold ${fs}px ${FONT}`;
@@ -786,7 +936,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       const wait = Math.ceil(game.reviveRemaining(p));
       if (wait > 0) text(`倒地 ${wait} 秒後可復活`, x, ly, fs * 0.78, '#ffb0a6');
       else if (Math.sin(time * 6) > -0.3) text('送禮復活！', x, ly, fs * 0.9, '#ffe27a');
-    } else if (p.lockId && game.getPlayer(p.lockId)) {
+    } else if (!raceMode && p.lockId && game.getPlayer(p.lockId)) {
       text(`鎖定▶${short(game.getPlayer(p.lockId).name, 7)}`, x, ly, fs * 0.72, '#ffd35c');
     }
   }
@@ -964,6 +1114,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const { lb, lb2, arena, legend } = layout();
     if (arenas) arenas.draw(ctx, { x: 4, y: 4, w: W - 8, h: H - 8 }, dpr * k);   // 場地地面：鋪滿整個畫面（排行榜、禮物提示列畫在它上面）；預設全場透明＝什麼都不畫
 
+    drawTrack();   // 賽跑：橢圓跑道（畫在武將下面）
     if (dim) {   // 技能發動：畫面短暫變暗，讓特效更顯眼
       ctx.fillStyle = `rgba(0,0,0,${config.skillDim * Math.sin(Math.PI * dim.age / dim.life)})`;
       ctx.fillRect(0, 0, W, H);
@@ -985,6 +1136,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       ctx.stroke(); ctx.globalAlpha = 1;
     }
     drawLeavers();
+    drawRaceBadges();
     effects.draw(ctx, false);   // 其他特效（刀光、火花、落雷…）
     ctx.restore();
 
@@ -998,7 +1150,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     }
 
     drawTeamHud(arena);
-    drawLeaderboard(lb);
+    drawRaceHud(arena);
+    if (game.getRace()) drawRaceBoard(lb, game.getRace()); else drawLeaderboard(lb);
     if (lb2) drawBossLeaderboard(lb2);
     if (legend) drawLegend(legend);
     drawBossQueue(arena, lb2 && W >= H ? lb2 : lb);

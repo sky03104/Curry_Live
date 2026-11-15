@@ -18,6 +18,10 @@ ML.createGame = function (config, heroes) {
   let match = { winner: null, restartAt: 0, time: 0 };   // winner：'red'／'blue'／'draw'／null（還沒分勝負）
   const teamLabel = t => (tc.names && tc.names[t]) || (t === 'red' ? '紅隊' : '藍隊');
   const foeOf = t => (t === 'red' ? 'blue' : 'red');
+  // ---------- 賽跑模式的狀態 ----------
+  const tr = config.race || {};
+  let race = null;             // 賽跑：{ phase: 'signup'|'countdown'|'run'|'result', left, cd, t, resLeft, entrants: Map, order, results }
+  const raceLock = new Map();  // 觀眾代號 → 他「@」的參賽者代號（沒上場的觀眾也能 @ 參賽者送禮）
 
   // 留言比對用：武將中文名與別名 → 武將資料（名字長的先比，避免短名搶先）
   const heroById = new Map(heroes.map(h => [h.heroId, h]));
@@ -149,6 +153,7 @@ ML.createGame = function (config, heroes) {
   function leave(me) {
     players.delete(me.id);
     left.set(me.id, time);
+    if (race && race.entrants.has(me.id)) { const e = race.entrants.get(me.id); if (race.phase === 'signup') race.entrants.delete(me.id); else { e.state = 'dnf'; } }   // 賽跑中烙跑＝棄權
     fx({ type: 'leave', id: me.id, hero: me.hero, name: me.name });
     notice(`${me.name} 烙跑了！`);
   }
@@ -159,6 +164,12 @@ ML.createGame = function (config, heroes) {
 
     if (isLeaveCommand(text)) { if (me) leave(me); return; }
 
+    if (mode === 'race') {   // 賽跑模式：我要參賽、@參賽者、解除鎖定
+      const t = plain(text);
+      if ((config.commands.raceJoin || []).some(c => plain(c) === t)) { registerRace(user); return; }
+      if (config.commands.unlock.includes(text)) { raceLock.delete(user.id); return; }
+      if (text.startsWith(config.commands.lockPrefix) || text.startsWith('＠')) { raceLockCmd(user, text.slice(1).trim()); return; }
+    }
     if (mode === 'team') {   // 陣營模式：整句剛好是「加入紅隊／加入藍隊」才算
       const t = plain(text);
       if ((config.commands.joinRed || []).some(c => plain(c) === t)) { joinTeam(user, 'red'); return; }
@@ -226,6 +237,7 @@ ML.createGame = function (config, heroes) {
   // 主播指令的執行（留言指令和面板按鈕共用）：復活、或當成送了 count 個那個禮物
   function runHostGift(user, hostGift) {
     if (hostGift.setMode) { gameApi.setMode(hostGift.setMode); return; }
+    if (hostGift.race) { if (hostGift.race === 'open') openRace(); else if (hostGift.race === 'start') raceStartNow(); else if (hostGift.race === 'cancel') cancelRace('主播取消了比賽'); return; }
     if (hostGift.restartMatch) { if (mode === 'team') restartMatch(true); else notice('現在是亂鬥模式，沒有陣營賽可以重開'); return; }
     if (hostGift.revive !== undefined) { hostRevive(user, hostGift.revive); return; }
     if (hostGift.healAll) { healEveryone(); return; }
@@ -273,6 +285,7 @@ ML.createGame = function (config, heroes) {
   // 留言必須「剛好只有武將名」才算換角，避免聊天時提到別的武將（例如「呂布好強」）就被誤換。
   function switchHero(me, text, hero) {
     if (text !== hit_name(text) || hero === me.hero) return;
+    if (race && race.entrants.has(me.id) && hero.faction !== (tr.faction || 'Meng')) { notice(`${me.name} 參賽中只能換成萌國武將`); return; }
     if (time < (me.switchReadyAt || 0)) { notice(`${me.name} 剛換過武將，請稍等`); return; }
     me.hero = hero;
     refreshHp(me);
@@ -288,6 +301,10 @@ ML.createGame = function (config, heroes) {
   function handleGift(user, giftId, rawCount, comboMax) {   // comboMax：這次最多算幾個（觀眾連送用 maxGiftCombo；主播文字指令放寬到 hostMaxCount）
     const gift = config.gifts.find(g => g.id === giftId);
     if (!gift) return;
+    if (mode === 'race') {   // 賽跑中：一般禮物（普攻、技能…）全部停用；招換 BOSS 也暫停。玫瑰／GG 走 tiktokGift（見 handleEvent）
+      if ((config.actions[gift.action] || {}).summon) notice(`賽跑中不能招換 BOSS，${user.name} 的禮物沒有生效`);
+      return;
+    }
     // 招換 BOSS：不用先上場（這是花大錢的禮物，不該因為沒上場就白送）
     const summonId = (config.actions[gift.action] || {}).summon;
     if (summonId) {
@@ -587,6 +604,131 @@ ML.createGame = function (config, heroes) {
     }
   }
 
+  // ---------- 賽跑模式 ----------
+  const isMeng = h => !!h && h.faction === (tr.faction || 'Meng');
+  const rr = (a, b) => a + Math.random() * (b - a);
+  // 主播開放報名（按鈕或留言）：進入賽跑模式，報名倒數開始
+  function openRace() {
+    if (mode === 'race') { notice(race && race.phase === 'signup' ? '已經在報名中了' : '比賽進行中，結束後才能再開放報名'); return; }
+    mode = 'race';
+    teamOf.clear(); swaps.clear(); structs.clear(); match = { winner: null, restartAt: 0, time: 0 };
+    for (const p of players.values()) p.lockId = null;
+    raceLock.clear();
+    race = { phase: 'signup', left: tr.signupSeconds || 180, cd: 0, t: 0, resLeft: 0, entrants: new Map(), results: [] };
+    notice(`🏁 開放報名！${Math.round((tr.signupSeconds || 180) / 60)} 分鐘內留言「我要參賽」（只有萌國武將能參賽）`);
+    fx({ type: 'modeChange', mode });
+  }
+  // 留言「我要參賽」
+  function registerRace(user) {
+    if (!race || race.phase !== 'signup') { notice(race ? `${user.name} 比賽已經開始，下一場再報名` : ''); return; }
+    if (race.entrants.has(user.id)) { notice(`${user.name} 已經報名了`); return; }
+    if (race.entrants.size >= (tr.maxPlayers || 8)) { notice(`參賽名額已滿（${tr.maxPlayers || 8} 人），${user.name} 下一場再來`); return; }
+    let me = players.get(user.id);
+    if (me && !isMeng(me.hero)) { notice(`${me.name} 賽跑只能用萌國武將，請先留言萌國武將的名字換角，再報名`); return; }
+    if (!me) {
+      let hero = defaultHeroId && heroById.get(defaultHeroId);
+      if (!isMeng(hero)) { const pool = heroes.filter(isMeng); hero = pool[Math.floor(Math.random() * pool.length)]; }
+      if (!hero) { notice('目前沒有萌國武將可以參賽'); return; }
+      me = joinHero(user, hero);
+      if (!me) return;
+    }
+    race.entrants.set(user.id, { id: user.id, lane: race.entrants.size, progress: 0, seg: 0, state: 'ready', restLeft: 0, speed: 1, boost: [], hinder: [], finishedAt: 0, rank: 0 });
+    fx({ type: 'raceJoin', id: user.id });
+    notice(`🏃 ${me.name} 的 ${me.hero.displayName} 報名參賽！（${race.entrants.size}/${tr.maxPlayers || 8}）`);
+  }
+  // 「@參賽者」：沒上場的觀眾也能鎖定，之後送玫瑰／GG 才知道要幫誰
+  function raceLockCmd(user, rest) {
+    if (!rest) return;
+    const dummy = players.get(user.id) || { id: user.id };
+    const target = findLockTarget(dummy, rest);
+    if (target && race && race.entrants.has(target.id)) { raceLock.set(user.id, target.id); notice(`${user.name} 鎖定了參賽者 ${target.name}`); }
+    else notice(`${user.name} 找不到參賽者「${rest.length > 10 ? rest.slice(0, 10) + '…' : rest}」`);
+  }
+  // 玫瑰（助力）／GG（干擾）：參賽者只能助力自己；沒參賽的人要先 @ 參賽者
+  function raceGift(user, kind, rawCount) {
+    if (!race || (race.phase !== 'run' && race.phase !== 'countdown')) return;
+    const n = Math.max(1, Math.min(tr.maxGiftCombo || 20, Math.floor(rawCount) || 1));
+    const mine = race.entrants.get(user.id);
+    let target;
+    if (mine) {
+      if (kind === 'hinder') { notice(`${user.name} 參賽者不能干擾別人`); return; }
+      target = mine;
+    } else {
+      const id = raceLock.get(user.id); target = id && race.entrants.get(id);
+      if (!target) { notice(`${user.name} 請先留言「@參賽者名字」再送禮`); return; }
+    }
+    if (target.state === 'done' || target.state === 'dnf') return;
+    const list = kind === 'boost' ? target.boost : target.hinder;
+    list.push({ until: race.t + (tr.effectSeconds || 10), delta: (kind === 'boost' ? tr.boostStep : tr.hinderStep) * n });
+    fx({ type: kind === 'boost' ? 'raceBoost' : 'raceHinder', id: target.id, n });
+    const tp = players.get(target.id);
+    notice(`${user.name} 幫 ${tp ? tp.name : '參賽者'} ${kind === 'boost' ? '助力 🌹' : '干擾 😈'} ×${n}`);
+  }
+  // 這位參賽者現在每段結束「停下來休息」的機率
+  function restChanceOf(e) {
+    const sum = l => l.reduce((a, b) => a + (b.until > race.t ? b.delta : 0), 0);
+    return Math.max(tr.chanceMin === undefined ? 0.05 : tr.chanceMin, Math.min(tr.chanceMax || 0.8, (tr.restChance === undefined ? 0.4 : tr.restChance) - sum(e.boost) + sum(e.hinder)));
+  }
+  function raceRanks() {
+    const list = [...race.entrants.values()].filter(e => e.state !== 'dnf');
+    list.sort((a, b) => (a.state === 'done' ? 0 : 1) - (b.state === 'done' ? 0 : 1) || (a.state === 'done' ? a.finishedAt - b.finishedAt : b.progress - a.progress));
+    list.forEach((e, i) => { e.rank = i + 1; });
+    return list;
+  }
+  function raceStartNow() {
+    if (!race || race.phase !== 'signup') { notice('現在不是報名階段'); return; }
+    if (race.entrants.size < (tr.minPlayers || 3)) { notice(`報名人數不足（${race.entrants.size}/${tr.minPlayers || 3}），還不能開跑`); return; }
+    race.phase = 'countdown'; race.cd = tr.countdown || 3;
+    notice(`報名截止！${race.entrants.size} 位選手準備起跑`);
+    fx({ type: 'raceCountdown' });
+  }
+  function cancelRace(why) {
+    if (!race) { notice('現在沒有比賽'); return; }
+    notice(`比賽取消：${why}`);
+    race = null; raceLock.clear(); mode = 'brawl';
+    fx({ type: 'modeChange', mode });
+  }
+  function finishRace(timeout) {
+    race.phase = 'result'; race.resLeft = tr.resultSeconds || 15;
+    const ranks = raceRanks(), rewards = tr.rewards || [];
+    race.results = ranks.slice(0, rewards.length).map((e, i) => ({ id: e.id, rank: i + 1, xp: rewards[i] }));
+    for (const r of race.results) { const prof = scores.get(r.id); if (prof) grantXp(prof, r.xp); }
+    fx({ type: 'raceResult' });
+    notice(timeout ? '時間到！比賽結束' : '🏁 比賽結束！');
+    race.results.forEach(r => { const p = players.get(r.id), prof = scores.get(r.id); notice(`第 ${r.rank} 名：${p ? p.name : (prof && prof.name) || '選手'}　+${r.xp} 經驗`); });
+  }
+  function raceTick(dt) {
+    if (!race) return;
+    if (race.phase === 'signup') {
+      race.left -= dt;
+      if (race.left <= 0) { if (race.entrants.size >= (tr.minPlayers || 3)) raceStartNow(); else cancelRace(`報名人數不足（${race.entrants.size}/${tr.minPlayers || 3}）`); }
+      return;
+    }
+    if (race.phase === 'countdown') {
+      race.cd -= dt;
+      if (race.cd <= 0) { race.phase = 'run'; race.t = 0; for (const e of race.entrants.values()) e.state = 'run'; fx({ type: 'raceGo' }); notice('🏁 開跑！'); }
+      return;
+    }
+    if (race.phase === 'result') { race.resLeft -= dt; if (race.resLeft <= 0) { race = null; raceLock.clear(); mode = 'brawl'; notice('🥊 回到亂鬥模式'); fx({ type: 'modeChange', mode }); } return; }
+    race.t += dt;
+    const segs = tr.segments || 8, base = 1 / (segs * (tr.segmentSeconds || 6));
+    for (const e of race.entrants.values()) {
+      if (e.state === 'done' || e.state === 'dnf') continue;
+      if (e.state === 'rest') { e.restLeft -= dt; if (e.restLeft <= 0) { e.state = 'run'; fx({ type: 'raceResume', id: e.id }); } continue; }
+      e.progress += base * e.speed * dt;
+      if (e.progress >= 1) { e.progress = 1; e.state = 'done'; e.finishedAt = race.t; fx({ type: 'raceFinish', id: e.id }); continue; }
+      const seg = Math.floor(e.progress * segs);
+      if (seg > e.seg) {   // 跑完一小段：擲骰決定要不要休息；每段速度也有一點點隨機，才不會永遠平手
+        e.seg = seg; e.speed = 1 + rr(-0.06, 0.06);
+        if (Math.random() < restChanceOf(e)) { e.state = 'rest'; e.restLeft = rr(tr.restMin || 1, tr.restMax || 3); fx({ type: 'raceRest', id: e.id }); }
+      }
+    }
+    const alive = [...race.entrants.values()].filter(e => e.state !== 'dnf');
+    if (!alive.length) { cancelRace('所有選手都棄權了'); return; }
+    if (alive.every(e => e.state === 'done')) finishRace(false);
+    else if (race.t >= (tr.maxSeconds || 300)) finishRace(true);
+  }
+
   const gameApi = {
     setHeroPool,
     setHostMatcher(fn, isHost) { hostMatch = fn; hostCheck = isHost || null; },
@@ -601,22 +743,29 @@ ML.createGame = function (config, heroes) {
         // 主播的文字指令：主播本人留言設定好的字 = 送那個動作的禮物（不走一般留言處理）
         const hostGift = hostMatch && hostMatch(ev.user, ev.text);
         if (hostGift) { runHostGift(ev.user, hostGift); return; }
+        if (hostCheck && hostCheck(ev.user) && (config.commands.raceOpen || []).some(c => plain(c) === plain(ev.text))) { openRace(); return; }   // 主播留言「開放報名」
         if (hostCheck && hostCheck(ev.user) && hostLevelCommand(ev.text)) return;   // 主播留言「等級 名字 30」：調整等級
         handleChat(ev.user, ev.text);
       }
       else if (ev.type === 'gift') handleGift(ev.user, ev.giftId, ev.count);
+      else if (ev.type === 'tiktokGift' && mode === 'race') {   // 賽跑：用禮物名稱判斷是助力還是干擾
+        const nm = plain((ev.gift && ev.gift.name) || ''), gn = tr.giftNames || {};
+        const kind = (gn.boost || []).some(n => plain(n) === nm) ? 'boost' : (gn.hinder || []).some(n => plain(n) === nm) ? 'hinder' : null;
+        if (kind) raceGift(ev.user, kind, ev.count || 1);
+      }
     },
     // 每一格畫面呼叫一次，dt = 經過的秒數
     update(dt) {
       time += dt;
       if (mode === 'team') teamTick(dt);
+      if (mode === 'race') raceTick(dt);
       for (const p of [...players.values()]) {
         if (p.isBoss) { bossUpdate(p); continue; }
         tickBuffs(p, dt);
         if (p.down && time - p.downAt >= config.removeDownedAfterSeconds) {
           players.delete(p.id);
           notice(`${p.name} 倒地太久，離場了`);
-        } else if (time - p.lastActive >= config.idleRemoveSeconds) {
+        } else if (time - p.lastActive >= config.idleRemoveSeconds && !(race && race.entrants.has(p.id))) {
           players.delete(p.id);   // 太久沒留言也沒送禮：當作已經離開直播間，把位置讓出來（等級和傷害紀錄保留）
           notice(`${p.name} 太久沒動作，離場了`);
         }
@@ -723,8 +872,21 @@ ML.createGame = function (config, heroes) {
     clearBosses() { bossQueue.length = 0; if (players.has(BOSS_ID)) { players.delete(BOSS_ID); fx({ type: 'bossGone', id: BOSS_ID }); } },
     // ---------- 陣營模式 API ----------
     getMode() { return mode; },
+    // 賽跑：畫面和面板用。沒在賽跑回傳 null
+    getRace() {
+      if (mode !== 'race' || !race) return null;
+      const ranks = race.phase === 'signup' ? [] : raceRanks();
+      return { phase: race.phase, left: Math.max(0, race.left), cd: Math.max(0, race.cd), t: race.t, timeLeft: Math.max(0, (tr.maxSeconds || 300) - race.t), resLeft: Math.max(0, race.resLeft),
+        count: race.entrants.size, max: tr.maxPlayers || 8, min: tr.minPlayers || 3, results: race.results, ranks: ranks.map(e => e.id),
+        entrants: [...race.entrants.values()].map(e => ({ id: e.id, lane: e.lane, progress: e.progress, state: e.state, rank: e.rank,
+          boost: e.boost.reduce((a, b) => a + (b.until > race.t ? b.delta : 0), 0), hinder: e.hinder.reduce((a, b) => a + (b.until > race.t ? b.delta : 0), 0) })) };
+    },
+    raceBusy() { return mode === 'race' && !!race && (race.phase === 'countdown' || race.phase === 'run'); },
+    raceGift(user, kind, count) { raceGift(user, kind, count); },
     setMode(m) {
+      if (m === 'race') { openRace(); return; }
       if (m === mode) { notice(m === 'team' ? '已經是陣營模式了' : '已經是亂鬥模式了'); return; }
+      race = null; raceLock.clear();
       mode = m === 'team' ? 'team' : 'brawl';
       teamOf.clear(); swaps.clear(); match = { winner: null, restartAt: 0, time: 0 };
       if (mode === 'team') {
