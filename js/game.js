@@ -188,9 +188,22 @@ ML.createGame = function (config, heroes) {
     fx({ type: 'revive', id: p.id });
     notice(`${p.name} 的 ${p.hero.displayName} 滿血復活！`);
   }
+  // 主播按鈕「全部回血」：場上所有活著的武將（不含 BOSS）補滿血；倒地的不會被救起來（那要用「復活」）
+  function healEveryone() {
+    let n = 0;
+    for (const p of players.values()) {
+      if (p.isBoss || p.down || p.hp >= p.maxHp) continue;
+      const amount = Math.round(p.maxHp - p.hp);
+      p.hp = p.maxHp;
+      fx({ type: 'heal', id: p.id, amount, icon: '💖' });
+      n++;
+    }
+    notice(n ? `主播幫全場 ${n} 位武將補滿血！` : '大家的血都是滿的');
+  }
   // 主播指令的執行（留言指令和面板按鈕共用）：復活、或當成送了 count 個那個禮物
   function runHostGift(user, hostGift) {
     if (hostGift.revive !== undefined) { hostRevive(user, hostGift.revive); return; }
+    if (hostGift.healAll) { healEveryone(); return; }
     notice(`主播指令：${hostGift.label || '動作'} ×${hostGift.count || 1}`);   // 訊息區會寫出這次算幾個：寫 ×1 代表直播網址裡沒帶次數（忘了重貼網址）
     handleGift(user, hostGift.giftId, hostGift.count || 1, config.hostMaxCount);
   }

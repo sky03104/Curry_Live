@@ -17,6 +17,7 @@
     const has = a => hc.actions.includes(a);
     const b = (cls, a, text, arg) => `<button class="${cls}" data-a="${a}" data-arg="${arg || ''}" data-text="${esc(text)}">${esc(text)}</button>`;
     const gen = ['attack', 'aoe', 'skill', 'heal'].filter(has).map(a => b('act', a, hc.label(a) + cnt(a)));
+    gen.push(b('rv', 'healall', '全部回血'));
     const boss = hc.actions.filter(a => /^boss/.test(a)).map(a => b('boss', a, hc.label(a) + cnt(a)));
     const key = JSON.stringify([gen, boss, hc.hostId, cloud.enabled]);
     if (key !== lastKey) {   // 沒變就不重畫（免得點到一半按鈕被換掉）
