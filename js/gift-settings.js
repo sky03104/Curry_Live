@@ -105,7 +105,7 @@ ML.createGiftSettings = function (config, params) {
       const tiers = (config.tiktok.giftByDiamonds || []);
       return this.actions.map(a => {
         const name = Object.keys(state.map).find(n => state.map[n] === a);
-        const boss = !!config.actions[a].summon;
+        const boss = !!(config.actions[a].summon || config.actions[a].openRace);
         if (name) return { action: a, label: config.actions[a].label, name, icon: this.iconOf(name), boss };
         if (!boss || state.ignoreUnlisted) return null;
         const tier = tiers.find(x => x.gift === actionToGift[a]);   // 這隻 BOSS 的預設鑽石門檻
