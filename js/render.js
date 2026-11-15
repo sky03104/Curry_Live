@@ -363,7 +363,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     //   空間不夠（排行榜佔了很多、或畫面很扁）就整排縮小，最小縮到一半。）
     toastBox = null;
     const arenaFullW = arena.w;   // 還沒被禮物提示列擠窄的場地寬度（武將走動範圍用：提示列上方的空地也可以走）
-    const items = getLegend ? getLegend() : [];
+    const items = getLegend && game.getMode() !== 'race' ? getLegend() : [];   // 賽跑模式：普攻、技能、招換 BOSS 都停用，右下角的指令提示列先隱藏
     let legend = null;
     if (items.length) {
       // 2026-11-14 咖哩用手機看說「還是霧霧的」：直播影片壓縮會把彩色的字糊掉（顏色資訊被壓得很粗，只有明暗保得住），
