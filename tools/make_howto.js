@@ -1,7 +1,7 @@
 // 產生「玩法說明」圖片（發給觀眾看怎麼玩；版面是給 TikTok 圖文貼文用的）。
 // 用法：node tools/make_howto.js [--attack 玫瑰] [--aoe 煙火] [--skill 皇冠] [--heal 愛心] [--boss1 …] [--boss2 …] [--boss3 …]
 //   後面的禮物名稱是「主播自己指定的禮物」，沒給就寫「主播公布」（招換 BOSS 沒給就寫預設鑽石數）。想換說明文字就改下面各張的內容。
-// 需要 Playwright。輸出：roster/玩法說明_1.jpg … _10.jpg（前 5 張是玩法（第 5 張是陣營模式），後面蜀魏吳群萌各一張陣營武將圖，附武將名稱和技能名），每張 1080x1920（9:16），照順序當 TikTok 圖文貼文的輪播圖（滑著看）。
+// 需要 Playwright。輸出：roster/玩法說明_1.jpg … _11.jpg（前 6 張是玩法（第 5 張陣營模式、第 6 張賽跑模式），後面蜀魏吳群萌各一張陣營武將圖，附武將名稱和技能名），每張 1080x1920（9:16），照順序當 TikTok 圖文貼文的輪播圖（滑著看）。
 // 版面為 TikTok 留的安全區：上面 130px、下面 300px（標題文字和按鈕會蓋住）、右邊 110px（愛心、留言按鈕）不放重要內容。
 // 數字（60 秒復活、99 級、BOSS 鑽石數）請對照 js/config.js；改了設定要回頭改這裡。風格跟武將名冊一致（米白宣紙底）。
 const fs = require('fs');
@@ -21,7 +21,7 @@ const gift = k => args[k] || '主播公布';
 const bossGift = (k, def) => args[k] || def;
 const img = f => 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/heroes', f)).toString('base64');
 const hero = (f, name, c) => `<div class="h"><img src="${img(f)}"><span style="background:${c}">${name}</span></div>`;
-const TOTAL = 5 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 5 張玩法（含陣營模式）+ 每個陣營一張
+const TOTAL = 6 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 6 張玩法（含陣營模式、賽跑模式）+ 每個陣營一張
 
 const css = `
 * { box-sizing: border-box; margin: 0; }
@@ -68,6 +68,11 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .hc .nm { font-size: 44px; font-weight: 900; margin-top: 4px; line-height: 1.15; }
 .hc .sk { font-size: 30px; color: #fff; background: var(--c); border-radius: 12px; display: inline-block; padding: 2px 14px; margin-top: 6px; font-weight: 700; }
 .camp { display: flex; gap: 8px; margin-top: 20px; } .camp div { flex: 1; color: #fff; font-weight: 900; font-size: 34px; line-height: 1.25; text-align: center; border-radius: 14px; padding: 22px 4px; }
+.track { position: relative; height: 330px; margin-top: 18px; background: #fff; border-radius: 26px; border: 4px solid #E3D9BE; overflow: hidden; }
+.track .oval { position: absolute; left: 70px; right: 70px; top: 36px; bottom: 36px; border-radius: 50%; border: 22px solid #c9b48a; background: #8fc07a; }
+.track .st { position: absolute; left: 50%; bottom: 22px; width: 8px; height: 50px; background: #D9563E; margin-left: -4px; border-radius: 4px; }
+.track img { position: absolute; height: 120px; }
+.race3 { display: flex; gap: 14px; margin-top: 16px; } .race3 div { flex: 1; border-radius: 18px; padding: 16px 10px; text-align: center; color: #fff; font-size: 38px; font-weight: 900; line-height: 1.35; } .race3 small { display: block; font-size: 30px; font-weight: 700; opacity: .95; }
 .swipe { margin-top: 30px; font-size: 38px; color: #ffd35c; font-weight: 900; }
 `;
 const top = n => `<div class="top"><div class="t">萌戰三國・<b>直播亂鬥</b></div><div class="pg">${n}/${TOTAL}</div></div>`;
@@ -128,6 +133,16 @@ const slides = [
     <p>只能打<b>敵方</b>，不能打自己人。先<b>拆掉敵方防禦塔</b>，再把<b>敵方武將全部打倒</b>，才能<b>攻破主堡</b>！<span class="say">@塔</span><span class="say">@主堡</span> 可以鎖定。</p></div>
   <div class="card"><div class="no">9</div><h2>獎勵</h2>
     <p>贏的那隊<b>所有玩家</b>都拿<b>大量經驗值</b>！陣營模式倒地的<b>復活等待會越來越久</b>（60→90→120→180 秒）。</p></div>
+</div></div>`,
+`<div class="slide">${top(6)}<div class="body">
+  <div class="card" style="background:#E9F5E4;border-color:#bfe0b4"><div class="no" style="background:#4a9a3c;box-shadow:0 4px 0 #2f6f26">10</div><h2>賽跑模式　萌國大賽跑</h2>
+    <p>主播開放報名時，留言 <span class="say">我要參賽</span> 就能上場！<b>只有萌國武將能參賽</b>，最多 8 位。</p>
+    <div class="track"><div class="oval"></div><div class="st"></div>
+      <img src="${img('michelin.png')}" style="left:150px;top:6px"><img src="${img('dabao.png')}" style="left:330px;top:0px"><img src="${img('pudding.png')}" style="left:520px;top:8px"><img src="${img('joy.png')}" style="left:420px;top:200px"></div></div>
+  <div class="card"><div class="no">11</div><h2>跑完一圈拿經驗</h2>
+    <p>每跑一段<b>可能停下來休息</b>！只有<b>前三名</b>拿經驗值：<b>2000／1000／500</b>。</p></div>
+  <div class="card"><div class="no">12</div><h2>送禮幫忙或搗蛋</h2>
+    <p>送 <span class="say">玫瑰</span> 讓人<b>少休息</b>，送 <span class="say">GG</span> 讓人<b>多休息</b>。參賽者只能幫自己；沒參賽的要先留言 <span class="say">@參賽者名字</span> 再送禮。</p></div>
 </div></div>`,
 ];
 
