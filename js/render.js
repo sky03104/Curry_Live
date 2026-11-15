@@ -174,6 +174,12 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       const color = bright((config.factions[hero.faction] || { color: '#cccccc' }).color);
       const big = e.action === 'skill';
       const tv0 = views.get(e.hits[0].id);
+      // 專屬特效（js/hero-fx.js）：這隻武將的普攻／技能有登記（或萌國自動配）時用它，否則照原本依兵種的演出
+      const fxs = (!v.fixed && !v.boss && ML.heroFx && e.action !== 'aoe') ? ML.heroFx.pick(config, hero, big ? 'skill' : 'attack') : null;
+      const H = { v, fx: effects, color, after, quake: n => { quake = Math.max(quake, n); },
+        ring: (t, o) => rings.push(Object.assign({ v: t, age: 0 }, o)),
+        float: (t, txt, c, sc) => floats.push({ v: t, text: txt, color: c, scale: sc || 1.2, age: 0, life: 1.4 }) };
+      let customSkill = false;
       const color2 = v.fixed ? ((config.team.colors || {})[(game.getPlayer(e.id) || {}).team] || '#ffffff') : color;
       let delay;       // 幾秒後「打中」
       let onHit;       // 打中那一刻，在每個被打的人身上放的特效
@@ -210,6 +216,12 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
           effects.sparks(tv.x, tv.y, '#ffd35c', 22, 460, 5, 0.7);
           rings.push({ v: tv, age: 0, life: 0.45, color: '#ff6b5c', max: 1.5 });
         };
+      } else if (!big && fxs) {            // 專屬普攻
+        const ai = sprite.animInfo(hero.heroId, 'attack'), hitT = ai && ai.hit;
+        if (fxs.def.lunge !== false) v.lunge = { to: e.hits[0].id, t: 0, dur: (hitT || fxs.def.hit || 0.31) * 2 };
+        delay = hitT || fxs.def.hit || 0.31;
+        if (fxs.def.fire && tv0) fxs.def.fire(H, tv0, fxs.p);
+        onHit = tv => fxs.def.onHit(tv, H, fxs.p);
       } else if (!big) {
         // 普攻：衝過去砍一刀（2026-11-13 放慢放大：衝撞時間拉長、刀光變大、多一圈衝擊波）
         const ai = sprite.animInfo(hero.heroId, 'attack'), hitT = ai && ai.hit;   // 動畫有登記打中的那一格（hitFrame）：衝撞和傷害的時間跟著它走（小妮的大錘慢動作）
@@ -231,7 +243,17 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         floats.push({ v, text: `「${e.skillName}」`, color: '#ffd35c', scale: 1.5, age: 0, life: 2.3 });
         if (!tv0) return;
 
-        if (style === 'slam') {            // 猛將：衝過去重擊，地面裂開
+        if (fxs) {                          // 專屬技能
+          const si2 = sprite.animInfo(hero.heroId, 'skill'), hitS2 = si2 && si2.hit, base = hitS2 || fxs.def.hit || 0.5;
+          customSkill = true;
+          delay = charge + base;
+          if (fxs.def.lunge) after(charge, () => { v.lunge = { to: tv0.id, t: 0, dur: base * 2 }; startAnim(v, 'skill'); if (fxs.def.fire) fxs.def.fire(H, tv0, fxs.p); });
+          else {
+            after(charge, () => { v.hop = 1; v.hopH = 0.5; if (fxs.def.fire) fxs.def.fire(H, tv0, fxs.p); if (hitS2) startAnim(v, 'skill'); });
+            if (!hitS2) after(Math.max(0.2, delay - 0.65), () => startAnim(v, 'skill'));
+          }
+          onHit = tv => fxs.def.onHit(tv, H, fxs.p);
+        } else if (style === 'slam') {            // 猛將：衝過去重擊，地面裂開
           const si = sprite.animInfo(hero.heroId, 'skill'), hitS = si && si.hit;   // 同上：技能動畫有 hitFrame 就照它的時間
           after(charge, () => { v.lunge = { to: tv0.id, t: 0, dur: hitS ? hitS * 2 : 0.72 }; startAnim(v, 'skill'); });
           delay = charge + (hitS || 0.36);
@@ -281,7 +303,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       }
 
       // 技能不是「衝撞」型（謀士、遊俠、統帥）的武將若有 skill 逐格動畫：算好打中的時間，讓動畫的打擊那一格剛好對上（動畫約 0.65 秒後打到）
-      if (big && typeof delay === 'number' && ((config.troops[hero.troop] || {}).skillFx || 'slam') !== 'slam') after(Math.max(0.2, delay - 0.65), () => startAnim(v, 'skill'));
+      if (big && !customSkill && typeof delay === 'number' && ((config.troops[hero.troop] || {}).skillFx || 'slam') !== 'slam') after(Math.max(0.2, delay - 0.65), () => startAnim(v, 'skill'));
       for (const h of e.hits) {
         const tv = views.get(h.id);
         if (!tv) continue;
