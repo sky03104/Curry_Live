@@ -70,8 +70,32 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       if (W > 0) layout();   // 馬上排好位置：上場和送禮可能發生在同一瞬間（沒上場就送禮會自動上場），攻擊演出需要它的位置
       return;
     }
+    if (e.type === 'teamWin') {   // 分出勝負：贏的那方主堡噴金光、整個畫面震一下
+      for (const sv of views.values()) {
+        if (!sv.struct) continue;
+        const st = game.getPlayer(sv.id);
+        if (st && st.kind === 'base' && e.team !== 'draw' && st.team === e.team) { effects.pillar(sv.x, feet(sv), sv.size * 1.4, sv.size * 3.2, '#ffd35c'); effects.sparks(sv.x, sv.y, '#ffd35c', 60, 700, 7, 1.2); rings.push({ v: sv, age: 0, life: 1.2, color: '#ffd35c', max: 3, width: 12 }); }
+      }
+      quake = 1.6;
+      return;
+    }
     const v = views.get(e.id);
     if (!v) return;
+    if (e.type === 'structDown') {         // 防禦塔／主堡被打爆：碎石、火花、震動
+      v.shake = 1.2; quake = 1.4;
+      effects.sparks(v.x, v.y, '#ffb347', 50, 640, 7, 1);
+      effects.crack(v.x, feet(v), v.size * 1.6, '#ffb347');
+      rings.push({ v, age: 0, life: 0.8, color: '#ffb347', max: 2.4, width: 10 });
+      floats.push({ v, text: '摧毀！', color: '#ffb347', scale: 1.5, age: 0, life: 2 });
+      return;
+    }
+    if (e.type === 'teamJoin') {           // 選隊／換隊：隊色光圈
+      const tcol = (config.team.colors || {})[e.team] || '#fff';
+      v.hop = 1; v.hopH = 0.6;
+      rings.push({ v, age: 0, life: 0.5, color: tcol, max: 1.6, width: 6 });
+      floats.push({ v, text: (config.team.names || {})[e.team] || e.team, color: tcol, scale: 1.1, age: 0, life: 1.4 });
+      return;
+    }
     if (e.type === 'bossSpawn') {         // BOSS 降臨：等版面排好位置（下一格）再放紫色光柱、震動、畫面變暗
       after(0.25, () => {
         if (!views.has(e.id) || v.x === null) return;
@@ -115,6 +139,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       if (v.pending === 0) { v.hp = p.hp; v.shownHp = p.hp; }
       effects.sparks(v.x, v.y, '#ffffff', 18, 320, 5, 0.5, 0);
       rings.push({ v, age: 0, life: 0.4, color: '#ffffff', max: 1.2 });
+    } else if (e.type === 'revive' && e.quiet) {   // 新的一場：大家一起復活，只跳一下
+      v.hop = 1; v.hopH = 0.6;
     } else if (e.type === 'revive') {
       v.hop = 1; v.hopH = 1.4; v.flash = 1;
       effects.pillar(v.x, feet(v), v.size * 0.9, v.size * 2.2, '#ffe27a');
@@ -140,13 +166,18 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       const color = bright((config.factions[hero.faction] || { color: '#cccccc' }).color);
       const big = e.action === 'skill';
       const tv0 = views.get(e.hits[0].id);
+      const color2 = v.fixed ? ((config.team.colors || {})[(game.getPlayer(e.id) || {}).team] || '#ffffff') : color;
       let delay;       // 幾秒後「打中」
       let onHit;       // 打中那一刻，在每個被打的人身上放的特效
       v.hold = 1.6; v.goal = null;   // 出招期間站定不走動
       if (e.action !== 'aoe' && !big) startAnim(v, 'attack');   // 有出招逐格動畫的武將（魚哥）：普攻播 attack
       if (tv0 && e.action !== 'aoe' && tv0.x !== v.x) v.face = Math.sign(tv0.x - v.x);   // 轉身面向對手
 
-      if (e.action === 'aoe') {
+      if (v.fixed && tv0) {              // 防禦塔反擊：頂端射出光彈
+        effects.orb(v.x, v.y - v.size * 0.3, tv0.x, tv0.y, v.size * 0.3, color2, 0.5);
+        delay = 0.5;
+        onHit = tv => { effects.sparks(tv.x, tv.y, color2, 24, 460, 6, 0.7); rings.push({ v: tv, age: 0, life: 0.4, color: color2, max: 1.2 }); };
+      } else if (e.action === 'aoe') {
         // 全場攻擊（大招，刻意做得慢、做得大，讓觀眾看得出「每個人都被打到」）：
         //   集氣（畫面變暗、跳出招式名）→ 高高跳起 → 落地：地裂＋兩道震波往外擴散
         //   → 震波掃到誰，誰就被金色光柱打中、噴火花、被震退（離得越遠越晚被打到）
@@ -173,8 +204,9 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         };
       } else if (!big) {
         // 普攻：衝過去砍一刀（2026-11-13 放慢放大：衝撞時間拉長、刀光變大、多一圈衝擊波）
-        v.lunge = { to: e.hits[0].id, t: 0, dur: 0.62 };
-        delay = 0.31;
+        const ai = sprite.animInfo(hero.heroId, 'attack'), hitT = ai && ai.hit;   // 動畫有登記打中的那一格（hitFrame）：衝撞和傷害的時間跟著它走（小妮的大錘慢動作）
+        v.lunge = { to: e.hits[0].id, t: 0, dur: hitT ? hitT * 2 : 0.62 };
+        delay = hitT || 0.31;
         onHit = tv => {
           effects.slash(tv.x, tv.y, Math.atan2(tv.y - v.y, tv.x - v.x), tv.size * 0.9, color);
           effects.sparks(tv.x, tv.y, '#ffe9a8', 22, 460, 6, 0.7);
@@ -192,8 +224,9 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         if (!tv0) return;
 
         if (style === 'slam') {            // 猛將：衝過去重擊，地面裂開
-          after(charge, () => { v.lunge = { to: tv0.id, t: 0, dur: 0.72 }; startAnim(v, 'skill'); });
-          delay = charge + 0.36;
+          const si = sprite.animInfo(hero.heroId, 'skill'), hitS = si && si.hit;   // 同上：技能動畫有 hitFrame 就照它的時間
+          after(charge, () => { v.lunge = { to: tv0.id, t: 0, dur: hitS ? hitS * 2 : 0.72 }; startAnim(v, 'skill'); });
+          delay = charge + (hitS || 0.36);
           onHit = tv => {
             const ang = Math.atan2(tv.y - v.y, tv.x - v.x);
             effects.slash(tv.x, tv.y, ang, tv.size * 1.3, color);
@@ -312,16 +345,59 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       else if (arena.x + arena.w > legend.x - 12) arena.w = Math.max(120, legend.x - 12 - arena.x);   // 橫式：提示列比右邊那一欄寬時，武將的活動範圍也往左縮
     }
     const wander = config.wander && config.wander.enabled;
+    const teamMode = game.getMode() === 'team';
     const tb = toastBox;
     // BOSS：又大又固定，站在場地中間偏下；一般武將會被推開、不會疊在它身上
     const bossV = views.get('boss');
     if (bossV && game.getPlayer('boss')) {
-      const bs = clamp(Math.min(arena.h * 0.45, arena.w * 0.31), 90, 280);   // 2026-11-13 咖哩嫌太大：比原本小約兩成
-      const tx = arena.x + arena.w / 2, ty = arena.y + arena.h * 0.78 - bs / 2;
+      const bs = teamMode ? clamp(Math.min(arena.h * 0.5, arena.w * 0.17), 80, 240) : clamp(Math.min(arena.h * 0.45, arena.w * 0.31), 90, 280);   // 2026-11-13 咖哩嫌太大：比原本小約兩成
+      const tx = arena.x + arena.w / 2, ty = teamMode ? arena.y + arena.h - 50 - bs / 2 : arena.y + arena.h * 0.78 - bs / 2;   // 陣營模式：站在兩座塔中間
       if (bossV.x === null) { bossV.x = tx; bossV.y = ty; bossV.size = bs; }
       bossV.tsize = bs; bossV.tx = tx; bossV.ty = ty;
     }
-    if (n) {
+    if (!teamMode) for (const v of views.values()) { v.zx0 = undefined; v.zx1 = undefined; }
+    if (teamMode) {
+      // 陣營模式：紅方主堡｜紅隊武將｜紅方塔｜藍方塔｜藍隊武將｜藍方主堡
+      const sB = clamp(Math.min(arena.h * 0.55, arena.w * 0.13), 54, 170), sT = sB * 0.72;
+      const footY = arena.y + arena.h - 50, mid = arena.x + arena.w / 2;
+      const place = { base_red: [arena.x + sB * 0.64, sB], tower_red: [mid - sT * 0.6, sT], tower_blue: [mid + sT * 0.6, sT], base_blue: [arena.x + arena.w - sB * 0.64, sB] };
+      for (const st of game.getStructs()) {
+        let sv = views.get(st.id);
+        if (!sv) { sv = { id: st.id, boss: false, struct: true, fixed: true, deadT: 0, x: null, y: null, size: 80, hp: st.hp, shownHp: st.hp, down: st.down, flash: 0, shake: 0, hop: 0, hopH: 1, lunge: null, pending: 0, kbx: 0, kby: 0, face: 1, faceShown: 1, phase: Math.random() * 6 }; views.set(st.id, sv); }
+        const [px, ps] = place[st.id];
+        sv.tx = px; sv.ty = footY - ps / 2; sv.tsize = ps;
+        if (sv.x === null) { sv.x = sv.tx; sv.y = sv.ty; sv.size = ps; }
+      }
+      const zone = { red: { x0: arena.x + sB * 1.1 + 6, x1: mid - sT * 1.25 - 6 }, blue: { x0: mid + sT * 1.25 + 6, x1: arena.x + arena.w - sB * 1.1 - 6 } };
+      const groups = { red: list.filter(p => game.teamOf(p.id) === 'red'), blue: list.filter(p => game.teamOf(p.id) === 'blue') };
+      let size = 190;
+      for (const t of ['red', 'blue']) {
+        const m = groups[t].length, zw = Math.max(40, zone[t].x1 - zone[t].x0); let best = 0;
+        for (let cols = 1; cols <= Math.max(1, m); cols++) { const rows = Math.ceil(Math.max(1, m) / cols); best = Math.max(best, Math.min(zw / cols * 0.6, arena.h / rows * 0.5)); }
+        size = Math.min(size, best);
+      }
+      size = Math.max(32, Math.min(size, arena.h * 0.4));
+      for (const t of ['red', 'blue']) {
+        const m = groups[t].length, z = zone[t], zw = Math.max(40, z.x1 - z.x0);
+        let bc = { cols: 1, s: 0 };
+        for (let cols = 1; cols <= Math.max(1, m); cols++) { const rows = Math.ceil(Math.max(1, m) / cols), sz = Math.min(zw / cols * 0.6, arena.h / rows * 0.5); if (sz > bc.s) bc = { cols, s: sz }; }
+        const rows = Math.ceil(Math.max(1, m) / bc.cols), cw = zw / bc.cols, ch = arena.h / rows;
+        groups[t].forEach((p, i) => {
+          const v = views.get(p.id); if (!v) return;
+          const row = Math.floor(i / bc.cols), col = i % bc.cols, inRow = row === rows - 1 ? m - row * bc.cols : bc.cols;
+          const tx = (z.x0 + z.x1) / 2 + (col - (inRow - 1) / 2) * cw, ty = arena.y + (row + 0.5) * ch + 8;
+          if (v.x === null) { v.x = tx; v.y = ty; v.size = size; }
+          v.tsize = size; v.team = t;
+          v.zx0 = z.x0 + size * 0.5; v.zx1 = Math.max(v.zx0, z.x1 - size * 0.5);
+          if (!wander) { v.tx = clamp(tx, v.zx0, v.zx1); v.ty = ty; } else { v.tx = undefined; }
+        });
+      }
+      const xr = wide ? arena.x + arenaFullW : arena.x + arena.w;
+      bounds = { x0: arena.x + size * 0.6, x1: xr - size * 0.6, y0: arena.y + size * 0.65 + 50, y1: arena.y + arena.h - size * 0.5 - 56, size,
+                 lg: wide && legend ? { x: legend.x - (tb ? tb.w + 18 : 0), y: legend.y } : null };
+      bounds.y0 += 44;   // 上方資訊列和兩行訊息的位置
+      if (bounds.y0 > bounds.y1) bounds.y0 = bounds.y1 = (bounds.y0 + bounds.y1) / 2;
+    } else if (n) {
       // 試每一種「一排幾隻」，挑角色能畫最大的那種
       let best = null;
       for (let cols = 1; cols <= n; cols++) {
@@ -418,8 +494,9 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const list = [...views.values()].filter(v => v.x !== null);
     for (const v of list) {
       v.moving = false; v.want = 0; v.px = v.x; v.py = v.y;
+      if (v.zx0 !== undefined && (v.x < v.zx0 || v.x > v.zx1)) v.x += (clamp(v.x, v.zx0, v.zx1) - v.x) * Math.min(1, dt * 4);   // 陣營模式：被推出自己那隊的地盤就慢慢走回來
       // 倒地、正在出招或挨打時不走動（BOSS 固定站著）
-      if (v.boss || v.down || v.lunge || v.pending > 0 || v.hold > 0) continue;
+      if (v.boss || v.fixed || v.down || v.lunge || v.pending > 0 || v.hold > 0) continue;
       if (!v.goal) {
         if ((v.rest = (v.rest === undefined ? Math.random() * cfg.restMax : v.rest) - dt) > 0) continue;
         // 隨機挑幾個候選地點，只考慮「走過去不會擠到別人」的，從中選最空的；
@@ -427,10 +504,10 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         const reach = cfg.stepMax * v.size;   // 一次最多走多遠
         let best = null;
         for (let c = 0; c < 10; c++) {
-          const x = clamp(v.x + (Math.random() * 2 - 1) * reach, b.x0, b.x1), y = capY(b, x, clamp(v.y + (Math.random() * 2 - 1) * reach, b.y0, b.y1));
+          const x = clamp(v.x + (Math.random() * 2 - 1) * reach, v.zx0 !== undefined ? v.zx0 : b.x0, v.zx1 !== undefined ? v.zx1 : b.x1), y = capY(b, x, clamp(v.y + (Math.random() * 2 - 1) * reach, b.y0, b.y1));
           if (Math.hypot(x - v.x, y - v.y) < v.size * 0.4) continue;       // 太近了，等於沒走
           let room = 9;
-          for (const o of list) if (o !== v) room = Math.min(room, gap(x, y, (o.goal || o).x, (o.goal || o).y, o.boss ? (v.size + o.size) / 2 : v.size));
+          for (const o of list) if (o !== v) room = Math.min(room, gap(x, y, (o.goal || o).x, (o.goal || o).y, o.boss || o.fixed ? (v.size + o.size) / 2 : v.size));
           if (room < 1.05) continue;
           room = Math.min(room, 2) + Math.random() * 0.3;   // 夠空就好，不必永遠跑去最空的角落
           if (!best || room > best.room) best = { x, y, room };
@@ -451,11 +528,11 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       if (g >= 1 || (a.down && c.down)) continue;
       const dx = c.x - a.x || 0.01, dy = c.y - a.y, d = Math.hypot(dx, dy);
       const push = (1 - g) * a.size * Math.min(1, dt * 5) / d;
-      const wa = a.boss ? 0 : c.boss ? 1 : a.down ? 0 : c.down ? 1 : 0.5;   // BOSS 推不動，別人會被推開
+      const wa = a.boss || a.fixed ? 0 : c.boss || c.fixed ? 1 : a.down ? 0 : c.down ? 1 : 0.5;   // BOSS 推不動，別人會被推開
       a.x -= dx * push * wa; a.y -= dy * push * wa; c.x += dx * push * (1 - wa); c.y += dy * push * (1 - wa);
     }
     for (const v of list) {
-      if (!v.down && !v.boss) { v.x = clamp(v.x, b.x0, b.x1); v.y = capY(b, v.x, clamp(v.y, b.y0, b.y1)); }
+      if (!v.down && !v.boss && !v.fixed) { v.x = clamp(v.x, b.x0, b.x1); v.y = capY(b, v.x, clamp(v.y, b.y0, b.y1)); }
       if (!v.want) continue;
       // 這一格實際有沒有前進？有前進才算「走路中」（才會一顛一顛）。
       // 一直被擋住走不動超過半秒，就放棄這個目的地、休息一下再換地方，不會卡在原地踏步。
@@ -592,6 +669,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const { x, y } = pos(v);
     const size = v.size, r = size / 2, fs = clamp(size * 0.2, 12, 22);
     if (p.isBoss) { drawBoss(v, p, x, y); return; }
+    if (p.isStruct) { drawStruct(v, p, x, y); return; }
     const pose = v.down ? 'down' : v.lunge ? 'attack' : v.flash > 0 ? 'hit' : 'idle';
     // 身體傾斜：衝撞時往前傾，被打時往後仰
     let lean = 0;
@@ -608,7 +686,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     ctx.save();
     pill(bx - 2, by - 2, bw + 4, bh + 4);
     ctx.fillStyle = '#fff'; ctx.fill();
-    ctx.lineWidth = 1.5; ctx.strokeStyle = '#ffb8cf'; ctx.stroke();
+    const tcol = game.getMode() === 'team' && game.teamOf(p.id) ? (config.team.colors || {})[game.teamOf(p.id)] : null;   // 陣營模式：血條外框用隊色
+    ctx.lineWidth = tcol ? 3 : 1.5; ctx.strokeStyle = tcol || '#ffb8cf'; ctx.stroke();
     if (ratio > 0.01 && !v.down) {
       const fw = Math.max(bh, bw * ratio);   // 血很少時也留一小顆圓，才看得到
       pill(bx, by, fw, bh);
@@ -652,6 +731,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     ctx.font = `bold ${fs}px ${FONT}`;
     const lv = `Lv.${p.prof.level} `, nm = short(p.name, 8);
     const lvW = ctx.measureText(lv).width * 0.8, nmW = ctx.measureText(nm).width, left = x - (lvW + nmW) / 2;
+    if (tcol) { ctx.fillStyle = tcol; ctx.beginPath(); ctx.arc(left - fs * 0.5, by - fs * 0.75, fs * 0.32, 0, Math.PI * 2); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke(); }   // 名字前面一顆隊色圓點
     text(lv, left, by - fs * 0.7, fs * 0.8, v.down ? '#bbb' : '#ffd35c', 'left');
     text(nm, left + lvW, by - fs * 0.75, fs, v.down ? '#bbb' : '#fff', 'left');
     const fac = config.factions[p.hero.faction] || { label: '', color: '#888' };
@@ -670,6 +750,83 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       else if (Math.sin(time * 6) > -0.3) text('送禮復活！', x, ly, fs * 0.9, '#ffe27a');
     } else if (p.lockId && game.getPlayer(p.lockId)) {
       text(`鎖定▶${short(game.getPlayer(p.lockId).name, 7)}`, x, ly, fs * 0.72, '#ffd35c');
+    }
+  }
+
+  // ---------- 陣營模式：防禦塔、主堡、上方資訊列 ----------
+  function drawStruct(v, p, x, y) {
+    const s = v.size, fy = y + s / 2, col = (config.team.colors || {})[p.team] || '#fff', down = v.down;
+    const info = game.teamInfo(), st = info ? info.baseState(p.team) : 'tower';
+    ctx.save();
+    const lines = (...a) => { ctx.beginPath(); a.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath(); };
+    const stone = (x0, y0, w, h, light) => { const g = ctx.createLinearGradient(x0, y0, x0 + w, y0); g.addColorStop(0, light ? '#b9c1cb' : '#8d96a1'); g.addColorStop(1, light ? '#8d96a1' : '#6b747f'); ctx.fillStyle = g; ctx.fillRect(x0, y0, w, h); ctx.lineWidth = 2; ctx.strokeStyle = '#3a4048'; ctx.strokeRect(x0, y0, w, h); };
+    const hitK = Math.max(0, v.flash);
+    if (p.kind === 'tower') {
+      const w = s * 0.5, h = s * 0.95 * (down ? 0.32 : 1);
+      stone(x - w / 2, fy - h, w, h, true);
+      if (!down) {
+        ctx.fillStyle = col; ctx.fillRect(x - w / 2, fy - h * 0.55, w, h * 0.12);                      // 隊色橫條
+        stone(x - w * 0.62, fy - h - s * 0.08, w * 1.24, s * 0.1, false);                              // 平台
+        for (let i = 0; i < 3; i++) stone(x - w * 0.6 + i * w * 0.48, fy - h - s * 0.17, w * 0.28, s * 0.09, true);   // 垛口
+        const pulse = 0.75 + Math.sin(time * 3 + v.phase) * 0.25;
+        ctx.shadowColor = col; ctx.shadowBlur = 18 * pulse; ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(x, fy - h - s * 0.3, s * 0.1, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;   // 頂端發光的水晶
+        ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(x - s * 0.03, fy - h - s * 0.33, s * 0.03, 0, Math.PI * 2); ctx.fill();
+      } else { ctx.fillStyle = '#6b747f'; lines([x - w * 0.9, fy], [x - w * 0.5, fy - h * 1.4], [x - w * 0.1, fy]); ctx.fill(); lines([x + w * 0.1, fy], [x + w * 0.45, fy - h * 1.1], [x + w * 0.9, fy]); ctx.fill(); }
+    } else {
+      const w = s * 1.0, h = s * 0.72 * (down ? 0.35 : 1);
+      stone(x - w / 2, fy - h, w, h, true);
+      if (!down) {
+        stone(x - w * 0.62, fy - h * 1.35, w * 0.26, h * 1.35, false); stone(x + w * 0.36, fy - h * 1.35, w * 0.26, h * 1.35, false);   // 兩側角樓
+        for (let i = 0; i < 5; i++) stone(x - w * 0.48 + i * w * 0.2, fy - h - s * 0.08, w * 0.12, s * 0.08, true);            // 垛口
+        ctx.fillStyle = '#2a2f36'; ctx.beginPath(); ctx.moveTo(x - w * 0.16, fy); ctx.lineTo(x - w * 0.16, fy - h * 0.45); ctx.arc(x, fy - h * 0.45, w * 0.16, Math.PI, 0); ctx.lineTo(x + w * 0.16, fy); ctx.closePath(); ctx.fill();   // 城門
+        ctx.fillStyle = col; ctx.fillRect(x - w / 2, fy - h * 0.8, w, h * 0.1);                                                  // 隊色橫條
+        const fx2 = x, fyp = fy - h * 1.35 - s * 0.05, wave = Math.sin(time * 4 + v.phase) * s * 0.03;                           // 旗子
+        ctx.strokeStyle = '#3a4048'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(fx2, fy - h * 1.05); ctx.lineTo(fx2, fyp - s * 0.3); ctx.stroke();
+        ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(fx2, fyp - s * 0.3); ctx.lineTo(fx2 + s * 0.32, fyp - s * 0.22 + wave); ctx.lineTo(fx2, fyp - s * 0.12); ctx.closePath(); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+        if (st !== 'open') {   // 還不能打：外面罩一層護盾
+          const pr = 0.55 + Math.sin(time * 2.4) * 0.15;
+          ctx.fillStyle = `rgba(120,200,255,${0.16 * pr})`; ctx.strokeStyle = `rgba(160,225,255,${0.9 * pr})`; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.ellipse(x, fy - h * 0.6, w * 0.62, h * 1.0, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+      } else { ctx.fillStyle = '#6b747f'; for (let i = 0; i < 4; i++) { lines([x - w * 0.5 + i * w * 0.25, fy], [x - w * 0.42 + i * w * 0.25, fy - h * 1.2], [x - w * 0.3 + i * w * 0.25, fy]); ctx.fill(); } }
+    }
+    if (hitK > 0) { ctx.fillStyle = `rgba(255,255,255,${hitK * 0.55})`; ctx.fillRect(x - s * 0.55, fy - s, s * 1.1, s); }   // 被打閃白
+    ctx.restore();
+    // 血條（隊色）
+    const bw = Math.max(70, s * 1.1), bh = clamp(s * 0.1, 9, 15), bx = x - bw / 2, by = fy - s * (p.kind === 'tower' ? 1.45 : 1.55) - bh;
+    const ratio = clamp(v.shownHp / p.maxHp, 0, 1);
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(bx - 3, by - 3, bw + 6, bh + 6, (bh + 6) / 2); ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
+    if (ratio > 0.005) { ctx.fillStyle = col; ctx.beginPath(); ctx.roundRect(bx, by, Math.max(bh, bw * ratio), bh, bh / 2); ctx.fill(); }
+    ctx.restore();
+    text(`${down ? 0 : Math.max(0, Math.ceil(v.shownHp))}`, x, by + bh / 2, Math.max(10, bh * 0.85), '#fff');
+    const fs = clamp(s * 0.2, 13, 22);
+    text(p.name, x, by - fs * 0.7, fs, col);
+    if (p.kind === 'base' && !down) {
+      const msg = st === 'open' ? '可以攻擊！' : st === 'tower' ? '先拆防禦塔' : '要先打倒全部武將';
+      text(msg, x, fy + fs * 0.9, fs * 0.72, st === 'open' ? '#ffe27a' : '#cfe9ff');
+    }
+  }
+  // 陣營模式上方資訊列：紅隊人數｜剩餘時間｜藍隊人數；分出勝負時畫結果橫幅
+  function drawTeamHud(arena) {
+    const info = game.teamInfo();
+    if (!info) return;
+    const cx = arena.x + arena.w / 2, y = arena.y + 18, cols = config.team.colors || {};
+    const mm = Math.floor(info.left / 60), ss = String(Math.floor(info.left % 60)).padStart(2, '0');
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.78)'; ctx.beginPath(); ctx.roundRect(cx - 190, y - 18, 380, 36, 18); ctx.fill();
+    ctx.restore();
+    text(`紅隊 ${info.red} 人`, cx - 105, y, 20, cols.red, 'center');
+    text(`${mm}:${ss}`, cx, y, 20, '#fff', 'center');
+    text(`${info.blue} 人 藍隊`, cx + 105, y, 20, cols.blue, 'center');
+    if (info.winner) {
+      const w = info.winner, label = w === 'draw' ? '平手！' : `${(config.team.names || {})[w]}獲勝！`, c = w === 'draw' ? '#fff' : cols[w];
+      const by = arena.y + arena.h * 0.42;
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(arena.x, by - 52, arena.w, 104); ctx.restore();
+      text(`🏆 ${label}`, cx, by - 8, 54, c, 'center', true);
+      text(`${Math.ceil(info.restartIn)} 秒後開始下一場`, cx, by + 34, 22, '#fff', 'center');
     }
   }
 
@@ -802,6 +959,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       ctx.globalAlpha = 1;
     }
 
+    drawTeamHud(arena);
     drawLeaderboard(lb);
     if (lb2) drawBossLeaderboard(lb2);
     if (legend) drawLegend(legend);
@@ -811,6 +969,11 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const wide = W >= H;
     toasts.forEach((t, i) => {
       ctx.globalAlpha = t.age > toastLife - 1 ? toastLife - t.age : 1;
+      if (game.getMode() === 'team') {   // 陣營模式：右下角被主堡佔了，訊息改成兩行放在上方資訊列下面
+        const k = toasts.length - 1 - i;
+        if (k <= 1) text(t.text, arena.x + arena.w / 2, arena.y + 56 + (1 - k) * 22, 15, '#fff', 'center');
+        ctx.globalAlpha = 1; return;
+      }
       if (wide && toastBox) {   // 在提示列左邊、貼底、靠右對齊，新的在最下面、舊的往上；太長的字自動縮小塞進寬度
         ctx.font = `bold 15px ${FONT}`;
         const fs = Math.min(15, 15 * toastBox.w / Math.max(1, ctx.measureText(t.text).width));
@@ -820,7 +983,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       ctx.globalAlpha = 1;
     });
 
-    if (!views.size) text('留言武將名字上場，例如「呂布」', arena.x + arena.w / 2, arena.y + arena.h / 2, 26, '#fff');
+    if (![...views.values()].some(v => !v.fixed)) text('留言武將名字上場，例如「呂布」', arena.x + arena.w / 2, arena.y + arena.h / 2, 26, '#fff');
   }
 
   return {

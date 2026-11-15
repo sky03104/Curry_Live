@@ -24,6 +24,7 @@
       lastKey = key;
       $('#pad').innerHTML = `<div class="grp"><b>一般</b><div class="row">${gen.join('')}</div></div>
         <div class="grp"><b>復活</b><div class="row">${b('rv', 'revive', '復活自己')}${b('rv', 'revive', '復活全部', '全部')}</div></div>
+        <div class="grp"><b>玩法模式</b><div class="row">${b('mode', 'modeTeam', '切換陣營模式')}${b('mode', 'modeBrawl', '切換亂鬥模式')}${b('rv', 'matchRestart', '重開陣營賽')}</div></div>
         <div class="grp"><b>招換</b><div class="row">${boss.join('')}</div></div>`;
     }
     $('#who').textContent = hc.hostId ? `主播：${hc.hostName || hc.hostId.slice(0, 10)}` : '尚未設定主播';

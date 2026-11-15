@@ -22,6 +22,7 @@ ML.createUpdater = function (config, params, game, hooks) {
       const r = JSON.parse(raw);
       if (!r || Date.now() - r.at > 3 * 60 * 1000) return 0;
       const n = game.restoreRoster(r.list);
+      if (r.mode) game.importMode(r.mode);   // 陣營模式：隊伍、塔與主堡的血量一起放回來
       if (n) game.announce(`已自動更新到新版本（${current}），場上 ${n} 位武將已放回`);
       return n;
     } catch (e) { return 0; }
@@ -53,7 +54,7 @@ ML.createUpdater = function (config, params, game, hooks) {
     game.announce('發現新版本，3 秒後自動更新…');
     state.pending = false;
     setTimeout(() => {
-      try { hooks.beforeReload && hooks.beforeReload(); localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), list: game.exportRoster() })); } catch (e) { /* 存不了就算了，只是場上要重新留言 */ }
+      try { hooks.beforeReload && hooks.beforeReload(); localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), list: game.exportRoster(), mode: game.exportMode() })); } catch (e) { /* 存不了就算了，只是場上要重新留言 */ }
       try { localStorage.setItem(KEY + '.tried', state.latest); } catch (e) { /* 存不了就算了 */ }
       // 不是單純 reload：換成帶 &_v=新版本號 的網址，瀏覽器才會當成新網頁重抓所有檔案（見 index.html 的載入段），不會還在用快取的舊檔
       try { const u = new URL(location.href); u.searchParams.set('_v', state.latest); location.replace(u.toString()); } catch (e) { location.reload(); }
