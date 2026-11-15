@@ -189,7 +189,7 @@ window.ML = window.ML || {};
   }
   // 跑道畫在一張離螢幕的圖上（尺寸不變就不重畫），每格只貼上去；「起跑線」字樣每格直接畫（要用 render 的字型函式）
   ML.drawRaceTrack = function (ctx, T, text, segs) {
-    const cv = ctx.canvas, tf = ctx.getTransform(), key = [cv.width, cv.height, tf.a.toFixed(3), tf.d.toFixed(3), T.id, T.cx, T.cy, T.rx, T.ry, T.band, T.n].join('|');
+    const cv = ctx.canvas, tf = ctx.getTransform(), key = [cv.width, cv.height, tf.a.toFixed(3), tf.d.toFixed(3), T.id, T.cx, T.cy, T.rx, T.ry, T.band, T.n, segs].join('|');
     if (!T.layer || T.layer.key !== key) {
       const c2 = document.createElement('canvas'); c2.width = cv.width; c2.height = cv.height;
       const x2 = c2.getContext('2d'); x2.setTransform(tf.a, 0, 0, tf.d, 0, 0);

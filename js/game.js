@@ -239,7 +239,7 @@ ML.createGame = function (config, heroes) {
   // 主播指令的執行（留言指令和面板按鈕共用）：復活、或當成送了 count 個那個禮物
   function runHostGift(user, hostGift) {
     if (hostGift.setMode) { gameApi.setMode(hostGift.setMode); return; }
-    if (hostGift.race) { if (hostGift.race === 'open') openRace(); else if (hostGift.race === 'start') raceStartNow(); else if (hostGift.race === 'cancel') cancelRace('主播取消了比賽'); return; }
+    if (hostGift.race) { if (hostGift.race === 'open') openRace(); else if (hostGift.race === 'openHurdle') openRace('hurdle'); else if (hostGift.race === 'start') raceStartNow(); else if (hostGift.race === 'cancel') cancelRace('主播取消了比賽'); return; }
     if (hostGift.restartMatch) { if (mode === 'team') restartMatch(true); else notice('現在是亂鬥模式，沒有陣營賽可以重開'); return; }
     if (hostGift.revive !== undefined) { hostRevive(user, hostGift.revive); return; }
     if (hostGift.healAll) { healEveryone(); return; }
@@ -609,6 +609,14 @@ ML.createGame = function (config, heroes) {
   // ---------- 賽跑模式 ----------
   const isMeng = h => !!h && h.faction === (tr.faction || 'Meng');
   const rr = (a, b) => a + Math.random() * (b - a);
+  // 障礙賽的設定（見 config.race.hurdle）：關卡的位置平均分布在一圈上，第 i 關在 (i+1)/(關數+1)
+  const hd = Object.assign({ lapSeconds: 36, passChances: [0.85, 0.75, 0.65, 0.55, 0.45], stumbleMin: 2, stumbleMax: 3, chanceMin: 0.05, chanceMax: 0.95, obstacles: [] }, tr.hurdle || {});
+  const hurdlePos = i => (i + 1) / (hd.passChances.length + 1);
+  // 這位參賽者現在過第 idx 關的機率（玫瑰加、GG 減）
+  function passChanceOf(e, idx) {
+    const sum = l => l.reduce((a, b) => a + (b.until > race.t ? b.delta : 0), 0);
+    return Math.max(hd.chanceMin, Math.min(hd.chanceMax, hd.passChances[idx] + sum(e.boost) - sum(e.hinder)));
+  }
   // 這一場用哪一種賽道：隨機挑，但不會連續兩場同一種（nextTrackId 是測試用，指定下一場）
   let lastTrack = '', nextTrackId = '';
   function pickTrack() {
@@ -619,14 +627,14 @@ ML.createGame = function (config, heroes) {
     lastTrack = id; return id;
   }
   // 主播開放報名（按鈕或留言）：進入賽跑模式，報名倒數開始
-  function openRace() {
+  function openRace(kind) {
     if (mode === 'race') { notice(race && race.phase === 'signup' ? '已經在報名中了' : '比賽進行中，結束後才能再開放報名'); return; }
     mode = 'race';
     teamOf.clear(); swaps.clear(); structs.clear(); match = { winner: null, restartAt: 0, time: 0 };
     for (const p of players.values()) p.lockId = null;
     raceLock.clear();
-    race = { phase: 'signup', left: tr.signupSeconds || 180, cd: 0, t: 0, resLeft: 0, entrants: new Map(), results: [], track: pickTrack() };
-    notice(`🏁 開放報名！${Math.round((tr.signupSeconds || 180) / 60)} 分鐘內留言「我要參賽」（只有萌國武將能參賽）`);
+    race = { phase: 'signup', left: tr.signupSeconds || 180, cd: 0, t: 0, resLeft: 0, entrants: new Map(), results: [], track: pickTrack(), kind: kind === 'hurdle' ? 'hurdle' : 'normal' };
+    notice(race.kind === 'hurdle' ? `🚧 開放障礙賽報名！${Math.round((tr.signupSeconds || 180) / 60)} 分鐘內留言「我要參賽」（只有萌國武將能參賽，要闖 ${hd.passChances.length} 道關卡）` : `🏁 開放報名！${Math.round((tr.signupSeconds || 180) / 60)} 分鐘內留言「我要參賽」（只有萌國武將能參賽）`);
     fx({ type: 'modeChange', mode });
   }
   // 留言「我要參賽」
@@ -643,7 +651,7 @@ ML.createGame = function (config, heroes) {
       me = joinHero(user, hero);
       if (!me) return;
     }
-    race.entrants.set(user.id, { id: user.id, lane: race.entrants.size, progress: 0, seg: 0, state: 'ready', restLeft: 0, speed: 1, boost: [], hinder: [], finishedAt: 0, rank: 0 });
+    race.entrants.set(user.id, { id: user.id, lane: race.entrants.size, progress: 0, seg: 0, cp: 0, fails: 0, state: 'ready', restLeft: 0, speed: 1, boost: [], hinder: [], finishedAt: 0, rank: 0 });
     fx({ type: 'raceJoin', id: user.id });
     notice(`🏃 ${me.name} 的 ${me.hero.displayName} 報名參賽！（${race.entrants.size}/${tr.maxPlayers || 8}）`);
   }
@@ -722,12 +730,20 @@ ML.createGame = function (config, heroes) {
     }
     if (race.phase === 'result') { race.resLeft -= dt; if (race.resLeft <= 0) { race = null; raceLock.clear(); mode = 'brawl'; notice('🥊 回到亂鬥模式'); fx({ type: 'modeChange', mode }); } return; }
     race.t += dt;
-    const segs = tr.segments || 8, base = 1 / (segs * (tr.segmentSeconds || 6));
+    const hurdle = race.kind === 'hurdle';
+    const segs = tr.segments || 8, base = hurdle ? 1 / hd.lapSeconds : 1 / (segs * (tr.segmentSeconds || 6));
     for (const e of race.entrants.values()) {
       if (e.state === 'done' || e.state === 'dnf') continue;
       if (e.state === 'rest') { e.restLeft -= dt; if (e.restLeft <= 0) { e.state = 'run'; fx({ type: 'raceResume', id: e.id }); } continue; }
       e.progress += base * e.speed * dt;
+      if (hurdle && e.cp < hd.passChances.length && e.progress >= hurdlePos(e.cp)) {   // 障礙賽：跑到關卡，擲骰決定過不過；沒過就在關卡前摔倒停幾秒（之後直接繼續，不會再挑戰同一關）
+        const idx = e.cp, pos = hurdlePos(idx), ch = passChanceOf(e, idx), ok = Math.random() < ch;
+        e.cp++; e.speed = 1 + rr(-0.06, 0.06);
+        if (ok) fx({ type: 'hurdlePass', id: e.id, idx, chance: ch });
+        else { e.progress = pos; e.fails++; e.state = 'rest'; e.restLeft = rr(hd.stumbleMin, hd.stumbleMax); fx({ type: 'hurdleFail', id: e.id, idx, chance: ch }); continue; }
+      }
       if (e.progress >= 1) { e.progress = 1; e.state = 'done'; e.finishedAt = race.t; fx({ type: 'raceFinish', id: e.id }); continue; }
+      if (hurdle) continue;
       const seg = Math.floor(e.progress * segs);
       if (seg > e.seg) {   // 跑完一小段：擲骰決定要不要休息；每段速度也有一點點隨機，才不會永遠平手
         e.seg = seg; e.speed = 1 + rr(-0.06, 0.06);
@@ -755,7 +771,8 @@ ML.createGame = function (config, heroes) {
         // 主播的文字指令：主播本人留言設定好的字 = 送那個動作的禮物（不走一般留言處理）
         const hostGift = hostMatch && hostMatch(ev.user, ev.text);
         if (hostGift) { runHostGift(ev.user, hostGift); return; }
-        if (hostCheck && hostCheck(ev.user) && (config.commands.raceOpen || []).some(c => plain(c) === plain(ev.text))) { openRace(); return; }   // 主播留言「開放報名」
+        if (hostCheck && hostCheck(ev.user) && (config.commands.raceOpen || []).some(c => plain(c) === plain(ev.text))) { openRace(); return; }
+        if (hostCheck && hostCheck(ev.user) && (config.commands.hurdleOpen || []).some(c => plain(c) === plain(ev.text))) { openRace('hurdle'); return; }   // 主播留言「開放障礙賽」   // 主播留言「開放報名」
         if (hostCheck && hostCheck(ev.user) && hostLevelCommand(ev.text)) return;   // 主播留言「等級 名字 30」：調整等級
         handleChat(ev.user, ev.text);
       }
@@ -889,15 +906,16 @@ ML.createGame = function (config, heroes) {
       if (mode !== 'race' || !race) return null;
       const ranks = race.phase === 'signup' ? [] : raceRanks();
       const trk = (tr.tracks || []).find(t => t.id === race.track) || {};
-      return { track: race.track || 'oval', trackName: trk.name || '', phase: race.phase, left: Math.max(0, race.left), cd: Math.max(0, race.cd), t: race.t, timeLeft: Math.max(0, (tr.maxSeconds || 300) - race.t), resLeft: Math.max(0, race.resLeft),
+      return { kind: race.kind || 'normal', hurdles: race.kind === 'hurdle' ? hd.passChances.map((c, i) => ({ pos: hurdlePos(i), chance: c, icon: (hd.obstacles[i] || {}).icon || '🚧', name: (hd.obstacles[i] || {}).name || '關卡' })) : [], track: race.track || 'oval', trackName: trk.name || '', phase: race.phase, left: Math.max(0, race.left), cd: Math.max(0, race.cd), t: race.t, timeLeft: Math.max(0, (tr.maxSeconds || 300) - race.t), resLeft: Math.max(0, race.resLeft),
         count: race.entrants.size, max: tr.maxPlayers || 8, min: tr.minPlayers || 3, results: race.results, ranks: ranks.map(e => e.id),
-        entrants: [...race.entrants.values()].map(e => ({ id: e.id, lane: e.lane, progress: e.progress, state: e.state, rank: e.rank,
+        entrants: [...race.entrants.values()].map(e => ({ id: e.id, cp: e.cp, fails: e.fails, lane: e.lane, progress: e.progress, state: e.state, rank: e.rank,
           boost: e.boost.reduce((a, b) => a + (b.until > race.t ? b.delta : 0), 0), hinder: e.hinder.reduce((a, b) => a + (b.until > race.t ? b.delta : 0), 0) })) };
     },
     raceBusy() { return mode === 'race' && !!race && (race.phase === 'countdown' || race.phase === 'run'); },
     raceGift(user, kind, count) { raceGift(user, kind, count); },
     setMode(m) {
       if (m === 'race') { openRace(); return; }
+      if (m === 'hurdle') { openRace('hurdle'); return; }
       if (m === mode) { notice(m === 'team' ? '已經是陣營模式了' : '已經是亂鬥模式了'); return; }
       race = null; raceLock.clear();
       mode = m === 'team' ? 'team' : 'brawl';

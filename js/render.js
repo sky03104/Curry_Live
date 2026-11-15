@@ -111,6 +111,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       for (let i = 0; i < 4; i++) effects.emoji(v.x + (Math.random() - 0.5) * v.size * 0.6, v.y - v.size * 0.55, '💢', v.size * 0.28, (Math.random() - 0.5) * 60, 80 + Math.random() * 80, 200, 0.8, 0, v.y + v.size * 0.5);
       v.shake = 0.8; floats.push({ v, text: '被干擾！', color: '#c9b3ff', scale: 1, age: 0, life: 1.2 }); return;
     }
+    if (e.type === 'hurdlePass') { v.hop = 1; v.hopH = 1.5; effects.sparks(v.x, v.y, '#7dffa0', 14, 360, 4, 0.6); floats.push({ v, text: '✅ 過關！', color: '#7dffa0', scale: 1.15, age: 0, life: 1.4 }); return; }
+    if (e.type === 'hurdleFail') { v.moving = false; v.shake = 1.4; v.flash = 1; effects.sparks(v.x, v.y, '#ff8a5c', 18, 380, 4, 0.7); effects.emoji(v.x, v.y - v.size * 0.8, '💥', v.size * 0.6, 0, 0, 0, 1.2, 0); floats.push({ v, text: '摔倒！', color: '#ffae7a', scale: 1.25, age: 0, life: 1.8 }); return; }
     if (e.type === 'raceFinish') { v.moving = false; v.hop = 1; v.hopH = 1.2; effects.sparks(v.x, v.y, '#ffd35c', 30, 520, 6, 0.9); floats.push({ v, text: '完賽！', color: '#ffd35c', scale: 1.3, age: 0, life: 1.8 }); return; }
     if (e.type === 'teamJoin') {           // 選隊／換隊：隊色光圈
       const tcol = (config.team.colors || {})[e.team] || '#fff';
@@ -575,7 +577,22 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const g = raceGeo;
     if (!g || game.getMode() !== 'race') return;
     if (!game.getRace()) return;
-    ML.drawRaceTrack(ctx, g.trk, text, config.race.segments || 8);
+    const R = game.getRace(), hurdle = R.kind === 'hurdle';
+    ML.drawRaceTrack(ctx, g.trk, text, hurdle ? 0 : (config.race.segments || 8));   // 障礙賽沒有「每段休息」，不畫每段的小圓點
+    if (hurdle) {   // 障礙賽：5 道關卡橫跨整個跑道寬度，中間放障礙物圖示，下面寫這一關的過關率
+      const band = g.trk.band;
+      R.hurdles.forEach((h, i) => {
+        const p = ML.raceTrackPoint(g.trk, h.pos, 0), nx = -p.ty, ny = p.tx;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,214,60,0.95)'; ctx.lineWidth = 5; ctx.setLineDash([10, 8]);
+        ctx.beginPath(); ctx.moveTo(p.x - nx * band / 2, p.y - ny * band / 2); ctx.lineTo(p.x + nx * band / 2, p.y + ny * band / 2); ctx.stroke();
+        ctx.setLineDash([]); ctx.restore();
+        const isz = Math.max(18, Math.min(band * 1.1, 46));
+        ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `${Math.round(isz)}px sans-serif`; ctx.fillText(h.icon, p.x, p.y); ctx.restore();
+        const outY = p.y + ny * (band / 2 + 12), side = outY < 78 ? -1 : 1;   // 在畫面最上緣的關卡，字改放在跑道內側，免得被上方資訊列蓋住
+        text(`${i + 1}關 ${Math.round(h.chance * 100)}%`, p.x + side * nx * (band / 2 + 12), p.y + side * ny * (band / 2 + 12), 13, '#fff');
+      });
+    }
   }
   function drawRaceBadges() {
     const g = raceGeo, R = g && game.getMode() === 'race' ? game.getRace() : null;
@@ -608,9 +625,10 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     if (!R) return;
     const cx = arena.x + arena.w / 2, y = arena.y + 18, mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
     let label = '';
-    if (R.phase === 'signup') label = `🏁 報名中 ${mmss(R.left)}　${R.count}/${R.max} 人　留言「我要參賽」`;
+    const hz = R.kind === 'hurdle';
+    if (R.phase === 'signup') label = `${hz ? '🚧 障礙賽' : '🏁'} 報名中 ${mmss(R.left)}　${R.count}/${R.max} 人　留言「我要參賽」`;
     else if (R.phase === 'countdown') label = `🏁 ${R.count} 位選手準備起跑`;
-    else if (R.phase === 'run') label = `🏁 比賽中　⏱ ${mmss(R.t)}`;
+    else if (R.phase === 'run') label = `${hz ? '🚧 障礙賽' : '🏁 比賽中'}　⏱ ${mmss(R.t)}`;
     else label = '🏁 比賽結束';
     ctx.font = `bold 20px ${FONT}`;
     const w = Math.min(arena.w - 10, ctx.measureText(label).width + 40);

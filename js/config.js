@@ -34,6 +34,15 @@ window.GAME_CONFIG = {
     maxGiftCombo: 20,                    // 一次連送最多算幾個
     maxSeconds: 300, resultSeconds: 15, countdown: 3,
     rewards: [2000, 1000, 500],          // 第 1、2、3 名的經驗值（其他人沒有）
+    // 障礙賽（主播按「開放障礙賽」或留言「開放障礙賽」；跟一般賽跑各自開）：跑道上有 5 道關卡，跑到時擲骰決定過不過（各關機率不同，越後面越難）。
+    // 沒過關＝在關卡前摔倒停 stumbleMin～stumbleMax 秒再繼續（不會淘汰、不會退回）；中途不會因為機率停下來休息。玫瑰每個讓過關率 +5%、GG 每個 -5%（持續秒數與疊加跟賽跑一樣），過關率限制在 chanceMin～chanceMax。
+    hurdle: {
+      lapSeconds: 36,                    // 完全不摔倒大約幾秒跑完一圈
+      passChances: [0.85, 0.75, 0.65, 0.55, 0.45],   // 第 1～5 關的基本過關率
+      stumbleMin: 2, stumbleMax: 3,
+      chanceMin: 0.05, chanceMax: 0.95,
+      obstacles: [{ icon: '🚧', name: '柵欄' }, { icon: '🪨', name: '落石' }, { icon: '🌊', name: '水坑' }, { icon: '🔥', name: '火圈' }, { icon: '🧱', name: '高牆' }],
+    },
     // 賽道：每次開放報名時隨機挑一種（不會連續兩場同一種）。形狀與外觀畫在 js/race-tracks.js，這裡只列 id 和名字
     tracks: [
       { id: 'oval', name: '橢圓田徑場' }, { id: 'kart', name: '賽車場' }, { id: 'eight', name: '八字沙漠' }, { id: 'flower', name: '花瓣花園' },
@@ -370,6 +379,7 @@ window.GAME_CONFIG = {
     unlock: ['解除鎖定'],       // 留言這些字就解除鎖定（可以多加幾種說法）
     setLevel: ['等級', '設定等級'],   // 主播本人留言「等級 名字 30」→ 把那位觀眾調成 Lv.30（要先在面板「主播文字指令」設定主播）
     raceJoin: ['我要參賽'],             // 賽跑模式：報名參賽（整句剛好才算）
+    hurdleOpen: ['開放障礙賽'],         // 障礙賽：主播留言這句＝開放障礙賽報名（只有主播有效）
     raceOpen: ['開放報名'],             // 賽跑模式：主播留言這句＝開放報名（只有主播有效）
     joinRed: ['加入紅隊', '紅隊'],      // 陣營模式：留言這些字（整句剛好）加入紅隊
     joinBlue: ['加入藍隊', '藍隊'],     // 陣營模式：加入藍隊
