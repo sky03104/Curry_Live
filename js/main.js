@@ -103,6 +103,33 @@
     }
     return res;
   }
+  // ---------- 主播按鈕：面板點一下 → 這裡幾秒內執行 ----------
+  let cmdSeq = null, cmdBusy = false;   // cmdSeq：已經處理過的最新序號（第一次讀到時只記下來、不執行，免得重新整理後重播舊指令）
+  async function pollCommand() {
+    if (!cloud.enabled || !cloud.canWrite || cmdBusy) return;
+    cmdBusy = true;
+    try {
+      const c = await cloud.fetchCommand();
+      if (!c) return;
+      if (cmdSeq === null) { cmdSeq = c.seq; return; }
+      if (c.seq > cmdSeq) { cmdSeq = c.seq; runButton(c); }
+    } finally { cmdBusy = false; }
+  }
+  function runButton(c) {
+    fastUntil = Date.now() + ((config.save.cloud.cmdBurstHold || 60) * 1000);
+    const hg = hostCmd.press(String(c.action || ''), c.count, c.arg);
+    if (!hg) return;
+    const h = c.host && c.host.id ? c.host : { id: hostCmd.hostId, name: hostCmd.hostName };   // 面板會把主播代號一起送來，不用等設定同步
+    if (!h.id) { game.announce('主播按鈕：還沒設定主播（面板「主播文字指令」選「我就是主播」）'); return; }
+    game.hostPress({ id: String(h.id).slice(0, 80), name: String(h.name || '主播').slice(0, 40) }, hg);
+  }
+  // 平常每 cmdPollSeconds 秒看一次；剛收到按鈕指令後的一段時間（cmdBurstHold 秒）改成更密（cmdBurstSeconds 秒），連按幾下的反應更快、又不會整場都密集讀取
+  let fastUntil = 0;
+  function schedulePoll() {
+    const cc = config.save.cloud, fast = Date.now() < fastUntil;
+    setTimeout(async () => { try { await pollCommand(); } catch (e) { /* 這次失敗下次再試 */ } schedulePoll(); }, (fast ? (cc.cmdBurstSeconds || 0.5) : (cc.cmdPollSeconds || 1)) * 1000);
+  }
+  if (cloud.canWrite) schedulePoll();
   setInterval(() => flushCloud(), config.save.cloud.intervalSeconds * 1000);
   // 直播畫面每隔一段時間重讀一次雲端：主播在面板調整的等級才會套用進來（每 5 分鐘一次，免費額度夠用）
   if (cloud.canWrite) setInterval(async () => { if (!cloud.enabled) return; try { game.importProfiles(await cloud.load(), true); applyCloudSettings(); } catch (e) { /* 這次讀不到下次再試 */ } }, (config.save.cloud.pullSeconds || 300) * 1000);

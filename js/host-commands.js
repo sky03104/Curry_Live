@@ -74,6 +74,12 @@ ML.createHostCommands = function (config) {
       save(); return true;
     },
     isHost(user) { return !!(state.hostId && user && user.id === state.hostId); },
+    // 主播按鈕（面板上點一下）：跟留言指令一樣的結果格式，但不用比對文字。action 是動作代號（attack、skill、boss1…或 revive），arg 是復活的對象（空白＝自己、「全部」）
+    press(action, count, arg) {
+      if (action === REVIVE) return { revive: String(arg || '').slice(0, 40) };
+      if (!actionToGift[action]) return null;
+      return { giftId: actionToGift[action], count: Math.max(1, Math.min(maxCount(action), Math.floor(Number(count)) || 1)), label: label(action) };
+    },
     // 這句留言是不是主播的指令？是就回傳 { giftId, count }（count = 這個動作設定的次數），不是回傳 null
     match(user, text) {
       if (!state.hostId || !user || user.id !== state.hostId) return null;

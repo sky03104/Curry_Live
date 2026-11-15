@@ -188,6 +188,12 @@ ML.createGame = function (config, heroes) {
     fx({ type: 'revive', id: p.id });
     notice(`${p.name} 的 ${p.hero.displayName} 滿血復活！`);
   }
+  // 主播指令的執行（留言指令和面板按鈕共用）：復活、或當成送了 count 個那個禮物
+  function runHostGift(user, hostGift) {
+    if (hostGift.revive !== undefined) { hostRevive(user, hostGift.revive); return; }
+    notice(`主播指令：${hostGift.label || '動作'} ×${hostGift.count || 1}`);   // 訊息區會寫出這次算幾個：寫 ×1 代表直播網址裡沒帶次數（忘了重貼網址）
+    handleGift(user, hostGift.giftId, hostGift.count || 1, config.hostMaxCount);
+  }
   // 主播的復活指令：不用等倒地倒數，馬上滿血復活。target 空白 = 主播自己；「全部」= 所有倒地的人；其他 = 用名字找那位觀眾
   function hostRevive(user, target) {
     const t = String(target || '').trim();
@@ -411,6 +417,7 @@ ML.createGame = function (config, heroes) {
   const gameApi = {
     setHeroPool,
     setHostMatcher(fn, isHost) { hostMatch = fn; hostCheck = isHost || null; },
+    hostPress(user, hostGift) { if (user && user.id && hostGift) runHostGift(user, hostGift); },   // 面板的主播按鈕
     setDefaultHero(id) { defaultHeroId = heroById.has(id) ? id : ''; },
     onFx(fn) { fxListeners.push(fn); },
     handleEvent(ev) {
@@ -420,8 +427,7 @@ ML.createGame = function (config, heroes) {
       if (ev.type === 'chat') {
         // 主播的文字指令：主播本人留言設定好的字 = 送那個動作的禮物（不走一般留言處理）
         const hostGift = hostMatch && hostMatch(ev.user, ev.text);
-        if (hostGift && hostGift.revive !== undefined) { hostRevive(ev.user, hostGift.revive); return; }
-        if (hostGift) { notice(`主播指令：${hostGift.label || '動作'} ×${hostGift.count || 1}`); handleGift(ev.user, hostGift.giftId, hostGift.count || 1, config.hostMaxCount); return; }   // 訊息區會寫出這次算幾個：寫 ×1 代表直播網址裡沒帶次數（忘了重貼網址）
+        if (hostGift) { runHostGift(ev.user, hostGift); return; }
         if (hostCheck && hostCheck(ev.user) && hostLevelCommand(ev.text)) return;   // 主播留言「等級 名字 30」：調整等級
         handleChat(ev.user, ev.text);
       }

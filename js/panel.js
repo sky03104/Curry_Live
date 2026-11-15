@@ -35,6 +35,15 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       </div>
     </details>
 
+    <details class="card" data-k="hostbtn" open>
+      <summary><span class="ico">🎮</span>主播按鈕<em id="hb-state"></em></summary>
+      <div class="body">
+        <div class="hint">主播用<b>點的</b>，比打字快：按下面的按鈕，會<b>另外開一個小視窗</b>（只有大顆按鈕），主播直播時點那個視窗就好。點一下，直播畫面約 1～2 秒內執行（效果跟主播留言指令一樣，次數用下面「主播文字指令」設定的「次」）。要先<b>開啟雲端存檔</b>，並在「主播文字指令」選好「我就是主播」。</div>
+        <div class="row"><button id="hb-open" class="main">🪟 開啟主播按鈕小視窗</button></div>
+        <div class="hint" id="hb-msg"></div>
+      </div>
+    </details>
+
     <details class="card" data-k="hostcmd">
       <summary><span class="ico">🎙️</span>主播文字指令<em id="hc-state"></em></summary>
       <div class="body">
@@ -425,10 +434,20 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     }, 1000);
   };
   const hcUrlState = () => { const n = Object.keys(hc.cmds).length, c = Object.keys(hc.urlParams().cnt ? JSON.parse(hc.urlParams().cnt) : {}).length; $('#hc-urlstate').innerHTML = hc.hostId ? `📋 目前「直播用網址」帶著：主播 ✔、指令 ${n} 個、次數設定 ${c} 個。${saving.cloud.enabled ? '有開雲端存檔：改完會自動同步，<b>不用重貼網址</b>（直播軟體至少要貼過一次含雲端代號的網址）。' : '<b>改完要重貼網址</b>。'}直播時主播打指令，畫面訊息區會寫「主播指令：普攻 ×10」，次數不對就代表還沒套用。` : ''; };
-  const hcWarn = () => { hcUrlState(); const d = hc.duplicates(); $('#hc-warn').textContent = d.length ? `⚠ ${d.map(hc.label).join('、')} 的指令文字跟前面的動作重複，這幾個不會觸發。` : ''; };
+  const hcWarn = () => { hbRender(); hcUrlState(); const d = hc.duplicates(); $('#hc-warn').textContent = d.length ? `⚠ ${d.map(hc.label).join('、')} 的指令文字跟前面的動作重複，這幾個不會觸發。` : ''; };
   $('#hc-set').onclick = () => { const id = $('#hc-pick').value; if (!id) return; hc.setHost(id, recent.get(id) || ''); hcWho(); hcWarn(); hcSync(); renderGiftSettings(); };
   $('#hc-cmds').onchange = e => { const n = e.target.closest('[data-hcn]'); if (!n) return; hc.setCount(n.dataset.hcn, n.value); n.value = hc.countOf(n.dataset.hcn); hcWarn(); hcSync(); renderGiftSettings(); };
   $('#hc-cmds').oninput = e => { const i = e.target.closest('[data-hc]'); if (!i) return; hc.setCmd(i.dataset.hc, i.value); hcWarn(); hcWho(); hcSync(); renderGiftSettings(); };
+  // ---------- 主播按鈕：開一個只有大顆按鈕的小視窗（pad.html） ----------
+  function hbRender() { $('#hb-state').textContent = saving.cloud.enabled && hc.hostId ? '可用' : '還不能用'; }
+  $('#hb-open').onclick = () => {
+    const msg = t => { $('#hb-msg').textContent = t; };
+    if (!saving.cloud.enabled) { msg('⚠ 要先開啟雲端存檔（「存檔」那張卡片），直播畫面才收得到按鈕。'); return; }
+    if (!hc.hostId) { msg('⚠ 還沒設定主播：到下面「主播文字指令」選「我就是主播」。'); return; }
+    const url = new URL('pad.html', location.href); if (window.APP_VERSION) url.searchParams.set('_v', window.APP_VERSION);
+    const w = window.open(url.toString(), 'curryLiveHostPad', 'popup=yes,width=360,height=560,left=40,top=40');
+    msg(w ? '✔ 已開啟小視窗（可以把它拖到想放的位置；再按一次會回到同一個視窗）。' : '⚠ 瀏覽器擋掉了彈出視窗：請在網址列旁允許這個網站的彈出視窗，再按一次。');
+  };
   hcRows(); hcWho(); hcPick(); hcWarn();
   // 版本號：面板這個視窗載入時的版本；發現有新版就提醒（直播畫面會自己更新，面板要自己重新整理）
   if (saving.updater) { const showVer = () => { const u = saving.updater; $('#p-ver').textContent = u.pending ? `版本 ${u.current} ⚠ 有新版 ${u.latest}，請重新整理本頁` : `版本 ${u.current}`; }; showVer(); setInterval(showVer, 5000); }

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>主播按鈕・直播亂鬥</title>
+<style>
+  html, body { margin: 0; min-height: 100%; background: #F7F1E3; color: #3E4A46;
+    font-family: "Noto Sans TC","Microsoft JhengHei","PingFang TC","WenQuanYi Zen Hei",sans-serif; }
+  body { padding: 10px 12px 16px; box-sizing: border-box; user-select: none; }
+  h1 { font-size: 15px; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: baseline; }
+  h1 small { font-size: 11px; font-weight: normal; color: #8C9490; }
+  .grp { margin-bottom: 10px; }
+  .grp > b { display: block; font-size: 11px; color: #8C9490; margin: 0 0 4px 2px; font-weight: normal; }
+  .row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  button { font: inherit; font-size: 18px; font-weight: 700; padding: 14px 6px; border-radius: 12px; cursor: pointer;
+    border: 2px solid #E3D9BE; background: #fff; color: #3E4A46; touch-action: manipulation; }
+  button:active { transform: scale(0.97); background: #fff3c9; }
+  button:disabled { opacity: 0.5; }
+  button.act { border-color: #ffd35c; }
+  button.rv  { border-color: #7dffa0; background: #f1fff5; }
+  button.boss { border-color: #c9a8f0; background: #efe4fb; }
+  #msg { font-size: 12px; min-height: 34px; margin-top: 4px; color: #3E4A46; }
+  #msg.bad { color: #B23F2B; }
+  #ver { font-size: 10px; color: #8C9490; text-align: right; }
+</style>
+</head>
+<body>
+<h1>🎮 主播按鈕 <small id="who"></small></h1>
+<div id="pad"></div>
+<div id="msg"></div>
+<div id="ver"></div>
+<script>
+  // 載入程式檔。網址若帶 &_v=版本號（面板開這個小視窗時會帶），每個檔案加 ?v=版本號，避免瀏覽器用到快取的舊檔。
+  (function () {
+    var v = new URLSearchParams(location.search).get('_v') || '', q = v ? '?v=' + encodeURIComponent(v) : '';
+    ['js/version.js', 'js/config.js', 'js/host-commands.js', 'js/cloud-save.js', 'js/hostpad.js'].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
+  })();
+</script>
+</body>
+</html>
