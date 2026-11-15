@@ -92,7 +92,7 @@ ML.createHeroSprite = function (heroes, config, basePath) {
     // 這隻武將有沒有這個動作、圖準備好了沒；回傳 { 秒數 } 或 null
     animInfo(heroId, name) {
       const m = animMeta(heroId, name);
-      return m && loadSheet(heroId, name) ? { dur: m.frames * (m.repeat || 1) / (m.fps || 4) } : null;
+      return m && loadSheet(heroId, name) ? { dur: m.frames * (m.repeat || 1) / (m.fps || 4), hit: m.hitFrame ? (m.hitFrame - 0.5) / (m.fps || 4) : null } : null;   // hit：打中那一格是第幾秒（config 有寫 hitFrame 才有；動畫慢的武將用它讓傷害數字對上打擊那一格）
     },
     // (x, y) 是角色中心，size 是角色高度。state = { pose, poseTime, flash(0~1 閃白強度), lean(身體傾斜角度), facing(-1 面向左 ~ 1 面向右) }
     draw(ctx, hero, x, y, size, state) {

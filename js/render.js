@@ -204,8 +204,9 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         };
       } else if (!big) {
         // 普攻：衝過去砍一刀（2026-11-13 放慢放大：衝撞時間拉長、刀光變大、多一圈衝擊波）
-        v.lunge = { to: e.hits[0].id, t: 0, dur: 0.62 };
-        delay = 0.31;
+        const ai = sprite.animInfo(hero.heroId, 'attack'), hitT = ai && ai.hit;   // 動畫有登記打中的那一格（hitFrame）：衝撞和傷害的時間跟著它走（小妮的大錘慢動作）
+        v.lunge = { to: e.hits[0].id, t: 0, dur: hitT ? hitT * 2 : 0.62 };
+        delay = hitT || 0.31;
         onHit = tv => {
           effects.slash(tv.x, tv.y, Math.atan2(tv.y - v.y, tv.x - v.x), tv.size * 0.9, color);
           effects.sparks(tv.x, tv.y, '#ffe9a8', 22, 460, 6, 0.7);
@@ -223,8 +224,9 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         if (!tv0) return;
 
         if (style === 'slam') {            // 猛將：衝過去重擊，地面裂開
-          after(charge, () => { v.lunge = { to: tv0.id, t: 0, dur: 0.72 }; startAnim(v, 'skill'); });
-          delay = charge + 0.36;
+          const si = sprite.animInfo(hero.heroId, 'skill'), hitS = si && si.hit;   // 同上：技能動畫有 hitFrame 就照它的時間
+          after(charge, () => { v.lunge = { to: tv0.id, t: 0, dur: hitS ? hitS * 2 : 0.72 }; startAnim(v, 'skill'); });
+          delay = charge + (hitS || 0.36);
           onHit = tv => {
             const ang = Math.atan2(tv.y - v.y, tv.x - v.x);
             effects.slash(tv.x, tv.y, ang, tv.size * 1.3, color);
