@@ -198,8 +198,8 @@ ML.createGame = function (config, heroes) {
     p.maxHp = p.hp = stats(p).maxHp;
     players.set(user.id, p);
     if (mode === 'team' && !teamOf.has(user.id)) autoAssign(user.id);   // 陣營模式：先分到人數少的那隊（第一次自己改選不算換隊）
-    if (quiet) return p;   // 自動更新後把場上武將放回來：不吵（不跳上場訊息與特效）
-    fx({ type: 'join', id: p.id });
+    fx({ type: 'join', id: p.id, quiet: !!quiet });   // 一定要通知畫面建立這隻的顯示（以前自動更新放回來的武將漏掉這步，畫面上看不到）
+    if (quiet) return p;   // 自動更新後把場上武將放回來：不吵（不跳上場訊息）
     const tm = mode === 'team' && teamOf.get(user.id) ? `【${teamLabel(teamOf.get(user.id).team)}】` : '';
     notice(p.prof.level > 1 ? `${p.name} 的 ${hero.displayName}（Lv.${p.prof.level}）${tm}上場！` : `${p.name} 的 ${hero.displayName} ${tm}上場！`);
     return p;

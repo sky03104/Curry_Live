@@ -43,6 +43,15 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
 
   const short = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
+  // 替一隻武將（或 BOSS）建立畫面上的顯示狀態。上場通知和排位置時都會用到：排位置時發現有人沒有顯示狀態，也會補建，不會因為漏了通知就看不到
+  function makeView(p) {
+    if (!p || views.has(p.id)) return views.get(p.id);
+    sprite.preload(p.hero);   // 先去下載這隻的圖（用到才載入）
+    const v = { id: p.id, boss: !!p.isBoss, deadT: 0, x: null, y: null, size: p.isBoss ? 200 : 80, hp: p.hp, shownHp: p.hp, down: !!p.down,
+      flash: 0, shake: 0, hop: 1, hopH: 1.2, lunge: null, pending: 0, kbx: 0, kby: 0, face: -1, faceShown: -1, phase: Math.random() * 6 };
+    views.set(p.id, v);
+    return v;
+  }
   // ---------- 接收遊戲通知，排入動態 ----------
   let leavers = [];          // 烙跑的武將：已經不在遊戲裡了，但畫面上還要演完「跑出畫面」
   game.onFx(e => {
@@ -64,9 +73,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     }
     if (e.type === 'join') {
       const p = game.getPlayer(e.id);
-      sprite.preload(p.hero);   // 先去下載這隻的圖（用到才載入）
-      views.set(e.id, { id: e.id, boss: !!p.isBoss, deadT: 0, x: null, y: null, size: p.isBoss ? 200 : 80, hp: p.hp, shownHp: p.hp, down: false,
-        flash: 0, shake: 0, hop: 1, hopH: 1.2, lunge: null, pending: 0, kbx: 0, kby: 0, face: -1, faceShown: -1, phase: Math.random() * 6 });
+      makeView(p);
       if (W > 0) layout();   // 馬上排好位置：上場和送禮可能發生在同一瞬間（沒上場就送禮會自動上場），攻擊演出需要它的位置
       return;
     }
@@ -299,6 +306,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
   // ---------- 排位置 ----------
   function layout() {
     const list = game.getPlayers().filter(p => !p.isBoss);   // BOSS 不參與一般武將的排位
+    list.forEach(makeView);   // 保險：場上有人沒有顯示狀態就補建
+    const bp = game.getPlayer('boss'); if (bp && bp.isBoss) makeView(bp);
     const n = list.length;
     const wide = W >= H;
     const lbW = wide ? clamp(W * 0.26, 260, 340) : W - 32;
