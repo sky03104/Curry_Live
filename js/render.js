@@ -16,6 +16,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
   let toasts = [];           // 左下角訊息
   let time = 0, W = 0, H = 0, viewK = 1;   // viewK：畫面整體縮小的比例（很小的直播畫面會等比例縮小來畫）
   let dim = null;            // 技能發動時畫面短暫變暗
+  let toastBox = null;       // 橫式且有禮物提示列時：系統訊息放在提示列左邊（{ right, bottom, w }）；沒有就 null，訊息放回排行榜下面
   let bounds = null;         // 武將可以走動的範圍
   let quake = 0;             // 整個畫面震動的強度（重擊時）
 
@@ -281,6 +282,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     // 禮物提示列：告訴觀眾「送哪個禮物會觸發哪個動作」。
     // （2026-11-13 咖哩要求移到畫面右下角；2026-11-14 再要求改成「一排直的」：一個動作一列，從右下角往上疊。
     //   空間不夠（排行榜佔了很多、或畫面很扁）就整排縮小，最小縮到一半。）
+    toastBox = null;
     const arenaFullW = arena.w;   // 還沒被禮物提示列擠窄的場地寬度（武將走動範圍用：提示列上方的空地也可以走）
     const items = getLegend ? getLegend() : [];
     let legend = null;
@@ -293,7 +295,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       // 兩排直的：左邊是一般動作（普攻、全場、技能、回血），最右邊是招換 BOSS（紫色底）；只有一種就只畫一排
       // 2026-11-14 咖哩要求改成四排：一般動作兩排、招換 BOSS 兩排（每組各自對半分，前面那排多一個）
       const split = list => list.length < 2 ? [list] : [list.slice(0, Math.ceil(list.length / 2)), list.slice(Math.ceil(list.length / 2))];
-      const cols = [...split(items.filter(i => !i.boss)), ...split(items.filter(i => i.boss))].filter(c => c.length)
+      // 2026-11-15 咖哩要求再改成「兩排」：所有指令照順序（一般動作在前、招換 BOSS 在後）對半分成左右兩排，黃／紫色帶仍區分兩種
+      const cols = split([...items.filter(i => !i.boss), ...items.filter(i => i.boss)]).filter(c => c.length)
         .map(list => ({ list, w: Math.max(...list.map(wOf)) }));
       const natW = cols.reduce((a, c) => a + c.w, 0) + (cols.length - 1) * base.colGap;
       const natH = Math.max(...cols.map(c => c.list.length)) * (base.rowH + base.gap) - base.gap;
@@ -303,10 +306,12 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       const scale = clamp(avail / natH, minScale, 1.1);   // 最大 1.1 倍（再大會蓋住畫面）
       const w = natW * scale, h = natH * scale;
       legend = { cols, scale, base, w, h, x: W - 16 - w, y: H - 16 - h };
+      if (wide) toastBox = { right: legend.x - 12, bottom: H - 16, w: 330 };   // 系統訊息：放在指令左邊、貼著底、新的在最下面往上疊
       if (!wide) arena.w -= w + 8;                                              // 直式：場地讓出右邊這一塊
       else if (arena.x + arena.w > legend.x - 12) arena.w = Math.max(120, legend.x - 12 - arena.x);   // 橫式：提示列比右邊那一欄寬時，武將的活動範圍也往左縮
     }
     const wander = config.wander && config.wander.enabled;
+    const tb = toastBox;
     // BOSS：又大又固定，站在場地中間偏下；一般武將會被推開、不會疊在它身上
     const bossV = views.get('boss');
     if (bossV && game.getPlayer('boss')) {
@@ -343,7 +348,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       const xr = wide ? arena.x + arenaFullW : arena.x + arena.w;
       bounds = { x0: arena.x + size * 0.6, x1: xr - size * 0.6,
                  y0: arena.y + size * 0.65 + 50, y1: arena.y + arena.h - size * 0.5 - 56,
-                 size, lg: wide && legend ? { x: legend.x, y: legend.y } : null };
+                 size, lg: wide && legend ? { x: legend.x - (tb ? tb.w + 18 : 0), y: legend.y } : null };   // 障礙物＝提示列＋它左邊的訊息區，武將不鑽進去
       // 畫面很小時上下可能擠到沒有空間（下限比上限還高）：這時就讓大家排在同一條水平線上、只左右走
       if (bounds.y0 > bounds.y1) bounds.y0 = bounds.y1 = (bounds.y0 + bounds.y1) / 2;
       if (bounds.x0 > bounds.x1) bounds.x0 = bounds.x1 = (bounds.x0 + bounds.x1) / 2;
@@ -805,7 +810,11 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const wide = W >= H;
     toasts.forEach((t, i) => {
       ctx.globalAlpha = t.age > toastLife - 1 ? toastLife - t.age : 1;
-      if (wide) text(t.text, lb.x + 4, (lb2 && !wide ? lb2.y + lb2.h : lb.y + lb.h) + 22 + i * 24, 14, '#fff', 'left');
+      if (wide && toastBox) {   // 在提示列左邊、貼底、靠右對齊，新的在最下面、舊的往上；太長的字自動縮小塞進寬度
+        ctx.font = `bold 15px ${FONT}`;
+        const fs = Math.min(15, 15 * toastBox.w / Math.max(1, ctx.measureText(t.text).width));
+        text(t.text, toastBox.right, toastBox.bottom - 12 - (toasts.length - 1 - i) * 24, fs, '#fff', 'right');
+      } else if (wide) text(t.text, lb.x + 4, (lb2 && !wide ? lb2.y + lb2.h : lb.y + lb.h) + 22 + i * 24, 14, '#fff', 'left');
       else text(t.text, 20, H - 16 - (toasts.length - 1 - i) * 24, 15, '#fff', 'left');
       ctx.globalAlpha = 1;
     });
