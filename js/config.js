@@ -34,6 +34,12 @@ window.GAME_CONFIG = {
     maxGiftCombo: 20,                    // 一次連送最多算幾個
     maxSeconds: 300, resultSeconds: 15, countdown: 3,
     rewards: [2000, 1000, 500],          // 第 1、2、3 名的經驗值（其他人沒有）
+    // 賽道：每次開放報名時隨機挑一種（不會連續兩場同一種）。形狀與外觀畫在 js/race-tracks.js，這裡只列 id 和名字
+    tracks: [
+      { id: 'oval', name: '橢圓田徑場' }, { id: 'kart', name: '賽車場' }, { id: 'eight', name: '八字沙漠' }, { id: 'flower', name: '花瓣花園' },
+      { id: 'triangle', name: '冰原三角' }, { id: 'dumbbell', name: '火山啞鈴' }, { id: 'wave', name: '海濱棧道' }, { id: 'star', name: '星空五角' },
+      { id: 'heart', name: '愛心賽道' }, { id: 'lshape', name: '城市街道' },
+    ],
     giftNames: { boost: ['玫瑰', 'Rose'], hinder: ['GG'] },   // TikTok 禮物名稱（賽跑時專用，跟亂鬥的禮物對照分開）
   },
 

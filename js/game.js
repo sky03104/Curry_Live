@@ -609,6 +609,15 @@ ML.createGame = function (config, heroes) {
   // ---------- 賽跑模式 ----------
   const isMeng = h => !!h && h.faction === (tr.faction || 'Meng');
   const rr = (a, b) => a + Math.random() * (b - a);
+  // 這一場用哪一種賽道：隨機挑，但不會連續兩場同一種（nextTrackId 是測試用，指定下一場）
+  let lastTrack = '', nextTrackId = '';
+  function pickTrack() {
+    const ids = (tr.tracks || []).map(t => t.id); if (!ids.length) return 'oval';
+    let id = nextTrackId && ids.includes(nextTrackId) ? nextTrackId : '';
+    nextTrackId = '';
+    if (!id) { const pool = ids.length > 1 ? ids.filter(x => x !== lastTrack) : ids; id = pool[Math.floor(Math.random() * pool.length)]; }
+    lastTrack = id; return id;
+  }
   // 主播開放報名（按鈕或留言）：進入賽跑模式，報名倒數開始
   function openRace() {
     if (mode === 'race') { notice(race && race.phase === 'signup' ? '已經在報名中了' : '比賽進行中，結束後才能再開放報名'); return; }
@@ -616,7 +625,7 @@ ML.createGame = function (config, heroes) {
     teamOf.clear(); swaps.clear(); structs.clear(); match = { winner: null, restartAt: 0, time: 0 };
     for (const p of players.values()) p.lockId = null;
     raceLock.clear();
-    race = { phase: 'signup', left: tr.signupSeconds || 180, cd: 0, t: 0, resLeft: 0, entrants: new Map(), results: [] };
+    race = { phase: 'signup', left: tr.signupSeconds || 180, cd: 0, t: 0, resLeft: 0, entrants: new Map(), results: [], track: pickTrack() };
     notice(`🏁 開放報名！${Math.round((tr.signupSeconds || 180) / 60)} 分鐘內留言「我要參賽」（只有萌國武將能參賽）`);
     fx({ type: 'modeChange', mode });
   }
@@ -735,6 +744,7 @@ ML.createGame = function (config, heroes) {
     setHeroPool,
     setHostMatcher(fn, isHost) { hostMatch = fn; hostCheck = isHost || null; },
     hostPress(user, hostGift) { if (user && user.id && hostGift) runHostGift(user, hostGift); },   // 面板的主播按鈕
+    setNextRaceTrack(id) { nextTrackId = id; },   // 測試用：指定下一場賽道
     setDefaultHero(id) { defaultHeroId = heroById.has(id) ? id : ''; },
     onFx(fn) { fxListeners.push(fn); },
     handleEvent(ev) {
@@ -878,7 +888,8 @@ ML.createGame = function (config, heroes) {
     getRace() {
       if (mode !== 'race' || !race) return null;
       const ranks = race.phase === 'signup' ? [] : raceRanks();
-      return { phase: race.phase, left: Math.max(0, race.left), cd: Math.max(0, race.cd), t: race.t, timeLeft: Math.max(0, (tr.maxSeconds || 300) - race.t), resLeft: Math.max(0, race.resLeft),
+      const trk = (tr.tracks || []).find(t => t.id === race.track) || {};
+      return { track: race.track || 'oval', trackName: trk.name || '', phase: race.phase, left: Math.max(0, race.left), cd: Math.max(0, race.cd), t: race.t, timeLeft: Math.max(0, (tr.maxSeconds || 300) - race.t), resLeft: Math.max(0, race.resLeft),
         count: race.entrants.size, max: tr.maxPlayers || 8, min: tr.minPlayers || 3, results: race.results, ranks: ranks.map(e => e.id),
         entrants: [...race.entrants.values()].map(e => ({ id: e.id, lane: e.lane, progress: e.progress, state: e.state, rank: e.rank,
           boost: e.boost.reduce((a, b) => a + (b.until > race.t ? b.delta : 0), 0), hinder: e.hinder.reduce((a, b) => a + (b.until > race.t ? b.delta : 0), 0) })) };
