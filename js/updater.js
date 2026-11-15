@@ -54,7 +54,8 @@ ML.createUpdater = function (config, params, game, hooks) {
     setTimeout(() => {
       try { hooks.beforeReload && hooks.beforeReload(); localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), list: game.exportRoster() })); } catch (e) { /* 存不了就算了，只是場上要重新留言 */ }
       try { localStorage.setItem(KEY + '.tried', state.latest); } catch (e) { /* 存不了就算了 */ }
-      location.reload();
+      // 不是單純 reload：換成帶 &_v=新版本號 的網址，瀏覽器才會當成新網頁重抓所有檔案（見 index.html 的載入段），不會還在用快取的舊檔
+      try { const u = new URL(location.href); u.searchParams.set('_v', state.latest); location.replace(u.toString()); } catch (e) { location.reload(); }
     }, 3000);
   }
   if (auto) restore();

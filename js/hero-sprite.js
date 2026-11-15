@@ -36,7 +36,7 @@ ML.createHeroSprite = function (heroes, config, basePath) {
     const img = new Image();
     img.onload = () => { images.set(id, img); whites.set(id, makeWhite(img)); loadState.set(id, 'ok'); };
     img.onerror = () => loadState.set(id, 'error');   // 圖載不到就畫底色塊＋名字，不讓整個遊戲停擺
-    img.src = `${basePath}/${id}.png`;
+    img.src = `${basePath}/${id}.png${window.APP_VERSION ? '?v=' + window.APP_VERSION : ''}`;   // 版本號當網址參數：更新後圖片也一起換新
     return 'loading';
   }
   // ---------- 逐格動畫（config.heroAnims）----------
@@ -50,7 +50,7 @@ ML.createHeroSprite = function (heroes, config, basePath) {
       sheets.set(key, null);
       const img = new Image();
       img.onload = () => sheets.set(key, img);   // 載不到就維持 null，這個動作就不會播
-      img.src = `${basePath}/${m.src}`;
+      img.src = `${basePath}/${m.src}${window.APP_VERSION ? '?v=' + window.APP_VERSION : ''}`;
     }
     return sheets.get(key);
   }
