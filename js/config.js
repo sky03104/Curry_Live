@@ -319,6 +319,8 @@ window.GAME_CONFIG = {
       walk: { src: 'pudding_walk.png', frames: 8, cw: 526, ch: 372, ground: 368, fps: 9 },   // 走路循環（黃金獵犬優雅小跑，8 格）
       idle: { src: 'pudding_idle.png', frames: 8, cw: 497, ch: 491, ground: 487, fps: 2.5, repeat: 2 },   // 待機：吃布丁（舀一口→吃→再舀→吃光→舔嘴），連播 2 輪
       eat: { src: 'pudding_idle.png', frames: 8, cw: 497, ch: 491, ground: 487, fps: 3 },                 // 回血：同一組，播一輪
+      attack: { src: 'pudding_attack.png', frames: 8, cw: 535, ch: 412, ground: 408, fps: 12, hitFrame: 5 },   // 普攻：蓄力→躍起→前爪重拍（第 5 格打中）
+      skill: { src: 'pudding_attack.png', frames: 8, cw: 535, ch: 412, ground: 408, fps: 9, hitFrame: 5 },
     },
     joy: {
       idle: { src: 'joy_idle.png', frames: 8, cw: 372, ch: 419, ground: 416, fps: 2.5, repeat: 2 },   // 待機：啃大雞腿→啃成骨頭→骨頭啃光，連播 2 輪
