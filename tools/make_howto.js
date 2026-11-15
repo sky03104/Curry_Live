@@ -13,6 +13,8 @@ global.window = {};   // 讀武將資料與陣營設定（跟 make_roster.js 一
 require(path.join(root, 'data/heroes.js'));
 require(path.join(root, 'data/extra-heroes.js'));
 require(path.join(root, 'js/config.js'));
+global.ML = {};   // 賽道形狀（js/race-tracks.js）只用來取形狀，不畫圖
+require(path.join(root, 'js/race-tracks.js'));
 const heroData = window.HEROES_DATA, factions = window.GAME_CONFIG.factions;
 const FACTION_ORDER = ['Shu', 'Wei', 'Wu', 'Qun', 'Meng'];   // 蜀魏吳群萌（有武將的才做）
 const args = {};
@@ -23,6 +25,12 @@ const img = f => 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'ass
 const hero = (f, name, c) => `<div class="h"><img src="${img(f)}"><span style="background:${c}">${name}</span></div>`;
 const TOTAL = 6 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 6 張玩法（含陣營模式、賽跑模式）+ 每個陣營一張
 
+// 10 種賽道的小圖：直接用遊戲裡的形狀與路面顏色畫成 SVG，賽道改了重跑就會跟著更新
+const trackChips = () => (window.GAME_CONFIG.race.tracks || []).map(t => {
+  const T = ML.buildRaceTrack(t.id, 0, 0, 1, 1, 0.2, 0.02, 4), P = T.pts, d = P.map((q, i) => (i ? 'L' : 'M') + (50 + q.x * 42).toFixed(1) + ' ' + (32 + q.y * 24).toFixed(1)).join('') + 'Z';
+  const col = T.theme.surface.replace(/rgba\((\d+),(\d+),(\d+),[^)]+\)/, 'rgb($1,$2,$3)'), inf = T.theme.infield.replace(/rgba\((\d+),(\d+),(\d+),[^)]+\)/, 'rgb($1,$2,$3)');
+  return `<div class="tc"><svg viewBox="0 0 100 64"><path d="${d}" fill="${inf}" stroke="#fff" stroke-width="13" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${col}" stroke-width="9" stroke-linejoin="round"/></svg><span>${t.name}</span></div>`;
+}).join('');
 const css = `
 * { box-sizing: border-box; margin: 0; }
 body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingFang TC","WenQuanYi Zen Hei",sans-serif; color: #3E4A46; }
@@ -73,6 +81,7 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .track .st { position: absolute; left: 50%; bottom: 22px; width: 8px; height: 50px; background: #D9563E; margin-left: -4px; border-radius: 4px; }
 .track img { position: absolute; height: 120px; }
 .race3 { display: flex; gap: 14px; margin-top: 16px; } .race3 div { flex: 1; border-radius: 18px; padding: 16px 10px; text-align: center; color: #fff; font-size: 38px; font-weight: 900; line-height: 1.35; } .race3 small { display: block; font-size: 30px; font-weight: 700; opacity: .95; }
+.tracks10 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 18px; } .tc { background: #fff; border-radius: 16px; padding: 8px 4px 6px; text-align: center; min-width: 0; } .tc svg { width: 100%; height: auto; display: block; } .tc span { display: block; font-size: 23px; font-weight: 700; line-height: 1.2; }
 .swipe { margin-top: 30px; font-size: 38px; color: #ffd35c; font-weight: 900; }
 `;
 const top = n => `<div class="top"><div class="t">萌戰三國・<b>直播亂鬥</b></div><div class="pg">${n}/${TOTAL}</div></div>`;
@@ -136,9 +145,8 @@ const slides = [
 </div></div>`,
 `<div class="slide">${top(6)}<div class="body">
   <div class="card" style="background:#E9F5E4;border-color:#bfe0b4"><div class="no" style="background:#4a9a3c;box-shadow:0 4px 0 #2f6f26">10</div><h2>賽跑模式　萌國大賽跑</h2>
-    <p>主播開放報名時，留言 <span class="say">我要參賽</span> 就能上場！<b>只有萌國武將能參賽</b>，最多 8 位。</p>
-    <div class="track"><div class="oval"></div><div class="st"></div>
-      <img src="${img('michelin.png')}" style="left:150px;top:6px"><img src="${img('dabao.png')}" style="left:330px;top:0px"><img src="${img('pudding.png')}" style="left:520px;top:8px"><img src="${img('joy.png')}" style="left:420px;top:200px"></div></div>
+    <p>主播開放報名時，留言 <span class="say">我要參賽</span> 就能上場！<b>只有萌國武將能參賽</b>，最多 8 位。<b>10 種賽道，每場隨機一種</b>！</p>
+    <div class="tracks10">${trackChips()}</div></div>
   <div class="card"><div class="no">11</div><h2>跑完一圈拿經驗</h2>
     <p>每跑一段<b>可能停下來休息</b>！只有<b>前三名</b>拿經驗值：<b>2000／1000／500</b>。</p></div>
   <div class="card"><div class="no">12</div><h2>送禮幫忙或搗蛋</h2>
