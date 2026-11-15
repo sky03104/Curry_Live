@@ -52,6 +52,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div class="hint">先用主播的帳號在直播間<b>隨便留言一次</b>，再從下面選自己（用帳號代號比對，不會被取一樣暱稱的人冒充）。</div>
         <div class="row"><select id="hc-pick"></select><button id="hc-set" class="main" style="flex:none">我就是主播</button></div>
         <div class="hc-who" id="hc-who"></div>
+        <div class="hint" id="hc-link" style="display:none"></div>
         <div class="sub">② 每個動作的指令文字（留空 = 不用）＋次數</div>
         <div class="hint">右邊的「次」＝一次留言算幾個禮物（傷害、回血乘上次數），不用同一句打好幾遍。一般動作最多 1000 次（1 鑽的玫瑰可能一次送很多個），招換 BOSS 最多 3 次。</div>
         <div id="hc-cmds"></div>
@@ -421,6 +422,12 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
 
   // 主播文字指令的設定畫面
   const hc = saving.hostCmd, recent = new Map();   // 最近留言的人：代號 → 名字
+  // 這個面板視窗有沒有連到 TikFinity：沒連的話，直播間的留言根本傳不進來（「最近留言的人」是空的、事件紀錄也是空的）
+  const hcLink = () => {
+    const q = new URLSearchParams(location.search), on = q.has('tikfinity') || q.has('ws') || (location.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(location.hostname));
+    const box = $('#hc-link'); box.style.display = on ? 'none' : '';
+    if (!on) { box.innerHTML = '⚠ <b>這個面板視窗還沒連到 TikFinity</b>，所以看不到直播間的留言（下面「最近留言的人」會一直是空的）。<button id="hc-link-go" class="main" style="margin-left:6px">連上 TikFinity</button>'; $('#hc-link-go').onclick = () => { q.set('tikfinity', '1'); location.search = q.toString(); }; }
+  };
   const hcWho = () => { $('#hc-who').textContent = hc.hostId ? `目前主播：${hc.hostName || '（沒有名字）'}（代號 ${hc.hostId.slice(0, 14)}${hc.hostId.length > 14 ? '…' : ''}）` : '目前還沒設定主播，指令不會生效。'; $('#hc-state').textContent = hc.hostId && Object.keys(hc.cmds).length ? '已設定' : ''; };
   const hcPick = () => { const cur = $('#hc-pick').value; $('#hc-pick').innerHTML = [...recent.entries()].reverse().map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join('') || '<option value="">（還沒有人留言）</option>'; if (recent.has(cur)) $('#hc-pick').value = cur; };
   const hcRows = () => { $('#hc-cmds').innerHTML = hc.actions.map(a => hc.isRevive(a)
@@ -452,7 +459,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     const w = window.open(url.toString(), 'curryLiveHostPad', 'popup=yes,width=360,height=560,left=40,top=40');
     msg(w ? '✔ 已開啟小視窗（可以把它拖到想放的位置；再按一次會回到同一個視窗）。' : '⚠ 瀏覽器擋掉了彈出視窗：請在網址列旁允許這個網站的彈出視窗，再按一次。');
   };
-  hcRows(); hcWho(); hcPick(); hcWarn();
+  hcRows(); hcWho(); hcPick(); hcWarn(); hcLink();
   // 版本號：面板這個視窗載入時的版本；發現有新版就提醒（直播畫面會自己更新，面板要自己重新整理）
   if (saving.updater) { const showVer = () => { const u = saving.updater; $('#p-ver').textContent = u.pending ? `版本 ${u.current} ⚠ 有新版 ${u.latest}，請重新整理本頁` : `版本 ${u.current}`; }; showVer(); setInterval(showVer, 5000); }
   hub.on(ev => {
