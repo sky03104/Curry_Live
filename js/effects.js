@@ -33,6 +33,7 @@ ML.createEffects = function () {
       ctx.strokeStyle = i.color; ctx.lineCap = 'round';
       ctx.lineWidth = i.size * (1 - k * 0.6);
       ctx.beginPath(); ctx.moveTo(i.x, i.y); ctx.lineTo(i.x - i.vx * 0.035, i.y - i.vy * 0.035); ctx.stroke();
+      ctx.fillStyle = i.color; ctx.beginPath(); ctx.arc(i.x, i.y, i.size * 0.55, 0, Math.PI * 2); ctx.fill();   // 圓圓的亮頭，看起來比較立體
     },
     // 刀光：一道中間粗兩頭尖的弧線，很快掃過去再淡掉
     slash(ctx, i, k) {
@@ -102,11 +103,30 @@ ML.createEffects = function () {
     // 表情符號粒子（骨頭、愛心、南瓜、起司…專屬特效用）：會轉、會掉、最後淡出
     emoji(ctx, i, k) {
       ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = k < 0.75 ? 1 : (1 - k) / 0.25;
-      ctx.translate(i.x, i.y); ctx.rotate(i.rot);
+      const fade = k < 0.75 ? 1 : (1 - k) / 0.25;
+      if (i.groundY !== undefined) {   // 地上的影子：離地越近越大越清楚（有高度的感覺）
+        const h = Math.max(0, i.groundY - i.y), near = 1 - Math.min(1, h / (i.size * 7));
+        ctx.save(); ctx.globalAlpha = fade * (0.12 + 0.35 * near); ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.ellipse(i.x, i.groundY, i.size * (0.25 + 0.3 * near), i.size * (0.08 + 0.1 * near), 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+      ctx.globalAlpha = fade;
+      ctx.translate(i.x, i.y); ctx.rotate(i.rot * 0.35); ctx.scale(Math.max(0.4, Math.abs(Math.cos(i.rot * 0.9))), 1);   // 一邊轉一邊壓扁＝像在空中翻面
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = i.size * 0.25; ctx.shadowOffsetY = i.size * 0.12;
       ctx.font = `${i.size}px "Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(i.ch, 0, 0);
+    },
+    // 碎塊：有三個面（上亮、左中、右暗）的小立方體，會翻滾、落地時有影子（地裂、砸地時飛出去的碎石）
+    chunk(ctx, i, k) {
+      ctx.globalCompositeOperation = 'source-over';
+      const fade = k < 0.7 ? 1 : (1 - k) / 0.3, s = i.size;
+      ctx.globalAlpha = fade * 0.4; ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.ellipse(i.x, i.groundY, s * 0.7, s * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = fade; ctx.translate(i.x, i.y); ctx.rotate(i.rot);
+      const face = (pts, col) => { ctx.beginPath(); pts.forEach((p, n) => (n ? ctx.lineTo(p[0] * s, p[1] * s) : ctx.moveTo(p[0] * s, p[1] * s))); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.stroke(); };
+      face([[0, -0.6], [0.55, -0.3], [0, 0], [-0.55, -0.3]], i.light);   // 上面
+      face([[-0.55, -0.3], [0, 0], [0, 0.6], [-0.55, 0.3]], i.mid);      // 左面
+      face([[0.55, -0.3], [0, 0], [0, 0.6], [0.55, 0.3]], i.dark);       // 右面
     },
     // 爪痕：三道平行的斜線一道一道劃出來
     claw(ctx, i, k) {
@@ -125,11 +145,13 @@ ML.createEffects = function () {
     fang(ctx, i, k) {
       const close = Math.min(1, k * 4), w = i.r * 1.6, n = 5, gap = (1 - close) * i.r * 0.9;
       ctx.globalAlpha = Math.min(1, (1 - k) * 2.2); ctx.lineJoin = 'round';
+      ctx.save(); ctx.globalAlpha *= 0.55; ctx.fillStyle = '#2a0a10'; ctx.beginPath(); ctx.ellipse(i.x, i.y, w / 2, gap + i.r * 0.55, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();   // 嘴裡的暗處
       for (const dir of [-1, 1]) {
         for (let c = 0; c < n; c++) {
           const x = i.x - w / 2 + (c + 0.5) * w / n, y = i.y + dir * (gap + i.r * 0.12);
           ctx.beginPath(); ctx.moveTo(x - w / n * 0.5, y + dir * i.r * 0.5); ctx.lineTo(x + w / n * 0.5, y + dir * i.r * 0.5); ctx.lineTo(x, y);
-          ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = i.color; ctx.stroke();
+          ctx.closePath(); const tg = ctx.createLinearGradient(x, y, x, y + dir * i.r * 0.5); tg.addColorStop(0, '#ffffff'); tg.addColorStop(1, '#c9c4d6');
+          ctx.fillStyle = tg; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = i.color; ctx.stroke();
         }
       }
     },
@@ -140,14 +162,26 @@ ML.createEffects = function () {
       ctx.globalAlpha = k < 0.7 ? 1 : (1 - k) / 0.3;
       ctx.translate(i.x, y); ctx.scale(sc, sc);
       ctx.font = `900 ${i.size}px "Noto Sans TC","Microsoft JhengHei",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.lineJoin = 'round'; ctx.lineWidth = i.size * 0.22; ctx.strokeStyle = '#2a1a10'; ctx.strokeText(i.text, 0, 0);
-      ctx.fillStyle = i.color; ctx.fillText(i.text, 0, 0);
+      ctx.lineJoin = 'round';
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillText(i.text, i.size * 0.12, i.size * 0.32);   // 地上的影子
+      ctx.fillStyle = '#6b4310'; ctx.strokeStyle = '#2a1a10'; ctx.lineWidth = i.size * 0.22;
+      for (let d = Math.round(i.size * 0.16); d >= 1; d--) { ctx.strokeText(i.text, d * 0.5, d); ctx.fillText(i.text, d * 0.5, d); }   // 一層層往下疊＝立體的厚度
+      ctx.strokeText(i.text, 0, 0);
+      const g = ctx.createLinearGradient(0, -i.size * 0.5, 0, i.size * 0.5); g.addColorStop(0, '#fffbe0'); g.addColorStop(0.45, i.color); g.addColorStop(1, '#b8801f');
+      ctx.fillStyle = g; ctx.fillText(i.text, 0, 0);
     },
     // 地面震波：壓扁成橢圓的一圈，往外擴散
     shock(ctx, i, k) {
+      ctx.globalCompositeOperation = 'source-over';
       ctx.translate(i.x, i.y); ctx.scale(1, 0.38);
-      ctx.globalAlpha = (1 - k) * 0.9; ctx.strokeStyle = i.color; ctx.lineWidth = i.r * 0.12 * (1 - k * 0.6);
-      ctx.beginPath(); ctx.arc(0, 0, i.r * Math.min(1, 0.15 + k * 1.1), 0, Math.PI * 2); ctx.stroke();
+      const rr = i.r * Math.min(1, 0.15 + k * 1.1), lw = i.r * 0.12 * (1 - k * 0.6), al = (1 - k) * 0.9;
+      const dust = ctx.createRadialGradient(0, 0, rr * 0.3, 0, 0, rr);   // 圈內一層淡淡的塵土
+      dust.addColorStop(0, 'rgba(255,255,255,0)'); dust.addColorStop(1, i.color);
+      ctx.globalAlpha = al * 0.25; ctx.fillStyle = dust; ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.fill();
+      for (const [dy, col, a] of [[lw * 0.9, 'rgba(0,0,0,0.55)', 1], [0, i.color, 1], [-lw * 0.25, '#ffffff', 0.55]]) {   // 下層暗邊＋彩色環＋上緣亮邊＝有厚度的環
+        ctx.globalAlpha = al * a; ctx.strokeStyle = col; ctx.lineWidth = col === '#ffffff' ? lw * 0.35 : lw;
+        ctx.beginPath(); ctx.arc(0, dy, rr, 0, Math.PI * 2); ctx.stroke();
+      }
     },
     // 光彈：飛向對手的一顆光球
     orb(ctx, i) {
@@ -161,7 +195,10 @@ ML.createEffects = function () {
     update(dt) {
       for (const i of items) {
         i.age += dt;
-        if (i.type === 'emoji') {
+        if (i.type === 'chunk') {
+          i.x += i.vx * dt; i.y += i.vy * dt; i.vy += i.g * dt; i.rot += i.vr * dt;
+          if (i.y > i.groundY) { i.y = i.groundY; i.vy *= -0.38; i.vx *= 0.65; i.vr *= 0.6; }   // 落地彈一下
+        } else if (i.type === 'emoji') {
           i.x += i.vx * dt; i.y += i.vy * dt; i.vy += i.g * dt; i.rot += i.vr * dt;
         } else if (i.type === 'p') {
           i.x += i.vx * dt; i.y += i.vy * dt; i.vy += i.g * dt;
@@ -223,7 +260,16 @@ ML.createEffects = function () {
       add({ type: 'crack', ground: true, x, y, lines, color, life: 0.9 });
     },
     // 專屬特效用的零件
-    emoji(x, y, ch, size, vx, vy, g, life, vr) { add({ type: 'emoji', ch, x, y, vx: vx || 0, vy: vy || 0, g: g || 0, size, rot: 0, vr: vr || 0, life: life || 1 }); },
+    emoji(x, y, ch, size, vx, vy, g, life, vr, groundY) { add({ type: 'emoji', ch, x, y, vx: vx || 0, vy: vy || 0, g: g || 0, size, rot: 0, vr: vr || 0, life: life || 1, groundY }); },
+    // 碎石塊：從 (x, y) 往上噴出去，落到 groundY 彈一下。color 是基底色（自動算出亮面和暗面）
+    debris(x, y, color, n, speed, groundY) {
+      const shade = (hex, f) => { const v = parseInt(String(hex).slice(1), 16); if (isNaN(v)) return hex; const m = c => Math.max(0, Math.min(255, Math.round(f > 0 ? c + (255 - c) * f : c * (1 + f)))); return `rgb(${m(v >> 16 & 255)},${m(v >> 8 & 255)},${m(v & 255)})`; };
+      for (let c = 0; c < n; c++) {
+        const a = rnd(-Math.PI * 0.95, -Math.PI * 0.05), s = rnd(0.4, 1) * speed;
+        add({ type: 'chunk', x: x + rnd(-8, 8), y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, g: 1400, size: rnd(5, 11), rot: rnd(0, 6), vr: rnd(-9, 9), groundY: groundY === undefined ? y + 40 : groundY,
+          light: shade(color, 0.45), mid: shade(color, 0), dark: shade(color, -0.45), life: rnd(0.9, 1.3) });
+      }
+    },
     claw(x, y, angle, r, color) { add({ type: 'claw', x, y, angle, r, color, life: 0.5 }); },
     fang(x, y, r, color) { add({ type: 'fang', x, y, r, color, life: 0.5 }); },
     stamp(x, y, text, size, color, life) { add({ type: 'stamp', x, y, text, size, color, life: life || 0.9 }); },

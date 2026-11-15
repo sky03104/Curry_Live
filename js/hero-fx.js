@@ -25,7 +25,7 @@ window.ML = window.ML || {};
   function emojiBurst(tv, h, ch, n, speed) {
     for (let i = 0; i < n; i++) {
       const a = rnd(0, Math.PI * 2), s = rnd(0.4, 1) * speed;
-      h.fx.emoji(tv.x, tv.y, ch, tv.size * rnd(0.28, 0.45), Math.cos(a) * s, Math.sin(a) * s - 120, 600, rnd(0.6, 1), rnd(-8, 8));
+      h.fx.emoji(tv.x, tv.y, ch, tv.size * rnd(0.28, 0.45), Math.cos(a) * s, Math.sin(a) * s - 120, 600, rnd(0.6, 1), rnd(-8, 8), tv.y + tv.size * 0.5);
     }
   }
 
@@ -73,6 +73,7 @@ window.ML = window.ML || {};
         h.fx.shock(tv.x, tv.y + tv.size * 0.5, tv.size * 1.6, c, 0.6);
         h.fx.crack(tv.x, tv.y + tv.size * 0.5, tv.size * 1.1, c);
         h.fx.sparks(tv.x, tv.y, c, 24, 500, 6, 0.7);
+        h.fx.debris(tv.x, tv.y + tv.size * 0.4, '#8a7a66', 7, 480, tv.y + tv.size * 0.5);
         h.quake(0.5);
       },
     },
@@ -85,7 +86,7 @@ window.ML = window.ML || {};
         const ch = pick(p, 'emoji', '⭐'), n = pick(p, 'n', 10), big = pick(p, 'big', 0.5);
         for (let i = 0; i < n; i++) h.after(i * 0.04, () => {
           const x = tv.x + rnd(-tv.size * 0.8, tv.size * 0.8), size = tv.size * rnd(0.3, 0.3 + big);
-          h.fx.emoji(x, tv.y - tv.size * 2.6, ch, size, rnd(-30, 30), rnd(500, 700), 900, 0.7, rnd(-6, 6));
+          h.fx.emoji(x, tv.y - tv.size * 2.6, ch, size, rnd(-30, 30), rnd(500, 700), 900, 0.7, rnd(-6, 6), tv.y + tv.size * 0.5);
         });
       },
       onHit(tv, h, p) {
@@ -93,6 +94,7 @@ window.ML = window.ML || {};
         emojiBurst(tv, h, pick(p, 'emoji', '⭐'), 8, 460);
         h.fx.shock(tv.x, tv.y + tv.size * 0.5, tv.size * 1.8, c, 0.7);
         h.fx.sparks(tv.x, tv.y, c, 30, 560, 6, 0.8);
+        h.fx.debris(tv.x, tv.y + tv.size * 0.4, '#8a7a66', 8, 520, tv.y + tv.size * 0.5);
         h.ring(tv, { life: 0.6, color: c, max: 2, width: 8 });
         h.quake(0.8);
       },
@@ -164,6 +166,7 @@ window.ML = window.ML || {};
         h.fx.pillar(tv.x, tv.y + tv.size * 0.5, tv.size * 1.5, tv.size * 3.2, c);
         h.fx.crack(tv.x, tv.y + tv.size * 0.5, tv.size * 1.7, c);
         h.fx.sparks(tv.x, tv.y, c, 44, 640, 7, 0.9);
+        h.fx.debris(tv.x, tv.y + tv.size * 0.4, '#5a4a78', 10, 600, tv.y + tv.size * 0.5);
         h.ring(tv, { life: 0.6, color: c, max: 2.4, width: 9 });
         h.quake(1.2);
       },
@@ -178,6 +181,7 @@ window.ML = window.ML || {};
         h.fx.shock(tv.x, tv.y + tv.size * 0.5, tv.size * 1.6, '#ffffff', 0.6);
         h.fx.crack(tv.x, tv.y + tv.size * 0.5, tv.size * 2, c);
         h.fx.sparks(tv.x, tv.y, c, 50, 700, 7, 1);
+        h.fx.debris(tv.x, tv.y + tv.size * 0.4, '#8a7a66', 16, 760, tv.y + tv.size * 0.5);
         h.ring(tv, { life: 0.7, color: c, max: 2.6, width: 10 });
         h.quake(1.8);
       },
