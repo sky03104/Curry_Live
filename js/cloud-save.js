@@ -89,7 +89,7 @@ ML.createCloudSave = function (config, params, slot, opts) {
     } catch (e) { return { ok: false, status: 0, error: e }; }
     finally { clearTimeout(timer); }
   }
-  const read = name => send('GET', docUrl(name));
+  const read = (name, extra) => send('GET', docUrl(name), null, extra);
   // 寫入用 Firestore 的 commit：可以在請求內容裡指定「前提條件」——
   //   pre = { exists:false }（我要建立新的，已經有人建了就失敗）或 { updateTime }（我要更新我讀到的那一版，別人改過就失敗）。
   //   這樣兩個畫面同時寫的時候，後寫的那個會被擋下來、重讀、合併再寫，不會把對方的進度蓋掉。
@@ -196,6 +196,25 @@ ML.createCloudSave = function (config, params, slot, opts) {
     return back === stamp ? { ok: true, text: '成功！寫入和讀回都正常，雲端存檔可以使用' } : { ok: false, text: '寫入後讀回的內容不一樣' };
   }
 
+  // ---------- 主播按鈕的「指令」（面板點一下 → 直播畫面很快執行）----------
+  // 用同一個雲端代號底下另一份文件 __cmd 傳話：面板寫一筆（有一個一直增加的序號），直播畫面每幾秒讀一次，序號變大就執行。
+  // 規則本來就允許（任何存檔名稱都行、內容只要符合格式），不用重新發布規則。
+  const CMD_SLOT = '__cmd';
+  async function sendCommand(cmd) {
+    if (!token) return { ok: false, text: '還沒開啟雲端存檔' };
+    const body = JSON.stringify(Object.assign({}, cmd, { seq: Date.now() }));
+    const r = await write(CMD_SLOT, { v: { integerValue: '1' }, data: { stringValue: body }, savedAt: { integerValue: String(Date.now()) } }, null);
+    return r.ok ? { ok: true } : { ok: false, text: explain(r) };
+  }
+  // 回傳 { seq, ... }；雲端還沒有這份文件回傳 { seq: 0 }；連不上或壞掉回傳 null（這次當沒看到，下次再試）
+  async function fetchCommand() {
+    if (!token) return null;
+    const r = await read(CMD_SLOT, { cache: 'no-store' });
+    if (r.status === 404) return { seq: 0 };
+    if (!r.ok) return null;
+    try { const c = JSON.parse(r.body.fields.data.stringValue); return c && Number(c.seq) > 0 ? c : { seq: 0 }; } catch (e) { return null; }
+  }
+
   function newToken() {
     const bytes = new Uint8Array(24);
     (window.crypto || window.msCrypto).getRandomValues(bytes);
@@ -214,6 +233,6 @@ ML.createCloudSave = function (config, params, slot, opts) {
     get enabled() { return !!token; }, get token() { return token; }, canWrite,
     get settings() { return remote.settings; },   // 雲端上目前的主播設定（讀過之後才有）
     get status() { return status; }, onStatus(fn) { listeners.push(fn); },
-    load, store, test, newToken, setToken,
+    load, store, test, newToken, setToken, sendCommand, fetchCommand,
   };
 };

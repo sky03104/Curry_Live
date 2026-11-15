@@ -35,6 +35,15 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       </div>
     </details>
 
+    <details class="card" data-k="hostbtn" open>
+      <summary><span class="ico">🎮</span>主播按鈕<em id="hb-state"></em></summary>
+      <div class="body">
+        <div class="hint">主播用<b>點的</b>，比打字快：點一下，直播畫面約 2～3 秒內就執行（效果跟主播留言指令一樣，次數用下面「主播文字指令」設定的「次」）。要先<b>開啟雲端存檔</b>（直播畫面靠它收到按鈕），並在「主播文字指令」選好「我就是主播」。</div>
+        <div class="hb-grid" id="hb-btns"></div>
+        <div class="hint" id="hb-msg"></div>
+      </div>
+    </details>
+
     <details class="card" data-k="hostcmd">
       <summary><span class="ico">🎙️</span>主播文字指令<em id="hc-state"></em></summary>
       <div class="body">
@@ -425,10 +434,30 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     }, 1000);
   };
   const hcUrlState = () => { const n = Object.keys(hc.cmds).length, c = Object.keys(hc.urlParams().cnt ? JSON.parse(hc.urlParams().cnt) : {}).length; $('#hc-urlstate').innerHTML = hc.hostId ? `📋 目前「直播用網址」帶著：主播 ✔、指令 ${n} 個、次數設定 ${c} 個。${saving.cloud.enabled ? '有開雲端存檔：改完會自動同步，<b>不用重貼網址</b>（直播軟體至少要貼過一次含雲端代號的網址）。' : '<b>改完要重貼網址</b>。'}直播時主播打指令，畫面訊息區會寫「主播指令：普攻 ×10」，次數不對就代表還沒套用。` : ''; };
-  const hcWarn = () => { hcUrlState(); const d = hc.duplicates(); $('#hc-warn').textContent = d.length ? `⚠ ${d.map(hc.label).join('、')} 的指令文字跟前面的動作重複，這幾個不會觸發。` : ''; };
+  const hcWarn = () => { hbRender(); hcUrlState(); const d = hc.duplicates(); $('#hc-warn').textContent = d.length ? `⚠ ${d.map(hc.label).join('、')} 的指令文字跟前面的動作重複，這幾個不會觸發。` : ''; };
   $('#hc-set').onclick = () => { const id = $('#hc-pick').value; if (!id) return; hc.setHost(id, recent.get(id) || ''); hcWho(); hcWarn(); hcSync(); renderGiftSettings(); };
   $('#hc-cmds').onchange = e => { const n = e.target.closest('[data-hcn]'); if (!n) return; hc.setCount(n.dataset.hcn, n.value); n.value = hc.countOf(n.dataset.hcn); hcWarn(); hcSync(); renderGiftSettings(); };
   $('#hc-cmds').oninput = e => { const i = e.target.closest('[data-hc]'); if (!i) return; hc.setCmd(i.dataset.hc, i.value); hcWarn(); hcWho(); hcSync(); renderGiftSettings(); };
+  // ---------- 主播按鈕 ----------
+  function hbRender() {
+    const btn = (a, text, arg) => `<button data-hb="${a}" data-arg="${arg || ''}" class="hb-${hc.actions && (a.startsWith('boss') || a === 'buff') ? 'boss' : 'act'}">${text}</button>`;
+    const gen = ['attack', 'aoe', 'skill', 'heal'].filter(a => hc.actions.includes(a)).map(a => btn(a, `${esc(hc.label(a))}${hc.countOf(a) > 1 ? ' ×' + hc.countOf(a) : ''}`));
+    const rev = [btn('revive', '復活自己'), btn('revive', '復活全部', '全部')];
+    const boss = hc.actions.filter(a => (a.startsWith('boss') || a === 'buff') && a !== 'buff').map(a => btn(a, esc(hc.label(a)) + (hc.countOf(a) > 1 ? ' ×' + hc.countOf(a) : '')));
+    $('#hb-btns').innerHTML = `<div class="hb-row">${gen.join('')}</div><div class="hb-row">${rev.join('')}</div><div class="hb-row">${boss.join('')}</div>`;
+    $('#hb-state').textContent = saving.cloud.enabled && hc.hostId ? '可用' : '還不能用';
+  }
+  $('#hb-btns').onclick = async e => {
+    const b = e.target.closest('[data-hb]'); if (!b) return;
+    const msg = t => { $('#hb-msg').textContent = t; };
+    if (!saving.cloud.enabled) { msg('⚠ 要先開啟雲端存檔（「存檔」那張卡片），直播畫面才收得到按鈕。'); return; }
+    if (!hc.hostId) { msg('⚠ 還沒設定主播：到下面「主播文字指令」選「我就是主播」。'); return; }
+    const action = b.dataset.hb, label = b.textContent;
+    b.disabled = true;
+    const r = await saving.cloud.sendCommand({ action, count: hc.countOf(action), arg: b.dataset.arg || '', host: { id: hc.hostId, name: hc.hostName } });
+    b.disabled = false;
+    msg(r.ok ? `✔ 已送出「${label}」（${new Date().toLocaleTimeString()}），直播畫面約 ${(config.save.cloud.cmdPollSeconds || 2) + 1} 秒內執行。` : '⚠ 送出失敗：' + (r.text || '連不上') + '。');
+  };
   hcRows(); hcWho(); hcPick(); hcWarn();
   // 版本號：面板這個視窗載入時的版本；發現有新版就提醒（直播畫面會自己更新，面板要自己重新整理）
   if (saving.updater) { const showVer = () => { const u = saving.updater; $('#p-ver').textContent = u.pending ? `版本 ${u.current} ⚠ 有新版 ${u.latest}，請重新整理本頁` : `版本 ${u.current}`; }; showVer(); setInterval(showVer, 5000); }
