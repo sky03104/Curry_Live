@@ -15,7 +15,7 @@ ML.createHostCommands = function (config) {
   const REVIVE = 'revive';                                  // 特別的「復活」指令（不是禮物動作）
   const actions = [...giftActions, REVIVE];
   const label = a => a === REVIVE ? '復活' : (config.actions[a] || {}).label || a;
-  const maxCount = a => (config.actions[a] && config.actions[a].summon) ? (config.boss && config.boss.maxSummonPerGift) || 3 : config.hostMaxCount || 1000;   // 次數上限：一般動作 hostMaxCount（1000，因為 1 鑽的玫瑰可能一次送很多個）；招換 BOSS 跟連送一樣 3
+  const maxCount = a => (config.actions[a] && config.actions[a].openRace) ? 1 : (config.actions[a] && config.actions[a].summon) ? (config.boss && config.boss.maxSummonPerGift) || 3 : config.hostMaxCount || 1000;   // 次數上限：一般動作 hostMaxCount（1000，因為 1 鑽的玫瑰可能一次送很多個）；招換 BOSS 跟連送一樣 3
   let state = { hostId: '', hostName: '', cmds: {}, counts: {} };
 
   function cleanCmds(o) {

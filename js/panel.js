@@ -103,7 +103,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div class="hint">連上直播後，觀眾送的禮物會出現在這裡，可以直接選它要對應哪個動作。</div>
         <div id="gs-seen"><div class="hint">（還沒收到任何禮物）</div></div>
         <div class="sub">沒被指定的禮物</div>
-        <label class="opt"><input type="radio" name="gs-other" value="tier">照價值分級（1 鑽普攻、5 鑽回血、20 鑽全場、100 鑽招換藍紅BUFF、200 鑽技能，500／1000／1500 鑽招換大 BOSS）</label>
+        <label class="opt"><input type="radio" name="gs-other" value="tier">照價值分級（1 鑽普攻、5 鑽回血、20 鑽全場、100 鑽招換藍紅BUFF、199 鑽開放賽跑或障礙賽、200 鑽技能，500／1000／1500 鑽招換大 BOSS）</label>
         <label class="opt"><input type="radio" name="gs-other" value="ignore">忽略（送了沒反應）</label>
         <div class="hint">回血小技巧：先留言「@某位玩家」，再送回血禮物，就會補給他，不是補自己。</div>
       </div>
@@ -112,7 +112,8 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     <details class="card" data-k="boss">
       <summary><span class="ico">🐉</span>招換 BOSS 的禮物<em>100／500／1000／1500 鑽</em></summary>
       <div class="body">
-        <div class="hint">指定哪個禮物招換哪隻 BOSS。<b>沒指定的話</b>，沒被其他動作用掉的禮物會照價值：100～199 鑽招換藍BUFF 或紅BUFF（隨機一隻）、500 鑽以上深淵魔龍、1000 鑽以上深淵凱薩、1500 鑽以上太古巨猿。場上同時只有一隻 BOSS，後來招換的會排隊。</div>
+        <div class="hint">指定哪個禮物招換哪隻 BOSS。<b>沒指定的話</b>，沒被其他動作用掉的禮物會照價值：剛好 199 鑽開放賽跑或障礙賽（隨機一種）、100～198 鑽招換藍BUFF 或紅BUFF（隨機一隻）、500 鑽以上深淵魔龍、1000 鑽以上深淵凱薩、1500 鑽以上太古巨猿。場上同時只有一隻 BOSS，後來招換的會排隊。</div>
+        <div class="hint">「開放賽跑」「開放障礙賽」可以各指定一個禮物；沒指定時 199 鑽的禮物會隨機開其中一種。<b>只有亂鬥模式時有效</b>（比賽或陣營賽進行中送了不會生效）。</div>
         <div class="hint">藍BUFF／紅BUFF（Lv.5）：<b>最後一擊的玩家</b>獲得效果，持續 1 小時——藍BUFF 每秒回復 10 血、紅BUFF 攻擊力加倍（血條旁會出現「回」「攻」的小圓章）。</div>
         <div id="gs-boss"></div>
         <div class="hint">玩家留言「@BOSS」或「@BOSS的名字」就能鎖定它。BOSS 每 60 秒隨機打一人，每 300 秒全場攻擊；打倒後經驗值平分給所有打過的玩家，最後一擊的人額外多拿。數值在 js/config.js 的 boss。</div>
@@ -212,7 +213,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     '</optgroup>').join('');
   heroSel.value = '呂布';
 
-  const isBoss = a => !!(config.actions[a] || {}).summon;
+  const isBoss = a => !!((config.actions[a] || {}).summon || (config.actions[a] || {}).openRace);   // 招換 BOSS 與「開放賽跑」的禮物放在同一區
   const giftBtn = g => `<button data-gift="${g.id}">${g.icon} ${g.name}<small>${config.actions[g.action].label}</small></button>`;
   $('#p-gifts').innerHTML = config.gifts.filter(g => !isBoss(g.action)).map(giftBtn).join('');
   $('#p-bosses').innerHTML = config.gifts.filter(g => isBoss(g.action)).map(giftBtn).join('');

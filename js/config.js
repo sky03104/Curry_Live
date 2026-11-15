@@ -166,6 +166,10 @@ window.GAME_CONFIG = {
     buff:   { label: '招換BUFF', summon: ['boss_blue', 'boss_red'] },   // 藍BUFF 或紅BUFF（隨機一隻）
     boss4:  { label: '招換藍BUFF', summon: 'boss_blue' },
     boss5:  { label: '招換紅BUFF', summon: 'boss_red' },
+    // 開啟賽跑：這三個「動作」不是攻擊，是把賽跑／障礙賽開放報名（只有亂鬥模式時有效；比賽或陣營賽進行中送了不會生效）。openRace：normal＝一般賽跑、hurdle＝障礙賽、random＝隨機一種
+    raceNormal: { label: '開放賽跑', openRace: 'normal' },
+    raceHurdle: { label: '開放障礙賽', openRace: 'hurdle' },
+    raceAny:    { label: '開放賽跑／障礙賽', openRace: 'random' },
   },
 
   // ---------- 禮物對應 ----------
@@ -184,6 +188,9 @@ window.GAME_CONFIG = {
     { id: 'buff',     name: '招換BUFF（藍紅隨機）', icon: '🎲', action: 'buff' },
     { id: 'boss4',    name: '招換藍BUFF', icon: '💧', action: 'boss4' },
     { id: 'boss5',    name: '招換紅BUFF', icon: '🔥', action: 'boss5' },
+    { id: 'raceany',  name: '開放賽跑／障礙賽（隨機）', icon: '🎲', action: 'raceAny' },
+    { id: 'raceg',    name: '開放賽跑', icon: '🏃', action: 'raceNormal' },
+    { id: 'hurdleg',  name: '開放障礙賽', icon: '🚧', action: 'raceHurdle' },
   ],
 
   // ---------- 真的 TikTok 禮物 → 遊戲裡的禮物 ----------
@@ -243,6 +250,7 @@ window.GAME_CONFIG = {
       { atLeast: 1000, gift: 'boss2' },
       { atLeast: 500,  gift: 'boss1' },
       { atLeast: 200, gift: 'crown' },      // 200 鑽以上 → 技能（原本 100 鑽以上，100～199 鑽改成招換 BUFF）
+      { atLeast: 199, gift: 'raceany' },    // 剛好 199 鑽 → 開放賽跑或障礙賽（隨機一種；想指定哪個禮物開哪一種，去面板「招換 BOSS／開賽跑的禮物」選）
       { atLeast: 100, gift: 'buff' },       // 100～199 鑽 → 招換藍BUFF／紅BUFF（隨機一隻）      // 100 鑽以上 → 技能
       { atLeast: 20,  gift: 'firework' },   // 20～99 鑽  → 全場攻擊
       { atLeast: 5,   gift: 'heart' },      // 5～19 鑽   → 回血

@@ -303,6 +303,14 @@ ML.createGame = function (config, heroes) {
   function handleGift(user, giftId, rawCount, comboMax) {   // comboMax：這次最多算幾個（觀眾連送用 maxGiftCombo；主播文字指令放寬到 hostMaxCount）
     const gift = config.gifts.find(g => g.id === giftId);
     if (!gift) return;
+    const openKind = (config.actions[gift.action] || {}).openRace;
+    if (openKind) {   // 開放賽跑／障礙賽的禮物：不用先上場；只有亂鬥模式時有效
+      if (mode !== 'brawl') { notice(`${user.name} 送了開放賽跑的禮物，但${mode === 'race' ? '比賽正在進行中' : '現在不是亂鬥模式'}，沒有生效`); return; }
+      const kind = openKind === 'random' ? (Math.random() < 0.5 ? 'normal' : 'hurdle') : openKind;
+      notice(`🎁 ${user.name} 送禮開放了${kind === 'hurdle' ? '障礙賽' : '賽跑'}！`);
+      openRace(kind);
+      return;
+    }
     if (mode === 'race') {   // 賽跑中：一般禮物（普攻、技能…）全部停用；招換 BOSS 也暫停。玫瑰／GG 走 tiktokGift（見 handleEvent）
       if ((config.actions[gift.action] || {}).summon) notice(`賽跑中不能招換 BOSS，${user.name} 的禮物沒有生效`);
       return;
