@@ -287,7 +287,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     if (items.length) {
       // 2026-11-14 咖哩用手機看說「還是霧霧的」：直播影片壓縮會把彩色的字糊掉（顏色資訊被壓得很粗，只有明暗保得住），
       // 所以提示列的字一律用純白＋最粗字重、底色用接近純黑，靠「明暗對比」撐住清晰度；字放到 34；沒有禮物圖片的格子不再畫空方框，省出空間給字。
-      const base = { rowH: 54, gap: 4, icon: 40, colGap: 8, font: 34, hintFont: 26 };
+      const base = { rowH: 44, gap: 4, icon: 32, colGap: 8, font: 27, hintFont: 21 };   // 2026-11-15 咖哩嫌字太大、武將太小：字 34→27
       ctx.font = `900 ${base.font}px ${FONT}`;
       const wOf = it => { const img = giftIcon(it.icon); return 14 + (img ? base.icon + 8 : 0) + ctx.measureText(it.label).width + (it.hint ? 10 + ctx.measureText(it.hint).width * base.hintFont / base.font : 0) + 14; };
       // 兩排直的：左邊是一般動作（普攻、全場、技能、回血），最右邊是招換 BOSS（紫色底）；只有一種就只畫一排
@@ -299,7 +299,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       const natH = Math.max(...cols.map(c => c.list.length)) * (base.rowH + base.gap) - base.gap;
       const stackBottom = lb2 ? Math.max(lb.y + lb.h, lb2.y + lb2.h) : lb.y + lb.h;                    // 右上角排行榜們的最下緣
       const avail = H - 16 - (wide ? stackBottom + 12 + (H >= 700 ? 4 * 24 : 0) : 120);   // 橫式：排行榜下面剩多少（畫面夠高才多留 4 行訊息的位置，扁的畫面把空間都給提示列）
-      const minScale = Math.max(0.8, Math.min(1.1, 14 / (viewK * base.font)));   // 畫面被等比例縮小時（例如直播橫幅），提示列的字要補回來：在螢幕上至少約 14 像素高
+      const minScale = Math.max(0.8, Math.min(1.1, 12 / (viewK * base.font)));   // 畫面被等比例縮小時（例如直播橫幅），提示列的字要補回來：在螢幕上至少約 14 像素高
       const scale = clamp(avail / natH, minScale, 1.1);   // 最大 1.1 倍（再大會蓋住畫面）
       const w = natW * scale, h = natH * scale;
       legend = { cols, scale, base, w, h, x: W - 16 - w, y: H - 16 - h };
@@ -321,11 +321,11 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       for (let cols = 1; cols <= n; cols++) {
         const rows = Math.ceil(n / cols);
         const cw = arena.w / cols, ch = arena.h / rows;
-        const size = Math.min(cw * 0.6, ch * 0.5, 190) * (wander ? 0.85 : 1);   // 留空間給名字、血條、腳下兩行字；會走動時再小一點才有路可走
+        const size = Math.min(cw * 0.6, ch * 0.5, 190);   // 留空間給名字、血條、腳下兩行字（2026-11-15 咖哩嫌武將太小：走動時的 0.85 倍縮小拿掉）
         if (!best || size > best.size) best = { cols, rows, cw, ch, size };
       }
       // 會走動時，武將高度最多佔場地高度的 36%，上下才留得出走動的空間（扁長的畫面特別需要）
-      const size = Math.max(36, wander ? Math.min(best.size, arena.h * 0.36) : best.size);
+      const size = Math.max(36, wander ? Math.min(best.size, arena.h * 0.42) : best.size);
       list.forEach((p, i) => {
         const v = views.get(p.id);
         if (!v) return;
