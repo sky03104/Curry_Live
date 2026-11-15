@@ -297,6 +297,13 @@ window.GAME_CONFIG = {
       walk: { src: 'hamster_walk.png', frames: 7, cw: 271, ch: 324, ground: 320, fps: 9 },   // 走路循環（原圖 16 格有的有羽扇有的沒有，只挑有羽扇的 7 格）
     },
     // 蕃薯：待機＝吃薯條（8 格，每秒 3 格連播 2 輪）；攻擊／技能＝撲出去咬（8 格，第 5 格咬下去；普攻 13 格/秒、技能 11 格/秒）
+    joy: {
+      idle: { src: 'joy_idle.png', frames: 8, cw: 372, ch: 419, ground: 416, fps: 2.5, repeat: 2 },   // 待機：啃大雞腿→啃成骨頭→骨頭啃光，連播 2 輪
+      eat: { src: 'joy_idle.png', frames: 8, cw: 372, ch: 419, ground: 416, fps: 3 },                 // 回血：同一組啃雞腿，播一輪
+      attack: { src: 'joy_attack.png', frames: 8, cw: 409, ch: 367, ground: 363, fps: 12, hitFrame: 5 },   // 攻擊：撲咬（第 5 格咬下去）
+      skill: { src: 'joy_attack.png', frames: 8, cw: 409, ch: 367, ground: 363, fps: 9, hitFrame: 5 },     // 技能：同一組，慢一點
+      walk: { src: 'joy_walk.png', frames: 6, cw: 283, ch: 288, ground: 285, fps: 8 },                // 走路：6 格（原圖中間兩欄被一隻大狗擋住，只用乾淨的 6 格）
+    },
     xiaoni: {
       idle: { src: 'xiaoni_idle.png', frames: 5, cw: 343, ch: 374, ground: 372, fps: 3, repeat: 2 },   // 待機：坐上沙發、躺著玩手機，旁邊對話泡泡裡的手機遊戲畫面會換（沒有跳起來的動作了）
       attack: { src: 'xiaoni_attack.png', frames: 8, cw: 318, ch: 603, ground: 600, fps: 3.5, hitFrame: 7 },   // 攻擊：100T 金色大錘子（2026-11-15 換成咖哩給的新圖）跳起來慢慢往下砸（第 7 格砸中地面；2026-11-15 咖哩嫌太快：8→5 格/秒，整段約 1.6 秒，傷害數字對在第 7 格約 1.3 秒時）
