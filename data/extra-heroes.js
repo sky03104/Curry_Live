@@ -19,4 +19,6 @@ window.HEROES_DATA = window.HEROES_DATA.concat([
   { heroId: 'hamster', displayName: '西當普利鼠', faction: 'Meng', troop: 'Strategist', baseHp: 600, baseAtk: 68, baseArmor: 28, skillName: '起司風暴', extra: true },
   // 蕃薯：萌國的杜賓犬猛將（黑虎戰甲、紫金披風）。能力值取猛將中間檔（跟米其林同一檔），技能「黑虎撲殺」，演出＝衝撞地裂。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
   { heroId: 'yam', displayName: '蕃薯', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '黑虎撲殺', extra: true },
+  // 小妮：萌國的長髮女孩猛將（灰色棒球帽＋墨鏡、灰色短背心與運動長褲、白拖鞋），武器是 100T 黑色大錘子。能力值取猛將中間檔（同米其林），技能「百噸重錘」，演出＝衝撞地裂。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
+  { heroId: 'xiaoni', displayName: '小妮', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '百噸重錘', extra: true },
 ]);

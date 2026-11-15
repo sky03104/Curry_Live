@@ -265,6 +265,12 @@ window.GAME_CONFIG = {
       walk: { src: 'hamster_walk.png', frames: 7, cw: 271, ch: 324, ground: 320, fps: 9 },   // 走路循環（原圖 16 格有的有羽扇有的沒有，只挑有羽扇的 7 格）
     },
     // 蕃薯：待機＝吃薯條（8 格，每秒 3 格連播 2 輪）；攻擊／技能＝撲出去咬（8 格，第 5 格咬下去；普攻 13 格/秒、技能 11 格/秒）
+    xiaoni: {
+      idle: { src: 'xiaoni_idle.png', frames: 5, cw: 343, ch: 374, ground: 372, fps: 3, repeat: 2 },   // 待機：坐上沙發、躺著玩手機，旁邊對話泡泡裡的手機遊戲畫面會換（沒有跳起來的動作了）
+      attack: { src: 'xiaoni_attack.png', frames: 8, cw: 238, ch: 527, ground: 524, fps: 8 },   // 攻擊：100T 黑色大錘子跳起來慢慢往下砸（第 7 格砸中地面；故意放慢，普攻約 1 秒）
+      skill: { src: 'xiaoni_attack.png', frames: 8, cw: 238, ch: 527, ground: 524, fps: 6 },   // 技能：同一組，更慢更有份量（約 1.3 秒）
+      walk: { src: 'xiaoni_walk.png', frames: 8, cw: 252, ch: 394, ground: 391, fps: 9 },   // 走路循環：一手拿手機邊走（8 格，原圖本來就面向左）
+    },
     yam: {
       idle: { src: 'yam_idle.png', frames: 8, cw: 298, ch: 423, ground: 420, fps: 3, repeat: 2 },
       attack: { src: 'yam_attack.png', frames: 8, cw: 701, ch: 458, ground: 406, fps: 13 },
