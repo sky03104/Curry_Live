@@ -377,7 +377,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         sv.tx = px; sv.ty = footY - ps / 2; sv.tsize = ps;
         if (sv.x === null) { sv.x = sv.tx; sv.y = sv.ty; sv.size = ps; }
       }
-      const zone = { red: { x0: arena.x + sB * 1.1 + 6, x1: mid - sT * 1.25 - 6 }, blue: { x0: mid + sT * 1.25 + 6, x1: arena.x + arena.w - sB * 1.1 - 6 } };
+      // 地盤：從主堡中心一路到自己的塔（武將可以站在塔堡前面，畫面窄的時候才不會擠成一團）
+      const zone = { red: { x0: place.base_red[0] + sB * 0.35, x1: place.tower_red[0] - sT * 0.15 }, blue: { x0: place.tower_blue[0] + sT * 0.15, x1: place.base_blue[0] - sB * 0.35 } };
       const groups = { red: list.filter(p => game.teamOf(p.id) === 'red'), blue: list.filter(p => game.teamOf(p.id) === 'blue') };
       let size = 190;
       for (const t of ['red', 'blue']) {
@@ -394,7 +395,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         groups[t].forEach((p, i) => {
           const v = views.get(p.id); if (!v) return;
           const row = Math.floor(i / bc.cols), col = i % bc.cols, inRow = row === rows - 1 ? m - row * bc.cols : bc.cols;
-          const tx = (z.x0 + z.x1) / 2 + (col - (inRow - 1) / 2) * cw, ty = arena.y + (row + 0.5) * ch + 8;
+          const yLo = arena.y + size * 0.65 + 50 + 44, yHi = Math.max(yLo, arena.y + arena.h - size * 0.5 - 56);   // 跟下面 bounds 同一個上下範圍：一開始就平均散在整個高度，不會全擠在最上面
+          const tx = (z.x0 + z.x1) / 2 + (col - (inRow - 1) / 2) * cw, ty = yLo + (row + 0.5) / rows * (yHi - yLo);
           if (v.x === null) { v.x = tx; v.y = ty; v.size = size; }
           v.tsize = size; v.team = t;
           v.zx0 = z.x0 + size * 0.5; v.zx1 = Math.max(v.zx0, z.x1 - size * 0.5);
