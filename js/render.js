@@ -423,18 +423,17 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       const laneGap = Math.max(4, (band - es * 0.5) / Math.min(8, n));
       const cx = arena.x + arena.w / 2, cy = arena.y + topPad + midH;
       const rx = Math.max(band * 0.6 + 10, arena.w * 0.5 - band / 2 - es * 0.55), ry = Math.max(band * 0.55 + 4, halfH - band / 2);
-      // 弧長對照表：進度（0～1，照路程算）換成橢圓上的角度，這樣在直道和彎道上的視覺速度才一樣
-      const N = 240, tab = [0]; let px = rx, py = 0;
-      for (let i = 1; i <= N; i++) { const th = i / N * Math.PI * 2, x = rx * Math.cos(th), y = ry * Math.sin(th); tab.push(tab[i - 1] + Math.hypot(x - px, y - py)); px = x; py = y; }
-      raceGeo = { cx, cy, rx, ry, band, laneGap, es, n, tab, total: tab[N] };
-      const ix = Math.max(10, (rx - band / 2 - es * 0.5) * 0.85), iy = Math.max(8, ry - band / 2 - es * 0.45);
+      // 跑道形狀在 js/race-tracks.js（10 種，每場隨機一種）；這裡只決定它的位置與大小
+      const trk = ML.buildRaceTrack(raceR.track, cx, cy, rx, ry, band, laneGap, Math.min(8, n));
+      raceGeo = { cx, cy, rx, ry, band, laneGap, es, n, trk };
+      const inf = trk.infield, ix = Math.max(0, (inf.x1 - inf.x0) / 2 - es * 0.45), iy = Math.max(0, (inf.y1 - inf.y0) / 2 - es * 0.4), icx = (inf.x0 + inf.x1) / 2, icy = (inf.y0 + inf.y1) / 2;   // 沒參賽的武將站在內場的空地
       for (const p of list) {
         const v = views.get(p.id); if (!v) continue;
         const entrant = raceR.entrants.some(e => e.id === p.id);
         v.tsize = es * (entrant ? 1 : 0.85); v.race = entrant;
-        if (v.x === null) { v.x = cx; v.y = cy; v.size = v.tsize; }
+        if (v.x === null) { v.x = icx; v.y = icy; v.size = v.tsize; }
         if (entrant) { v.tx = undefined; v.zx0 = v.zx1 = v.zy0 = v.zy1 = undefined; }
-        else { v.zx0 = cx - ix; v.zx1 = cx + ix; v.zy0 = cy - iy; v.zy1 = cy + iy; v.tx = undefined; }
+        else { v.zx0 = icx - ix; v.zx1 = icx + ix; v.zy0 = icy - iy; v.zy1 = icy + iy; v.tx = undefined; }
       }
       const xr = wide ? arena.x + arenaFullW : arena.x + arena.w;
       bounds = { x0: arena.x + es * 0.6, x1: xr - es * 0.6, y0: arena.y, y1: arena.y + arena.h, size: es, lg: null };
@@ -554,18 +553,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
   }
 
   // ---------- 賽跑：跑道幾何與參賽者的位置 ----------
-  // 路程比例（0～1）換成橢圓角度；從底部中央的起跑線出發，逆時針（先往右跑）
-  function raceTheta(g, frac) {
-    const f = ((frac % 1) + 1) % 1, s = f * g.total, tab = g.tab;
-    let lo = 0, hi = tab.length - 1;
-    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (tab[m] <= s) lo = m; else hi = m; }
-    const t = (s - tab[lo]) / Math.max(1e-6, tab[hi] - tab[lo]);
-    return Math.PI / 2 - (lo + t) / (tab.length - 1) * Math.PI * 2;
-  }
-  function racePoint(g, frac, lane) {
-    const th = raceTheta(g, frac), off = (lane - (g.n - 1) / 2) * g.laneGap;
-    return { x: g.cx + (g.rx + off) * Math.cos(th), y: g.cy + (g.ry + off) * Math.sin(th), th };
-  }
+  // 路程比例（0～1）＋第幾道 → 跑道上的位置與前進方向（形狀見 js/race-tracks.js）
+  function racePoint(g, frac, lane) { return ML.raceTrackPoint(g.trk, frac, (lane - (Math.min(8, g.n) - 1) / 2) * g.laneGap); }
   function driveRace(dt) {
     const R = raceGeo && game.getMode() === 'race' ? game.getRace() : null;
     if (!R) return;
@@ -577,7 +566,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       const pad = e.lane * 0.011 * Math.max(0, 1 - e.progress * 25);   // 起跑前站在線後面一點（一格一格錯開），開跑後慢慢排進跑道
       const P = racePoint(g, e.progress - pad, e.lane);
       v.x += (P.x - v.x) * k; v.y += (P.y - v.size * 0.35 - v.y) * k;
-      if (Math.abs(Math.sin(P.th)) > 0.05) v.face = Math.sign(Math.sin(P.th));   // 在上緣往左跑、下緣往右跑，彎道上保持原方向
+      if (Math.abs(P.tx) > 0.05) v.face = Math.sign(P.tx);   // 往右跑面向右、往左跑面向左；幾乎直上直下時保持原方向
       v.moving = e.state === 'run';
       v.goal = null; v.hold = Math.max(v.hold || 0, 0.2);
     }
@@ -585,22 +574,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
   function drawTrack() {
     const g = raceGeo;
     if (!g || game.getMode() !== 'race') return;
-    const R = game.getRace(); if (!R) return;
-    ctx.save();
-    ctx.fillStyle = 'rgba(70,150,86,0.30)'; ctx.beginPath(); ctx.ellipse(g.cx, g.cy, g.rx - g.band / 2, g.ry - g.band / 2, 0, 0, Math.PI * 2); ctx.fill();   // 內場草地
-    ctx.strokeStyle = 'rgba(204,134,76,0.70)'; ctx.lineWidth = g.band + 4; ctx.beginPath(); ctx.ellipse(g.cx, g.cy, g.rx, g.ry, 0, 0, Math.PI * 2); ctx.stroke();   // 跑道
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3;
-    for (const d of [-g.band / 2, g.band / 2]) { ctx.beginPath(); ctx.ellipse(g.cx, g.cy, g.rx + d, g.ry + d, 0, 0, Math.PI * 2); ctx.stroke(); }   // 內外白線
-    ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = 1.5; ctx.setLineDash([8, 10]);
-    for (let i = 1; i < Math.min(8, g.n); i++) { const d = (i - 0.5 - (g.n - 1) / 2) * g.laneGap; ctx.beginPath(); ctx.ellipse(g.cx, g.cy, g.rx + d, g.ry + d, 0, 0, Math.PI * 2); ctx.stroke(); }   // 分道線
-    ctx.setLineDash([]);
-    const segs = config.race.segments || 8;   // 每一小段的記號：到這裡會擲骰決定要不要休息
-    for (let i = 1; i < segs; i++) { const th = raceTheta(g, i / segs); ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.arc(g.cx + g.rx * Math.cos(th), g.cy + g.ry * Math.sin(th), 3, 0, Math.PI * 2); ctx.fill(); }
-    // 起跑／終點線（黑白格）
-    const y0 = g.cy + g.ry - g.band / 2, y1 = g.cy + g.ry + g.band / 2, cell = Math.max(6, g.band / 6);
-    for (let i = 0; i * cell < y1 - y0; i++) for (let j = 0; j < 2; j++) { ctx.fillStyle = (i + j) % 2 ? '#111' : '#fff'; ctx.fillRect(g.cx - cell + j * cell, y0 + i * cell, cell, Math.min(cell, y1 - y0 - i * cell)); }
-    text('起跑線', g.cx, y1 + 14, 14, '#fff');
-    ctx.restore();
+    if (!game.getRace()) return;
+    ML.drawRaceTrack(ctx, g.trk, text, config.race.segments || 8);
   }
   function drawRaceBadges() {
     const g = raceGeo, R = g && game.getMode() === 'race' ? game.getRace() : null;
@@ -641,6 +616,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const w = Math.min(arena.w - 10, ctx.measureText(label).width + 40);
     ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.78)'; ctx.beginPath(); ctx.roundRect(cx - w / 2, y - 18, w, 36, 18); ctx.fill(); ctx.restore();
     text(label, cx, y, 20, '#fff');
+    if (R.trackName && R.phase !== 'result') { const tl = `🏟 本場賽道：${R.trackName}`; ctx.font = `bold 15px ${FONT}`; const tw = ctx.measureText(tl).width + 28; ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.roundRect(cx - tw / 2, y + 22, tw, 24, 12); ctx.fill(); ctx.restore(); text(tl, cx, y + 34, 15, '#fff'); }
     if (R.phase === 'countdown') {
       const n = Math.ceil(R.cd);
       ctx.save(); ctx.globalAlpha = 0.9; text(String(n), cx, arena.y + arena.h * 0.5, 140 - (R.cd % 1) * 30, '#ffd35c', 'center', true); ctx.restore();
