@@ -1,7 +1,7 @@
 // 產生「玩法說明」圖片（發給觀眾看怎麼玩；版面是給 TikTok 圖文貼文用的）。
 // 用法：node tools/make_howto.js [--attack 玫瑰] [--aoe 煙火] [--skill 皇冠] [--heal 愛心] [--boss1 …] [--boss2 …] [--boss3 …]
 //   後面的禮物名稱是「主播自己指定的禮物」，沒給就寫「主播公布」（招換 BOSS 沒給就寫預設鑽石數）。想換說明文字就改下面各張的內容。
-// 需要 Playwright。輸出：roster/玩法說明_1.jpg … _11.jpg（前 6 張是玩法（第 5 張陣營模式、第 6 張賽跑模式），後面蜀魏吳群萌各一張陣營武將圖，附武將名稱和技能名），每張 1080x1920（9:16），照順序當 TikTok 圖文貼文的輪播圖（滑著看）。
+// 需要 Playwright。輸出：roster/玩法說明_1.jpg … _12.jpg（前 7 張是玩法（第 5 張陣營模式、第 6 張賽跑模式、第 7 張障礙賽），後面蜀魏吳群萌各一張陣營武將圖，附武將名稱和技能名），每張 1080x1920（9:16），照順序當 TikTok 圖文貼文的輪播圖（滑著看）。
 // 版面為 TikTok 留的安全區：上面 130px、下面 300px（標題文字和按鈕會蓋住）、右邊 110px（愛心、留言按鈕）不放重要內容。
 // 數字（60 秒復活、99 級、BOSS 鑽石數）請對照 js/config.js；改了設定要回頭改這裡。風格跟武將名冊一致（米白宣紙底）。
 const fs = require('fs');
@@ -23,7 +23,7 @@ const gift = k => args[k] || '主播公布';
 const bossGift = (k, def) => args[k] || def;
 const img = f => 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/heroes', f)).toString('base64');
 const hero = (f, name, c) => `<div class="h"><img src="${img(f)}"><span style="background:${c}">${name}</span></div>`;
-const TOTAL = 6 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 6 張玩法（含陣營模式、賽跑模式）+ 每個陣營一張
+const TOTAL = 7 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 7 張玩法（含陣營模式、賽跑模式、障礙賽）+ 每個陣營一張
 
 // 10 種賽道的小圖：直接用遊戲裡的形狀與路面顏色畫成 SVG，賽道改了重跑就會跟著更新
 const trackChips = () => (window.GAME_CONFIG.race.tracks || []).map(t => {
@@ -82,6 +82,7 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .track img { position: absolute; height: 120px; }
 .race3 { display: flex; gap: 14px; margin-top: 16px; } .race3 div { flex: 1; border-radius: 18px; padding: 16px 10px; text-align: center; color: #fff; font-size: 38px; font-weight: 900; line-height: 1.35; } .race3 small { display: block; font-size: 30px; font-weight: 700; opacity: .95; }
 .tracks10 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 18px; } .tc { background: #fff; border-radius: 16px; padding: 8px 4px 6px; text-align: center; min-width: 0; } .tc svg { width: 100%; height: auto; display: block; } .tc span { display: block; font-size: 23px; font-weight: 700; line-height: 1.2; }
+.gates { display: flex; gap: 10px; margin-top: 18px; } .gt { flex: 1; background: #fff; border-radius: 16px; padding: 10px 4px 8px; text-align: center; min-width: 0; } .gt i { display: block; font-style: normal; font-size: 64px; line-height: 1.1; } .gt b { display: block; font-size: 30px; } .gt span { display: block; font-size: 30px; font-weight: 900; color: #D9563E; }
 .swipe { margin-top: 30px; font-size: 38px; color: #ffd35c; font-weight: 900; }
 `;
 const top = n => `<div class="top"><div class="t">萌戰三國・<b>直播亂鬥</b></div><div class="pg">${n}/${TOTAL}</div></div>`;
@@ -151,6 +152,17 @@ const slides = [
     <p>每跑一段<b>可能停下來休息</b>！只有<b>前三名</b>拿經驗值：<b>2000／1000／500</b>。</p></div>
   <div class="card"><div class="no">12</div><h2>送禮幫忙或搗蛋</h2>
     <p>送 <span class="say">玫瑰</span> 讓人<b>少休息</b>，送 <span class="say">GG</span> 讓人<b>多休息</b>。參賽者只能幫自己；沒參賽的要先留言 <span class="say">@參賽者名字</span> 再送禮。</p></div>
+</div></div>`,
+
+
+`<div class="slide">${top(7)}<div class="body">
+  <div class="card" style="background:#FFF1DC;border-color:#f0cf9a"><div class="no" style="background:#e08a1e;box-shadow:0 4px 0 #a8620f">13</div><h2>障礙賽　闖 5 道關卡</h2>
+    <p>主播開放障礙賽時，留言 <span class="say">我要參賽</span> 報名。跑道上有 <b>5 道關卡</b>，每道<b>機率過關</b>，越後面越難！</p>
+    <div class="gates">${(window.GAME_CONFIG.race.hurdle.obstacles || []).map((o, i) => `<div class="gt"><i>${o.icon}</i><b>第${i + 1}關</b><span>${Math.round(window.GAME_CONFIG.race.hurdle.passChances[i] * 100)}%</span></div>`).join('')}</div></div>
+  <div class="card"><div class="no">14</div><h2>沒過關會怎樣</h2>
+    <p>在關卡前<b>摔倒停 2～3 秒</b>再繼續跑，<b>不會淘汰</b>、也不會退回，大家都能跑完。看<b>誰摔得最少、跑得最快</b>！</p></div>
+  <div class="card"><div class="no">15</div><h2>送禮幫忙或搗蛋</h2>
+    <p>送 <span class="say">玫瑰</span> 讓人<b>更容易過關</b>，送 <span class="say">GG</span> 讓人<b>更容易摔倒</b>。前三名拿經驗值，賽道有 <b>10 種專屬障礙賽道</b>，每場隨機！</p></div>
 </div></div>`,
 ];
 
