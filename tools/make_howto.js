@@ -1,7 +1,7 @@
 // 產生「玩法說明」圖片（發給觀眾看怎麼玩；版面是給 TikTok 圖文貼文用的）。
 // 用法：node tools/make_howto.js [--attack 玫瑰] [--aoe 煙火] [--skill 皇冠] [--heal 愛心] [--boss1 …] [--boss2 …] [--boss3 …]
 //   後面的禮物名稱是「主播自己指定的禮物」，沒給就寫「主播公布」（招換 BOSS 沒給就寫預設鑽石數）。想換說明文字就改下面各張的內容。
-// 需要 Playwright。輸出：roster/玩法說明_1.jpg … _9.jpg（前 4 張是玩法，後面蜀魏吳群萌各一張陣營武將圖，附武將名稱和技能名），每張 1080x1920（9:16），照順序當 TikTok 圖文貼文的輪播圖（滑著看）。
+// 需要 Playwright。輸出：roster/玩法說明_1.jpg … _10.jpg（前 5 張是玩法（第 5 張是陣營模式），後面蜀魏吳群萌各一張陣營武將圖，附武將名稱和技能名），每張 1080x1920（9:16），照順序當 TikTok 圖文貼文的輪播圖（滑著看）。
 // 版面為 TikTok 留的安全區：上面 130px、下面 300px（標題文字和按鈕會蓋住）、右邊 110px（愛心、留言按鈕）不放重要內容。
 // 數字（60 秒復活、99 級、BOSS 鑽石數）請對照 js/config.js；改了設定要回頭改這裡。風格跟武將名冊一致（米白宣紙底）。
 const fs = require('fs');
@@ -21,7 +21,7 @@ const gift = k => args[k] || '主播公布';
 const bossGift = (k, def) => args[k] || def;
 const img = f => 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/heroes', f)).toString('base64');
 const hero = (f, name, c) => `<div class="h"><img src="${img(f)}"><span style="background:${c}">${name}</span></div>`;
-const TOTAL = 4 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 4 張玩法 + 每個陣營一張
+const TOTAL = 5 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 5 張玩法（含陣營模式）+ 每個陣營一張
 
 const css = `
 * { box-sizing: border-box; margin: 0; }
@@ -67,6 +67,7 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .hc .pic { display: flex; align-items: center; justify-content: center; } .hc img { max-width: 100%; object-fit: contain; }
 .hc .nm { font-size: 44px; font-weight: 900; margin-top: 4px; line-height: 1.15; }
 .hc .sk { font-size: 30px; color: #fff; background: var(--c); border-radius: 12px; display: inline-block; padding: 2px 14px; margin-top: 6px; font-weight: 700; }
+.camp { display: flex; gap: 8px; margin-top: 20px; } .camp div { flex: 1; color: #fff; font-weight: 900; font-size: 34px; line-height: 1.25; text-align: center; border-radius: 14px; padding: 22px 4px; }
 .swipe { margin-top: 30px; font-size: 38px; color: #ffd35c; font-weight: 900; }
 `;
 const top = n => `<div class="top"><div class="t">萌戰三國・<b>直播亂鬥</b></div><div class="pg">${n}/${TOTAL}</div></div>`;
@@ -115,6 +116,18 @@ const slides = [
       <div class="buff" style="background:#c8432f"><b>紅BUFF（小 BOSS）</b><br>擊殺的人 1 小時內<b>攻擊力加倍</b></div>
     </div></div>
   <div class="big" style="text-align:center;font-weight:900;color:#D9563E">快來直播間一起玩！</div>
+</div></div>`,
+
+`<div class="slide">${top(5)}<div class="body">
+  <div class="card" style="background:#FDEBE8;border-color:#f3c4bd"><div class="no" style="background:#c8432f;box-shadow:0 4px 0 #8f2f20">7</div><h2>陣營大戰　紅隊 VS 藍隊</h2>
+    <p>主播開啟陣營模式時，留言 <span class="say">加入紅隊</span> 或 <span class="say">加入藍隊</span> 選邊站！<b>每場最多換 3 次隊</b>。</p>
+    <div class="camp">
+      <div style="background:#c8432f">紅<br>主堡</div><div style="background:#e2756a">紅隊<br>武將</div><div style="background:#7d8590">紅塔</div><div style="background:#7d8590">藍塔</div><div style="background:#5a9ce0">藍隊<br>武將</div><div style="background:#2f6fb8">藍<br>主堡</div>
+    </div></div>
+  <div class="card"><div class="no">8</div><h2>怎麼贏</h2>
+    <p>只能打<b>敵方</b>，不能打自己人。先<b>拆掉敵方防禦塔</b>，再把<b>敵方武將全部打倒</b>，才能<b>攻破主堡</b>！<span class="say">@塔</span><span class="say">@主堡</span> 可以鎖定。</p></div>
+  <div class="card"><div class="no">9</div><h2>獎勵</h2>
+    <p>贏的那隊<b>所有玩家</b>都拿<b>大量經驗值</b>！陣營模式倒地的<b>復活等待會越來越久</b>（60→90→120→180 秒）。</p></div>
 </div></div>`,
 ];
 
