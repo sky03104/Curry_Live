@@ -40,6 +40,7 @@ ML.createUpdater = function (config, params, game, hooks) {
       const v = String((await r.json()).version || '');
       state.latest = v;
       if (v && v !== current) state.pending = true;
+      else if (v === current) { try { localStorage.removeItem(KEY + '.tried'); } catch (e) { /* 清不掉就算了 */ } }   // 已經是最新版：把「試過了」的記號清掉，之後再有新版本才能再自動更新（直播軟體重開後拿到舊快取也能再更新一次）
     } catch (e) { /* 連不上就下次再試 */ }
   }
   async function tick() {
