@@ -191,7 +191,7 @@ window.ML = window.ML || {};
   const hash = s => { let h = 7; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
   function auto(heroId, kind) {
     const h = hash(heroId), list = kind === 'skill' ? AUTO_SKILL : AUTO_ATTACK;
-    return { style: list[h % list.length], emoji: AUTO_EMOJI[(h >> 3) % AUTO_EMOJI.length] };
+    return { style: list[h % list.length], emoji: AUTO_EMOJI[Math.floor(((h * 2654435761) >>> 0) / 4294967296 * AUTO_EMOJI.length)] };
   }
 
   // 查某隻武將的某種動作（'attack'／'skill'）有沒有專屬特效。回傳 { def, p } 或 null（null＝用原本依兵種的演出）
