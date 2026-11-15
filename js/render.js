@@ -296,7 +296,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       // 2026-11-14 咖哩要求改成四排：一般動作兩排、招換 BOSS 兩排（每組各自對半分，前面那排多一個）
       const split = list => list.length < 2 ? [list] : [list.slice(0, Math.ceil(list.length / 2)), list.slice(Math.ceil(list.length / 2))];
       // 2026-11-15 咖哩要求再改成「兩排」：所有指令照順序（一般動作在前、招換 BOSS 在後）對半分成左右兩排，黃／紫色帶仍區分兩種
-      const cols = split([...items.filter(i => !i.boss), ...items.filter(i => i.boss)]).filter(c => c.length)
+      // 2026-11-15 咖哩再改：左排＝一般動作、右排＝招換 BOSS；「招換BUFF（藍紅隨機）」不顯示（它是紅藍隨機，跟分開的藍BUFF／紅BUFF 重複）
+      const cols = [items.filter(i => !i.boss), items.filter(i => i.boss && i.action !== 'buff')].filter(c => c.length)
         .map(list => ({ list, w: Math.max(...list.map(wOf)) }));
       const natW = cols.reduce((a, c) => a + c.w, 0) + (cols.length - 1) * base.colGap;
       const natH = Math.max(...cols.map(c => c.list.length)) * (base.rowH + base.gap) - base.gap;
