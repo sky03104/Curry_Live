@@ -38,7 +38,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     <details class="card" data-k="hostbtn" open>
       <summary><span class="ico">🎮</span>主播按鈕<em id="hb-state"></em></summary>
       <div class="body">
-        <div class="hint">主播用<b>點的</b>，比打字快：按下面的按鈕，會<b>另外開一個小視窗</b>（只有大顆按鈕），主播直播時點那個視窗就好。點一下，直播畫面約 2～3 秒內執行（效果跟主播留言指令一樣，次數用下面「主播文字指令」設定的「次」）。要先<b>開啟雲端存檔</b>，並在「主播文字指令」選好「我就是主播」。</div>
+        <div class="hint">主播用<b>點的</b>，比打字快：按下面的按鈕，會<b>另外開一個小視窗</b>（只有大顆按鈕），主播直播時點那個視窗就好。點一下，直播畫面約 1～2 秒內執行（效果跟主播留言指令一樣，次數用下面「主播文字指令」設定的「次」）。要先<b>開啟雲端存檔</b>，並在「主播文字指令」選好「我就是主播」。</div>
         <div class="row"><button id="hb-open" class="main">🪟 開啟主播按鈕小視窗</button></div>
         <div class="hint" id="hb-msg"></div>
       </div>
