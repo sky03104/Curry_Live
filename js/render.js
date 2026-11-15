@@ -24,7 +24,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
   let quake = 0;             // 整個畫面震動的強度（重擊時）
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const after = (sec, fn) => timers.push({ t: sec, fn });
+  // 秒數若算出來不是數字（例如剛上場的人還沒排好位置、座標是空的），timer 會永遠不倒數也不執行，被打的人的 pending 就卡住、血條和走動都停住；所以一律保底成有限的秒數
+  const after = (sec, fn) => timers.push({ t: Number.isFinite(sec) ? sec : 0.9, fn });
 
   function text(str, x, y, size, color, align, bold) {
     ctx.font = `${bold === false ? '' : 'bold '}${size}px ${FONT}`;
@@ -693,7 +694,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
           const x = clamp(v.x + (Math.random() * 2 - 1) * reach, v.zx0 !== undefined ? v.zx0 : b.x0, v.zx1 !== undefined ? v.zx1 : b.x1), y = capY(b, x, clamp(v.y + (Math.random() * 2 - 1) * reach, v.zy0 !== undefined ? v.zy0 : b.y0, v.zy1 !== undefined ? v.zy1 : b.y1));
           if (Math.hypot(x - v.x, y - v.y) < v.size * 0.4) continue;       // 太近了，等於沒走
           let room = 9;
-          for (const o of list) if (o !== v) room = Math.min(room, gap(x, y, (o.goal || o).x, (o.goal || o).y, o.boss || o.fixed ? (v.size + o.size) / 2 : v.size));
+          for (const o of list) if (o !== v && !o.fixed) room = Math.min(room, gap(x, y, (o.goal || o).x, (o.goal || o).y, o.boss ? (v.size + o.size) / 2 : v.size));   // 塔堡不算障礙（武將本來就可以站在塔堡前面）；不然陣營模式的地盤被塔堡的避讓範圍吃掉，三、四隻擠不出走動的空位就全站著不動
           if (room < 1.05) continue;
           room = Math.min(room, 2) + Math.random() * 0.3;   // 夠空就好，不必永遠跑去最空的角落
           if (!best || room > best.room) best = { x, y, room };
@@ -710,6 +711,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     // 互相靠太近就輕輕推開，避免疊在一起；倒地的不會被推走
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
       const a = list[i], c = list[j];
+      if (a.fixed || c.fixed) continue;   // 塔堡不推武將、武將也不推塔堡
       const g = gap(a.x, a.y, c.x, c.y, (a.size + c.size) / 2);
       if (g >= 1 || (a.down && c.down)) continue;
       const dx = c.x - a.x || 0.01, dy = c.y - a.y, d = Math.hypot(dx, dy);
@@ -1182,7 +1184,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     arenas,
     frame(dt) { update(dt); draw(); },
     // 自動測試用：讀出每隻武將目前的位置
-    debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down, face: v.face, moving: v.moving, anim: v.anim ? v.anim.name : '' })); },
+    debugViews() { return [...views.values()].map(v => ({ id: v.id, x: v.x, y: v.y, size: v.size, down: v.down, face: v.face, moving: v.moving, anim: v.anim ? v.anim.name : '', pending: v.pending, hold: v.hold, race: v.race, hp: v.hp, shownHp: v.shownHp })); },
     debugBounds() { return bounds; },
     reset() { views.clear(); leavers = []; floats = []; rings = []; timers = []; toasts = []; dim = null; quake = 0; effects.clear(); },
   };
