@@ -291,6 +291,7 @@ window.GAME_CONFIG = {
   //   frames 幾格／cw ch 每格寬高（像素）／ground 腳底在第幾列／fps 每秒播幾格／repeat 連續播幾輪（預設 1）
   heroAnims: {
     michelin: {
+      walk: { src: 'michelin_walk.png', frames: 8, cw: 512, ch: 397, ground: 394, fps: 9 },   // 走路循環（鬥牛犬搖擺步，8 格）
       eat: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3 },
       idle: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3, repeat: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭
       idle2: { src: 'michelin_snack.png', frames: 8, cw: 465, ch: 355, ground: 351, fps: 3, repeat: 3 },   // 第二組待機：吃漢堡喝奶茶。每次停下來隨機挑 idle（啃骨頭）或 idle2（吃漢堡喝奶茶），機率一樣（idle3、idle4 依此類推）
@@ -315,6 +316,7 @@ window.GAME_CONFIG = {
     },
     // 蕃薯：待機＝吃薯條（8 格，每秒 3 格連播 2 輪）；攻擊／技能＝撲出去咬（8 格，第 5 格咬下去；普攻 13 格/秒、技能 11 格/秒）
     pudding: {
+      walk: { src: 'pudding_walk.png', frames: 8, cw: 526, ch: 372, ground: 368, fps: 9 },   // 走路循環（黃金獵犬優雅小跑，8 格）
       idle: { src: 'pudding_idle.png', frames: 8, cw: 497, ch: 491, ground: 487, fps: 2.5, repeat: 2 },   // 待機：吃布丁（舀一口→吃→再舀→吃光→舔嘴），連播 2 輪
       eat: { src: 'pudding_idle.png', frames: 8, cw: 497, ch: 491, ground: 487, fps: 3 },                 // 回血：同一組，播一輪
     },
@@ -338,6 +340,7 @@ window.GAME_CONFIG = {
       walk: { src: 'yam_walk.png', frames: 12, cw: 373, ch: 392, ground: 388, fps: 10 },   // 走路循環（12 格，原圖第 10~12 格畫成面向右，已單獨翻面）
     },
     dabao: {
+      walk: { src: 'dabao_walk.png', frames: 8, cw: 522, ch: 444, ground: 441, fps: 10 },   // 走路循環（柴犬輕快小跑，8 格）
       eat: { src: 'dabao_drumstick.png', frames: 8, cw: 379, ch: 360, ground: 350, fps: 3 },   // 回血：吃大雞腿（一輪）
       idle: { src: 'dabao_eat.png', frames: 8, cw: 384, ch: 387, ground: 383, fps: 3, repeat: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭，連播 3 輪（跟米其林一樣）
       idle2: { src: 'dabao_drumstick.png', frames: 8, cw: 379, ch: 360, ground: 350, fps: 3, repeat: 3 },   // 第二組待機：吃大雞腿。停下來時隨機挑 idle（啃骨頭）或 idle2（吃雞腿）
