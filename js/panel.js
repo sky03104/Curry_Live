@@ -38,8 +38,8 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     <details class="card" data-k="hostbtn" open>
       <summary><span class="ico">🎮</span>主播按鈕<em id="hb-state"></em></summary>
       <div class="body">
-        <div class="hint">主播用<b>點的</b>，比打字快：點一下，直播畫面約 2～3 秒內就執行（效果跟主播留言指令一樣，次數用下面「主播文字指令」設定的「次」）。要先<b>開啟雲端存檔</b>（直播畫面靠它收到按鈕），並在「主播文字指令」選好「我就是主播」。</div>
-        <div class="hb-grid" id="hb-btns"></div>
+        <div class="hint">主播用<b>點的</b>，比打字快：按下面的按鈕，會<b>另外開一個小視窗</b>（只有大顆按鈕），主播直播時點那個視窗就好。點一下，直播畫面約 2～3 秒內執行（效果跟主播留言指令一樣，次數用下面「主播文字指令」設定的「次」）。要先<b>開啟雲端存檔</b>，並在「主播文字指令」選好「我就是主播」。</div>
+        <div class="row"><button id="hb-open" class="main">🪟 開啟主播按鈕小視窗</button></div>
         <div class="hint" id="hb-msg"></div>
       </div>
     </details>
@@ -438,25 +438,15 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   $('#hc-set').onclick = () => { const id = $('#hc-pick').value; if (!id) return; hc.setHost(id, recent.get(id) || ''); hcWho(); hcWarn(); hcSync(); renderGiftSettings(); };
   $('#hc-cmds').onchange = e => { const n = e.target.closest('[data-hcn]'); if (!n) return; hc.setCount(n.dataset.hcn, n.value); n.value = hc.countOf(n.dataset.hcn); hcWarn(); hcSync(); renderGiftSettings(); };
   $('#hc-cmds').oninput = e => { const i = e.target.closest('[data-hc]'); if (!i) return; hc.setCmd(i.dataset.hc, i.value); hcWarn(); hcWho(); hcSync(); renderGiftSettings(); };
-  // ---------- 主播按鈕 ----------
-  function hbRender() {
-    const btn = (a, text, arg) => `<button data-hb="${a}" data-arg="${arg || ''}" class="hb-${hc.actions && (a.startsWith('boss') || a === 'buff') ? 'boss' : 'act'}">${text}</button>`;
-    const gen = ['attack', 'aoe', 'skill', 'heal'].filter(a => hc.actions.includes(a)).map(a => btn(a, `${esc(hc.label(a))}${hc.countOf(a) > 1 ? ' ×' + hc.countOf(a) : ''}`));
-    const rev = [btn('revive', '復活自己'), btn('revive', '復活全部', '全部')];
-    const boss = hc.actions.filter(a => (a.startsWith('boss') || a === 'buff') && a !== 'buff').map(a => btn(a, esc(hc.label(a)) + (hc.countOf(a) > 1 ? ' ×' + hc.countOf(a) : '')));
-    $('#hb-btns').innerHTML = `<div class="hb-row">${gen.join('')}</div><div class="hb-row">${rev.join('')}</div><div class="hb-row">${boss.join('')}</div>`;
-    $('#hb-state').textContent = saving.cloud.enabled && hc.hostId ? '可用' : '還不能用';
-  }
-  $('#hb-btns').onclick = async e => {
-    const b = e.target.closest('[data-hb]'); if (!b) return;
+  // ---------- 主播按鈕：開一個只有大顆按鈕的小視窗（pad.html） ----------
+  function hbRender() { $('#hb-state').textContent = saving.cloud.enabled && hc.hostId ? '可用' : '還不能用'; }
+  $('#hb-open').onclick = () => {
     const msg = t => { $('#hb-msg').textContent = t; };
     if (!saving.cloud.enabled) { msg('⚠ 要先開啟雲端存檔（「存檔」那張卡片），直播畫面才收得到按鈕。'); return; }
     if (!hc.hostId) { msg('⚠ 還沒設定主播：到下面「主播文字指令」選「我就是主播」。'); return; }
-    const action = b.dataset.hb, label = b.textContent;
-    b.disabled = true;
-    const r = await saving.cloud.sendCommand({ action, count: hc.countOf(action), arg: b.dataset.arg || '', host: { id: hc.hostId, name: hc.hostName } });
-    b.disabled = false;
-    msg(r.ok ? `✔ 已送出「${label}」（${new Date().toLocaleTimeString()}），直播畫面約 ${(config.save.cloud.cmdPollSeconds || 2) + 1} 秒內執行。` : '⚠ 送出失敗：' + (r.text || '連不上') + '。');
+    const url = new URL('pad.html', location.href); if (window.APP_VERSION) url.searchParams.set('_v', window.APP_VERSION);
+    const w = window.open(url.toString(), 'curryLiveHostPad', 'popup=yes,width=360,height=560,left=40,top=40');
+    msg(w ? '✔ 已開啟小視窗（可以把它拖到想放的位置；再按一次會回到同一個視窗）。' : '⚠ 瀏覽器擋掉了彈出視窗：請在網址列旁允許這個網站的彈出視窗，再按一次。');
   };
   hcRows(); hcWho(); hcPick(); hcWarn();
   // 版本號：面板這個視窗載入時的版本；發現有新版就提醒（直播畫面會自己更新，面板要自己重新整理）
