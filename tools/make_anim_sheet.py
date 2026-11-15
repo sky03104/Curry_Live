@@ -1,6 +1,6 @@
 """把「綠底、多格排在一張圖上」的連續動作圖，轉成遊戲用的逐格動畫條（透明背景、一排橫放）。
 
-用法：python3 tools/make_anim_sheet.py <原圖> <輸出檔名> [--grid 4x2] [--faces right|left] [--match-height 328] [--equalize area] [--erase-grid 6] [--row-counts 3,3,4] [--flip 3,4,5] [--pick 1,2,3,4,6,8,9] [--cut 768:512-1024] [--cx x1,x2,.. --feet y1,y2,.. --lift l1,l2,.. --scale 0.885]
+用法：python3 tools/make_anim_sheet.py <原圖> <輸出檔名> [--grid 4x2] [--faces right|left] [--match-height 328] [--equalize area] [--erase-grid 6] [--row-counts 3,3,4] [--flip 3,4,5] [--pick 1,2,3,4,6,8,9] [--cut 768:512-1024 或 h298:0-1200] [--cx x1,x2,.. --feet y1,y2,.. --lift l1,l2,.. --scale 0.885]
 範例：python3 tools/make_anim_sheet.py 米其林吃骨頭.jpg assets/heroes/michelin_eat.png --grid 4x2 --faces right
 
 做的事：
@@ -67,8 +67,11 @@ def main():
         for k in range(1, cols): x = round(k * W / cols); rgba[:, max(0, x - n):x + n, 3] = 0
         for k in range(1, rows): y = round(k * H / rows); rgba[max(0, y - n):y + n, :, 3] = 0
     for part in [x for x in opt['cut'].split(',') if x]:   # 兩格的東西（尾巴、武器）黏在一起時，沿 x 位置、在指定的 y 範圍切開一條 3 像素的縫（x:y0-y1）
-        x, yr = part.split(':'); y0_, y1_ = map(int, yr.split('-')); x = int(x)
-        rgba[y0_:y1_, max(0, x - 1):x + 2, 3] = 0
+        pos, rng = part.split(':'); a_, b_ = map(int, rng.split('-'))
+        if pos.startswith('h'):   # 橫線：h298:0-1200 ＝ 在 y=298、x 從 0 到 1200 切一條縫（原圖的黑色格線不是整齊的 N 等分時用）
+            y = int(pos[1:]); rgba[max(0, y - 3):y + 4, a_:b_, 3] = 0
+        else:                     # 直線：298:0-300 ＝ 在 x=298、y 從 0 到 300 切一條縫
+            x = int(pos); rgba[a_:b_, max(0, x - 3):x + 4, 3] = 0
     lab, comps = components(rgba[..., 3] > 40)
     comps = [c for c in comps if c['size'] >= 20]
     rc = [int(x) for x in opt['row-counts'].split(',')] if opt['row-counts'] else None   # 每一列的格數不一樣時（例如 3,3,4），每列各自平分寬度

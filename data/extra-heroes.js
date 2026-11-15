@@ -17,4 +17,6 @@ window.HEROES_DATA = window.HEROES_DATA.concat([
   { heroId: 'yuge', displayName: '魚哥', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '南瓜重擊', extra: true },
   // 西當普利鼠：萌國的倉鼠謀士（拿羽扇、穿綠金鎧甲）。能力值取謀士水準（血少、攻中、防低），技能演出＝法陣落雷。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
   { heroId: 'hamster', displayName: '西當普利鼠', faction: 'Meng', troop: 'Strategist', baseHp: 600, baseAtk: 68, baseArmor: 28, skillName: '起司風暴', extra: true },
+  // 蕃薯：萌國的杜賓犬猛將（黑虎戰甲、紫金披風）。能力值取猛將中間檔（跟米其林同一檔），技能「黑虎撲殺」，演出＝衝撞地裂。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
+  { heroId: 'yam', displayName: '蕃薯', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '黑虎撲殺', extra: true },
 ]);

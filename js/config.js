@@ -264,6 +264,13 @@ window.GAME_CONFIG = {
       skill: { src: 'hamster_attack.png', frames: 8, cw: 318, ch: 543, ground: 460, fps: 8 },
       walk: { src: 'hamster_walk.png', frames: 7, cw: 271, ch: 324, ground: 320, fps: 9 },   // 走路循環（原圖 16 格有的有羽扇有的沒有，只挑有羽扇的 7 格）
     },
+    // 蕃薯：待機＝吃薯條（8 格，每秒 3 格連播 2 輪）；攻擊／技能＝撲出去咬（8 格，第 5 格咬下去；普攻 13 格/秒、技能 11 格/秒）
+    yam: {
+      idle: { src: 'yam_idle.png', frames: 8, cw: 298, ch: 423, ground: 420, fps: 3, repeat: 2 },
+      attack: { src: 'yam_attack.png', frames: 8, cw: 701, ch: 458, ground: 406, fps: 13 },
+      skill: { src: 'yam_attack.png', frames: 8, cw: 701, ch: 458, ground: 406, fps: 11 },
+      walk: { src: 'yam_walk.png', frames: 12, cw: 373, ch: 392, ground: 388, fps: 10 },   // 走路循環（12 格，原圖第 10~12 格畫成面向右，已單獨翻面）
+    },
     dabao: {
       eat: { src: 'dabao_drumstick.png', frames: 8, cw: 379, ch: 360, ground: 350, fps: 3 },   // 回血：吃大雞腿（一輪）
       idle: { src: 'dabao_eat.png', frames: 8, cw: 384, ch: 387, ground: 383, fps: 3, repeat: 3 },   // 待機（走到定點停下來）也先用同一組啃骨頭，連播 3 輪（跟米其林一樣）
