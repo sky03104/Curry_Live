@@ -314,6 +314,10 @@ window.GAME_CONFIG = {
       walk: { src: 'hamster_walk.png', frames: 7, cw: 271, ch: 324, ground: 320, fps: 9 },   // 走路循環（原圖 16 格有的有羽扇有的沒有，只挑有羽扇的 7 格）
     },
     // 蕃薯：待機＝吃薯條（8 格，每秒 3 格連播 2 輪）；攻擊／技能＝撲出去咬（8 格，第 5 格咬下去；普攻 13 格/秒、技能 11 格/秒）
+    pudding: {
+      idle: { src: 'pudding_idle.png', frames: 8, cw: 497, ch: 491, ground: 487, fps: 2.5, repeat: 2 },   // 待機：吃布丁（舀一口→吃→再舀→吃光→舔嘴），連播 2 輪
+      eat: { src: 'pudding_idle.png', frames: 8, cw: 497, ch: 491, ground: 487, fps: 3 },                 // 回血：同一組，播一輪
+    },
     joy: {
       idle: { src: 'joy_idle.png', frames: 8, cw: 372, ch: 419, ground: 416, fps: 2.5, repeat: 2 },   // 待機：啃大雞腿→啃成骨頭→骨頭啃光，連播 2 輪
       eat: { src: 'joy_idle.png', frames: 8, cw: 372, ch: 419, ground: 416, fps: 3 },                 // 回血：同一組啃雞腿，播一輪
