@@ -159,7 +159,8 @@ ML.createGame = function (config, heroes) {
   }
 
   function handleChat(user, rawText) {
-    const text = rawText.trim();
+    // 全形英文（Ｊｏｙ）轉半形、去掉看不見的字元（零寬空白等），再比對；直播軟體傳來的留言常夾這些
+    const text = String(rawText).normalize('NFKC').replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim();
     const me = players.get(user.id);
 
     if (isLeaveCommand(text)) { if (me) leave(me); return; }
