@@ -9,6 +9,15 @@ ML.createGame = function (config, heroes) {
   const scores = new Map();    // 觀眾代號 → 這位觀眾的累計紀錄：傷害、擊倒數、等級、經驗值（離場後仍保留）
   const fxListeners = [];
   let time = 0;                // 遊戲內經過的秒數
+  // ---------- 陣營模式的狀態（亂鬥模式時完全不用）----------
+  const tc = config.team || {};
+  let mode = 'brawl';          // 'brawl' 亂鬥 ／ 'team' 陣營
+  const structs = new Map();   // 防禦塔與主堡（tower_red、base_red、tower_blue、base_blue）。不放進 players，所以不會被當成武將
+  const teamOf = new Map();    // 觀眾代號 → { team: 'red'|'blue', chosen: 自己選的才算 true（系統自動分的第一次改選不算換隊）}
+  const swaps = new Map();     // 觀眾代號 → 這場已經換過幾次隊
+  let match = { winner: null, restartAt: 0, time: 0 };   // winner：'red'／'blue'／'draw'／null（還沒分勝負）
+  const teamLabel = t => (tc.names && tc.names[t]) || (t === 'red' ? '紅隊' : '藍隊');
+  const foeOf = t => (t === 'red' ? 'blue' : 'red');
 
   // 留言比對用：武將中文名與別名 → 武將資料（名字長的先比，避免短名搶先）
   const heroById = new Map(heroes.map(h => [h.heroId, h]));
@@ -46,6 +55,7 @@ ML.createGame = function (config, heroes) {
   // 等級跟著「觀眾」走（不是跟著武將），所以換武將、倒地、離場再回來，等級都還在。
   // 能力值 = 武將的基礎值 ×（1 + 每級成長 ×（等級 - 1））
   function stats(p) {
+    if (p.isStruct) return { maxHp: p.maxHp, atk: 0, def: p.defv };
     if (p.isBoss) return { maxHp: p.maxHp, atk: p.def.atk, def: p.def.def };
     const g = config.leveling, up = p.prof.level - 1;
     const u = config.uniformHero, base = u && u.enabled ? { hp: u.hp, atk: u.atk, def: u.def } : { hp: p.hero.baseHp, atk: p.hero.baseAtk, def: p.hero.baseArmor };   // 全員同能力（config.uniformHero）
@@ -108,7 +118,11 @@ ML.createGame = function (config, heroes) {
     const closest = list => list.sort((a, b) => plain(a.name).length - plain(b.name).length)[0];   // 「只打一部分」：挑最接近的
     const hero = nameTable.find(([name]) => name === rest || (r && plain(name) === r));
     const boss = players.get(BOSS_ID);
+    const foe = mode === 'team' && teamOf.get(me.id) ? foeOf(teamOf.get(me.id).team) : null;
     const steps = [
+      () => foe && /^(防禦塔|塔)$/.test(rest.trim()) && structs.get('tower_' + foe),   // 陣營模式：@塔 ＝ 敵方防禦塔
+      () => foe && /^(主堡|堡|基地)$/.test(rest.trim()) && structs.get('base_' + foe),
+      () => mode === 'team' && [...structs.values()].filter(o => o.name === rest.trim())[0],
       () => boss && isBossName(rest) && boss,                       // @BOSS：鎖定場上的 BOSS（@BOSS的名字走下面一般的名字比對）
       () => cands.filter(o => o.name === rest)[0],
       () => longest(cands.filter(o => rest.startsWith(o.name))),
@@ -145,6 +159,12 @@ ML.createGame = function (config, heroes) {
 
     if (isLeaveCommand(text)) { if (me) leave(me); return; }
 
+    if (mode === 'team') {   // 陣營模式：整句剛好是「加入紅隊／加入藍隊」才算
+      const t = plain(text);
+      if ((config.commands.joinRed || []).some(c => plain(c) === t)) { joinTeam(user, 'red'); return; }
+      if ((config.commands.joinBlue || []).some(c => plain(c) === t)) { joinTeam(user, 'blue'); return; }
+    }
+
     if (config.commands.unlock.includes(text)) {
       if (me && me.lockId) { me.lockId = null; notice(`${me.name} 解除鎖定`); }
       return;
@@ -155,6 +175,7 @@ ML.createGame = function (config, heroes) {
       const rest = text.slice(1).trim();
       if (!rest) return;
       const target = findLockTarget(me, rest);
+      if (target && mode === 'team' && isAlly(me, target)) { notice(`${me.name} 不能鎖定同隊的 ${target.name}`); return; }
       if (target) { me.lockId = target.id; notice(`${me.name} 鎖定了 ${target.name}`); }
       else notice(`${me.name} 找不到「${rest.length > 10 ? rest.slice(0, 10) + '…' : rest}」`);
       return;
@@ -176,9 +197,11 @@ ML.createGame = function (config, heroes) {
     const p = { id: user.id, name: user.name, hero, prof, maxHp: 0, hp: 0, down: false, downAt: 0, lockId: null, lastActive: time };
     p.maxHp = p.hp = stats(p).maxHp;
     players.set(user.id, p);
+    if (mode === 'team' && !teamOf.has(user.id)) autoAssign(user.id);   // 陣營模式：先分到人數少的那隊（第一次自己改選不算換隊）
     if (quiet) return p;   // 自動更新後把場上武將放回來：不吵（不跳上場訊息與特效）
     fx({ type: 'join', id: p.id });
-    notice(p.prof.level > 1 ? `${p.name} 的 ${hero.displayName}（Lv.${p.prof.level}）上場！` : `${p.name} 的 ${hero.displayName} 上場！`);
+    const tm = mode === 'team' && teamOf.get(user.id) ? `【${teamLabel(teamOf.get(user.id).team)}】` : '';
+    notice(p.prof.level > 1 ? `${p.name} 的 ${hero.displayName}（Lv.${p.prof.level}）${tm}上場！` : `${p.name} 的 ${hero.displayName} ${tm}上場！`);
     return p;
   }
 
@@ -202,6 +225,8 @@ ML.createGame = function (config, heroes) {
   }
   // 主播指令的執行（留言指令和面板按鈕共用）：復活、或當成送了 count 個那個禮物
   function runHostGift(user, hostGift) {
+    if (hostGift.setMode) { gameApi.setMode(hostGift.setMode); return; }
+    if (hostGift.restartMatch) { if (mode === 'team') restartMatch(true); else notice('現在是亂鬥模式，沒有陣營賽可以重開'); return; }
     if (hostGift.revive !== undefined) { hostRevive(user, hostGift.revive); return; }
     if (hostGift.healAll) { healEveryone(); return; }
     notice(`主播指令：${hostGift.label || '動作'} ×${hostGift.count || 1}`);   // 訊息區會寫出這次算幾個：寫 ×1 代表直播網址裡沒帶次數（忘了重貼網址）
@@ -279,6 +304,8 @@ ML.createGame = function (config, heroes) {
       if (!me) return;
     }
     const count = Math.max(1, Math.min(comboMax || config.maxGiftCombo, Math.floor(rawCount) || 1));
+    if (mode === 'team' && !teamOf.has(me.id)) autoAssign(me.id);
+    if (mode === 'team' && match.winner) { notice(`本場已結束，${Math.max(1, Math.ceil(match.restartAt - time))} 秒後開始下一場`); return; }
 
     if (me.down) {
       const wait = reviveRemaining(me);
@@ -291,7 +318,7 @@ ML.createGame = function (config, heroes) {
     if (gift.action === 'heal') {
       // 先用「@名字」鎖定了另一位玩家（還活著、血沒滿）→ 這份回血補給他；否則補自己
       const ally = players.get(me.lockId);
-      const target = ally && ally !== me && !ally.isBoss && !ally.down && ally.hp < ally.maxHp ? ally : me;
+      const target = ally && ally !== me && !ally.isBoss && !ally.isStruct && !ally.down && ally.hp < ally.maxHp && (mode !== 'team' || isAlly(me, ally)) ? ally : me;
       const amount = Math.min(target.maxHp - target.hp, Math.round(target.maxHp * action.healPercent * count));
       target.hp += amount;
       fx({ type: 'heal', id: target.id, amount, icon: gift.icon });
@@ -300,7 +327,8 @@ ML.createGame = function (config, heroes) {
     }
 
     let targets;
-    if (gift.action === 'aoe') {
+    if (mode === 'team') targets = teamTargets(me, gift.action === 'aoe');
+    else if (gift.action === 'aoe') {
       targets = others(me);
     } else {
       const locked = players.get(me.lockId);
@@ -323,11 +351,11 @@ ML.createGame = function (config, heroes) {
       t.hp -= dmg;
       me.prof.damage += dmg;
       if (t.isBoss) t.hits.set(me.id, (t.hits.get(me.id) || 0) + dmg);   // 記下誰打過 BOSS（打倒時經驗值平分給他們）
-      if (t.hp <= 0) { t.down = true; t.downAt = time; me.prof.kills++; if (t.isBoss) t.lastHitId = me.id; downed.push(t); }
+      if (t.hp <= 0) { markDown(t); if (!t.isStruct) me.prof.kills++; if (t.isBoss) t.lastHitId = me.id; downed.push(t); }
       return { id: t.id, dmg, down: t.down };
     });
     fx({ type: 'attack', id: me.id, action: gift.action, icon: gift.icon, skillName: me.hero.skillName, hits });
-    downed.forEach(t => { if (t.isBoss) bossDefeated(t, me); else { notice(`${me.name} 擊倒了 ${t.name}！`); gainKillXp(me, t); } });
+    downed.forEach(t => { if (t.isBoss) bossDefeated(t, me); else if (t.isStruct) structDown(t, me); else { notice(`${me.name} 擊倒了 ${t.name}！`); gainKillXp(me, t); } });
   }
 
   // ---------- BOSS ----------
@@ -405,7 +433,7 @@ ML.createGame = function (config, heroes) {
       const reduce = config.defenseFactor / (config.defenseFactor + stats(t).def);
       const dmg = Math.min(t.hp, Math.max(1, Math.round(b.def.atk * mult * roll * reduce)));
       t.hp -= dmg;
-      if (t.hp <= 0) { t.down = true; t.downAt = time; }
+      if (t.hp <= 0) markDown(t);
       return { id: t.id, dmg, down: t.down };
     });
     fx({ type: 'attack', id: b.id, action: aoe ? 'aoe' : 'attack', icon: '', skillName: aoe ? b.def.aoeName : b.def.skillName, label: aoe ? b.def.aoeName + '！' : '', hits });
@@ -425,7 +453,139 @@ ML.createGame = function (config, heroes) {
     else if (time >= b.nextAttackAt) { b.nextAttackAt = time + bossCfg.attackEverySeconds; bossStrike(b, false); }
   }
 
-  function reviveRemaining(p) { return p.down ? Math.max(0, config.reviveSeconds - (time - p.downAt)) : 0; }
+  function reviveRemaining(p) { return p.down ? Math.max(0, (p.reviveAfter || config.reviveSeconds) - (time - p.downAt)) : 0; }
+
+
+  // ---------- 陣營模式 ----------
+  // 倒地：記下時間；陣營模式的復活冷卻會越倒越久（60→90→120→180 秒，每場重算）
+  function markDown(t) {
+    t.down = true; t.downAt = time;
+    if (t.isStruct || t.isBoss) return;
+    t.deaths = (t.deaths || 0) + 1;
+    const arr = tc.reviveSeconds || [];
+    t.reviveAfter = mode === 'team' && arr.length ? arr[Math.min(t.deaths, arr.length) - 1] : config.reviveSeconds;
+  }
+  const isAlly = (a, b) => { const x = teamOf.get(a.id); if (b.isStruct) return !!(x && x.team === b.team); const y = teamOf.get(b.id); return !!(x && y && x.team === y.team); };
+  const teamCount = t => [...players.values()].filter(o => !o.isBoss && teamOf.has(o.id) && teamOf.get(o.id).team === t).length;
+  function autoAssign(id) {
+    const r = teamCount('red'), b = teamCount('blue');
+    teamOf.set(id, { team: r < b ? 'red' : b < r ? 'blue' : (Math.random() < 0.5 ? 'red' : 'blue'), chosen: false });
+  }
+  // 留言「加入紅隊／加入藍隊」：第一次選隊免費，之後每換一次隊算一次，每場最多 tc.maxSwitches 次
+  function joinTeam(user, team) {
+    let me = players.get(user.id);
+    if (!me) {
+      const dh = defaultHeroId && heroById.get(defaultHeroId);
+      if (!dh) { notice(`${user.name} 請先留言武將名字上場`); return; }
+      me = joinHero(user, dh);
+      if (!me) return;
+    }
+    const cur = teamOf.get(user.id) || { team: null, chosen: false };
+    if (cur.team === team) {
+      if (!cur.chosen) { cur.chosen = true; teamOf.set(user.id, cur); notice(`${me.name} 加入了${teamLabel(team)}`); } else notice(`${me.name} 已經在${teamLabel(team)}了`);
+      return;
+    }
+    const max = tc.maxSwitches === undefined ? 3 : tc.maxSwitches;
+    if (cur.chosen) {
+      const used = swaps.get(user.id) || 0;
+      if (used >= max) { notice(`${me.name} 這場的換隊次數（${max} 次）已經用完`); return; }
+      swaps.set(user.id, used + 1);
+      teamOf.set(user.id, { team, chosen: true });
+      notice(`${me.name} 換到${teamLabel(team)}（剩 ${max - used - 1} 次換隊）`);
+    } else {
+      teamOf.set(user.id, { team, chosen: true });
+      notice(`${me.name} 加入了${teamLabel(team)}`);
+    }
+    fx({ type: 'teamJoin', id: user.id, team });
+  }
+  function makeStruct(kind, team) {
+    const isTower = kind === 'tower', name = `${team === 'red' ? '紅方' : '藍方'}${isTower ? '防禦塔' : '主堡'}`;
+    const maxHp = isTower ? tc.towerHp : tc.baseHp;
+    return { id: `${kind}_${team}`, name, isStruct: true, kind, team, maxHp, hp: maxHp, down: false, downAt: 0, defv: isTower ? tc.towerDef : tc.baseDef,
+      hero: { heroId: 'struct', displayName: name, faction: 'Team', troop: 'Ranger', skillName: '' }, lockId: null, nextAt: 0 };
+  }
+  function initStructs() {
+    structs.clear();
+    for (const t of ['red', 'blue']) { const tw = makeStruct('tower', t); tw.nextAt = time + (tc.towerAttackEvery || 5); structs.set(tw.id, tw); const b = makeStruct('base', t); structs.set(b.id, b); }
+  }
+  // 敵方主堡能不能打：防禦塔已經倒了，而且那隊場上沒有活著的武將（沒人也算全倒）
+  function baseOpen(team) {
+    const tw = structs.get('tower_' + team);
+    if (!tw || !tw.down) return false;
+    return !teamCount0Alive(team);
+  }
+  const teamCount0Alive = team => [...players.values()].some(o => !o.isBoss && !o.down && teamOf.has(o.id) && teamOf.get(o.id).team === team);
+  // 陣營模式下，這次攻擊要打誰
+  function teamTargets(me, aoe) {
+    const mine = teamOf.get(me.id).team, foe = foeOf(mine);
+    const heroes = [...players.values()].filter(o => !o.isBoss && !o.down && teamOf.has(o.id) && teamOf.get(o.id).team === foe);
+    const tower = structs.get('tower_' + foe), base = structs.get('base_' + foe);
+    const towerUp = tower && !tower.down, baseUp = base && !base.down && baseOpen(foe);
+    const boss = players.get(BOSS_ID), bossUp = boss && !boss.down;
+    if (aoe) return [...heroes, ...(towerUp ? [tower] : []), ...(baseUp ? [base] : []), ...(bossUp ? [boss] : [])];
+    const locked = players.get(me.lockId) || structs.get(me.lockId);
+    if (locked && !locked.down) {
+      const ok = locked.isBoss ? true : locked.isStruct ? (locked.team === foe && (locked.kind === 'tower' || baseUp)) : (teamOf.has(locked.id) && teamOf.get(locked.id).team === foe);
+      if (ok) return [locked];
+      if (locked.isStruct && locked.team === foe && locked.kind === 'base') notice(`${me.name} 主堡還不能打（要先拆塔、而且對方全倒）`);
+    }
+    if (bossUp && Math.random() < (bossCfg.autoTargetChance || 0)) return [boss];
+    if (baseUp) return [base];
+    const pool = [...heroes, ...(towerUp ? [tower, tower] : [])];   // 塔算兩份，不然武將多的時候塔都沒人打
+    return pool.length ? [pool[Math.floor(Math.random() * pool.length)]] : [];
+  }
+  function structDown(t, killer) {
+    fx({ type: 'structDown', id: t.id });
+    if (t.kind === 'tower') { notice(`${killer.name} 拆掉了${t.name}！`); return; }
+    endMatch(foeOf(t.team), `${killer.name} 攻破了${t.name}！`);
+  }
+  function endMatch(winner, why) {
+    if (match.winner) return;
+    match.winner = winner; match.restartAt = time + (tc.resultSeconds || 15);
+    let nWin = 0, nLose = 0;
+    for (const [id, t] of teamOf) {
+      const prof = scores.get(id); if (!prof) continue;
+      const win = winner !== 'draw' && t.team === winner;
+      grantXp(prof, win ? tc.winXp : tc.loseXp);
+      if (win) nWin++; else nLose++;
+    }
+    fx({ type: 'teamWin', team: winner });
+    notice(winner === 'draw' ? '時間到，平手！' : `🏆 ${teamLabel(winner)}獲勝！`);
+    if (why) notice(why);
+    if (winner !== 'draw') notice(`${teamLabel(winner)} ${nWin} 位玩家各 +${tc.winXp} 經驗，${teamLabel(foeOf(winner))} ${nLose} 位各 +${tc.loseXp}`);
+  }
+  // 新的一場：塔堡回滿、大家滿血復活、隊伍重新分（系統先平均分，玩家可以再自己選）
+  function restartMatch(manual) {
+    initStructs();
+    teamOf.clear(); swaps.clear(); match = { winner: null, restartAt: 0, time: 0 };
+    const list = [...players.values()].filter(o => !o.isBoss).sort(() => Math.random() - 0.5);
+    for (const p of list) { p.down = false; p.hp = p.maxHp; p.deaths = 0; p.reviveAfter = 0; p.lockId = null; autoAssign(p.id); fx({ type: 'revive', id: p.id, quiet: true }); }
+    fx({ type: 'matchReset' });
+    notice(manual ? '主播重開了陣營賽！可以留言「加入紅隊／加入藍隊」重新選隊' : '新的一場開始！可以留言「加入紅隊／加入藍隊」重新選隊');
+  }
+  function teamTick(dt) {
+    if (match.winner) { if (time >= match.restartAt) restartMatch(false); return; }
+    const hasR = teamCount('red') > 0, hasB = teamCount('blue') > 0;
+    if (hasR && hasB) match.time += dt;
+    if (tc.matchSeconds && match.time >= tc.matchSeconds) {
+      const r = structs.get('base_red'), b = structs.get('base_blue'), pr = r.hp / r.maxHp, pb = b.hp / b.maxHp;
+      endMatch(Math.abs(pr - pb) < 1e-6 ? 'draw' : pr > pb ? 'red' : 'blue', '時間到，比主堡剩餘血量');
+      return;
+    }
+    // 防禦塔反擊：每隔幾秒隨機打敵方一位活著的武將
+    for (const tw of structs.values()) {
+      if (tw.kind !== 'tower' || tw.down || time < tw.nextAt) continue;
+      tw.nextAt = time + (tc.towerAttackEvery || 5);
+      const pool = [...players.values()].filter(o => !o.isBoss && !o.down && teamOf.has(o.id) && teamOf.get(o.id).team === foeOf(tw.team));
+      if (!pool.length) continue;
+      const t = pool[Math.floor(Math.random() * pool.length)];
+      const roll = 1 + (Math.random() * 2 - 1) * config.damageVariance, reduce = config.defenseFactor / (config.defenseFactor + stats(t).def);
+      const dmg = Math.min(t.hp, Math.max(1, Math.round(tc.towerAtk * roll * reduce)));
+      t.hp -= dmg; if (t.hp <= 0) markDown(t);
+      fx({ type: 'attack', id: tw.id, action: 'attack', icon: '', skillName: '', hits: [{ id: t.id, dmg, down: t.down }] });
+      if (t.down) notice(`${tw.name}擊倒了 ${t.name}！`);
+    }
+  }
 
   const gameApi = {
     setHeroPool,
@@ -449,6 +609,7 @@ ML.createGame = function (config, heroes) {
     // 每一格畫面呼叫一次，dt = 經過的秒數
     update(dt) {
       time += dt;
+      if (mode === 'team') teamTick(dt);
       for (const p of [...players.values()]) {
         if (p.isBoss) { bossUpdate(p); continue; }
         tickBuffs(p, dt);
@@ -464,6 +625,7 @@ ML.createGame = function (config, heroes) {
     // 清空場上。keepProgress = true 時保留每位觀眾的等級、經驗值、擊倒數（只把場上武將和傷害排行榜清掉）
     reset(keepProgress) {
       players.clear(); left.clear(); killLog.clear(); bossQueue.length = 0; time = 0;
+      teamOf.clear(); swaps.clear(); match = { winner: null, restartAt: 0, time: 0 }; if (mode === 'team') initStructs();
       scores.forEach(s => { s.buffs = null; });   // 遊戲時間歸零，BUFF 也一併清掉
       if (keepProgress) scores.forEach(s => { s.damage = 0; }); else scores.clear();
     },
@@ -559,7 +721,47 @@ ML.createGame = function (config, heroes) {
     // 測試用：把 BOSS 血量直接設成某個比例（測試尾刀獎勵）／把 BOSS 和排隊全部清掉
     debugBossHp(ratio) { const b = players.get(BOSS_ID); if (b && !b.down) b.hp = Math.max(1, Math.round(b.maxHp * ratio)); },
     clearBosses() { bossQueue.length = 0; if (players.has(BOSS_ID)) { players.delete(BOSS_ID); fx({ type: 'bossGone', id: BOSS_ID }); } },
-    getPlayer(id) { return players.get(id); },
+    // ---------- 陣營模式 API ----------
+    getMode() { return mode; },
+    setMode(m) {
+      if (m === mode) { notice(m === 'team' ? '已經是陣營模式了' : '已經是亂鬥模式了'); return; }
+      mode = m === 'team' ? 'team' : 'brawl';
+      teamOf.clear(); swaps.clear(); match = { winner: null, restartAt: 0, time: 0 };
+      if (mode === 'team') {
+        initStructs();
+        const list = [...players.values()].filter(o => !o.isBoss).sort(() => Math.random() - 0.5);
+        for (const p of list) { p.deaths = 0; p.reviveAfter = 0; p.lockId = null; autoAssign(p.id); }
+        notice('⚔ 切換成陣營模式！留言「加入紅隊／加入藍隊」選隊（可換 3 次）');
+      } else {
+        structs.clear();
+        for (const p of players.values()) p.lockId = null;
+        notice('🥊 切換回亂鬥模式');
+      }
+      fx({ type: 'modeChange', mode });
+    },
+    restartMatch() { if (mode === 'team') restartMatch(true); },
+    getStructs() { return [...structs.values()]; },
+    teamOf(id) { const t = teamOf.get(id); return t ? t.team : null; },
+    teamInfo() {
+      if (mode !== 'team') return null;
+      const left = tc.matchSeconds ? Math.max(0, tc.matchSeconds - match.time) : 0;
+      return { red: teamCount('red'), blue: teamCount('blue'), winner: match.winner, restartIn: match.winner ? Math.max(0, match.restartAt - time) : 0, left,
+        baseState: t => { const b = structs.get('base_' + t), tw = structs.get('tower_' + t); return b && b.down ? 'down' : baseOpen(t) ? 'open' : tw && !tw.down ? 'tower' : 'guarded'; } };
+    },
+    exportMode() {
+      return mode !== 'team' ? null : { mode, teams: [...teamOf].map(([id, t]) => [id, t.team, t.chosen ? 1 : 0]), swaps: [...swaps], match: { winner: match.winner, time: match.time },
+        structs: [...structs.values()].map(s => ({ id: s.id, hp: s.hp, down: s.down })) };
+    },
+    importMode(m) {
+      if (!m || m.mode !== 'team') return;
+      if (mode !== 'team') { mode = 'team'; initStructs(); }
+      for (const [id, team, chosen] of m.teams || []) if (players.has(id) && (team === 'red' || team === 'blue')) teamOf.set(id, { team, chosen: !!chosen });
+      for (const pl of players.values()) if (!pl.isBoss && !teamOf.has(pl.id)) autoAssign(pl.id);
+      for (const [id, n] of m.swaps || []) swaps.set(id, n);
+      for (const r of m.structs || []) { const s = structs.get(r.id); if (s) { s.hp = Math.max(0, Math.min(s.maxHp, Number(r.hp) || 0)); s.down = !!r.down || s.hp <= 0; } }
+      if (m.match) { match.time = Number(m.match.time) || 0; }
+    },
+    getPlayer(id) { return players.get(id) || structs.get(id); },
     reviveRemaining,
     stats,
     xpNeed,

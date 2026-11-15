@@ -157,6 +157,8 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div class="row"><select id="p-hero"></select><button id="p-join" class="main">留言武將名（上場）</button></div>
         <div class="row"><select id="p-target"></select><button id="p-lock">留言 @名字（鎖定）</button></div>
         <div class="row"><button id="p-unlock">留言「解除鎖定」</button><button id="p-leave">留言「烙跑」</button></div>
+        <div class="row"><button id="p-red">留言「加入紅隊」</button><button id="p-blue">留言「加入藍隊」</button></div>
+        <div class="row"><button id="p-modeteam">切換陣營模式</button><button id="p-modebrawl">切換亂鬥模式</button></div>
         <div class="row"><input id="p-text" placeholder="自己打留言內容"><button id="p-say">送出留言</button></div>
         <div class="sub">送禮</div>
         <div class="row">數量 <input id="p-count" type="number" min="1" value="1" style="width:60px;flex:none"></div>
@@ -489,6 +491,10 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   $('#p-lock').onclick = () => { if (targetSel.value) hub.chat(me(), '@' + targetSel.value); };
   $('#p-unlock').onclick = () => hub.chat(me(), config.commands.unlock[0]);
   $('#p-leave').onclick = () => hub.chat(me(), config.commands.leave[0]);
+  $('#p-red').onclick = () => hub.chat(me(), config.commands.joinRed[0]);
+  $('#p-blue').onclick = () => hub.chat(me(), config.commands.joinBlue[0]);
+  $('#p-modeteam').onclick = () => game.setMode('team');
+  $('#p-modebrawl').onclick = () => game.setMode('brawl');
   $('#p-say').onclick = () => { const t = $('#p-text').value; if (t.trim()) { hub.chat(me(), t); $('#p-text').value = ''; } };
   $('#p-text').onkeydown = e => { if (e.key === 'Enter') $('#p-say').click(); };
   $('#p-gifts').onclick = e => {
