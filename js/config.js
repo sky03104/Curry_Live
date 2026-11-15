@@ -5,6 +5,20 @@
 // ============================================================
 window.GAME_CONFIG = {
 
+  // ---------- 武將專屬特效（js/hero-fx.js 有每種演出的說明）----------
+  // 每隻武將的普攻（attack）和技能（skill）各挑一種演出；沒登記的魏蜀吳群照原本依兵種的演出，沒登記的萌國角色會自動配一組。
+  // 新增角色時在這裡加一行；style 從 hero-fx.js 的 STYLES 挑，emoji／color／n 是可調參數。
+  heroFx: {
+    michelin: { attack: { style: 'bite', color: '#ffffff' }, skill: { style: 'emojiRain', emoji: '🦴', n: 12, color: '#ffe9c0' } },   // 米其林：咬一口、骨頭雨
+    dabao:    { attack: { style: 'claw', color: '#ffb36b' }, skill: { style: 'windBlades', emoji: '🍃', color: '#8fffd0' } },          // 大寶：爪痕、風刃旋風
+    pudding:  { attack: { style: 'emojiPop', emoji: '💖', color: '#ff8fb8' }, skill: { style: 'heartWave', emoji: '💖', color: '#ff8fb8' } },   // 布丁：愛心爆、暖心光波
+    yuge:     { attack: { style: 'emojiPop', emoji: '🎃', color: '#ff9a3c' }, skill: { style: 'emojiRain', emoji: '🎃', n: 9, big: 0.7, color: '#ff9a3c' } },   // 魚哥：南瓜爆、南瓜雨
+    hamster:  { attack: { style: 'projectile', emoji: '🧀', color: '#ffd35c' }, skill: { style: 'emojiStorm', emoji: '🧀', n: 18, color: '#ffd35c' } },   // 西當普利鼠：丟起司、起司旋風
+    yam:      { attack: { style: 'claw', color: '#b06cff' }, skill: { style: 'tigerPounce', color: '#b06cff' } },                      // 蕃薯：紫色爪痕、猛虎撲殺
+    xiaoni:   { attack: { style: 'shockSmash', color: '#ffd35c' }, skill: { style: 'stampSmash', text: '100T', color: '#ffd35c' } },   // 小妮：重擊震波、100T 大字砸下來
+  },
+  heroFxAuto: true,   // 沒登記的萌國角色自動配一組專屬特效（false＝不配，維持依兵種的演出）
+
   // ---------- 陣營模式（主播按「切換陣營模式」才會用到；平常是亂鬥模式）----------
   // 場地由左到右：紅方主堡｜紅隊武將｜紅方防禦塔｜藍方防禦塔｜藍隊武將｜藍方主堡
   // 規則：只能打敵方（武將、防禦塔、主堡），不能打同隊；敵塔倒了、而且敵方場上武將全部倒地，才能打主堡；主堡倒了那隊輸。
