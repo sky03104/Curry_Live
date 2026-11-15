@@ -77,6 +77,7 @@ ML.createHostCommands = function (config) {
     // 主播按鈕（面板上點一下）：跟留言指令一樣的結果格式，但不用比對文字。action 是動作代號（attack、skill、boss1…或 revive），arg 是復活的對象（空白＝自己、「全部」）
     press(action, count, arg) {
       if (action === REVIVE) return { revive: String(arg || '').slice(0, 40) };
+      if (action === 'healall') return { healAll: true, label: '全部回血' };   // 只有按鈕有：全場活著的武將一起補滿血
       if (!actionToGift[action]) return null;
       return { giftId: actionToGift[action], count: Math.max(1, Math.min(maxCount(action), Math.floor(Number(count)) || 1)), label: label(action) };
     },
