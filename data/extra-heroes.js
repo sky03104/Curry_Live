@@ -21,4 +21,6 @@ window.HEROES_DATA = window.HEROES_DATA.concat([
   { heroId: 'yam', displayName: '蕃薯', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '黑虎撲殺', extra: true },
   // 小妮：萌國的長髮女孩猛將（灰色棒球帽＋墨鏡、灰色短背心與運動長褲、白拖鞋），武器是 100T 黑色大錘子。能力值取猛將中間檔（同米其林），技能「百噸重錘」，演出＝衝撞地裂。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
   { heroId: 'xiaoni', displayName: '小妮', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '百噸重錘', extra: true },
+  // Joy：萌國的約克夏小狗遊俠（紅纓頭盔、金紅鎧甲、背著劍鞘）。能力值取遊俠平均（同大寶），技能「紅纓突襲」。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
+  { heroId: 'joy', displayName: 'Joy', faction: 'Meng', troop: 'Ranger', baseHp: 540, baseAtk: 72, baseArmor: 25, skillName: '紅纓突襲', extra: true },
 ]);
