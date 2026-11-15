@@ -159,7 +159,8 @@ ML.createGame = function (config, heroes) {
   }
 
   function handleChat(user, rawText) {
-    const text = rawText.trim();
+    // 全形英文（Ｊｏｙ）轉半形、去掉看不見的字元（零寬空白等），再比對；直播軟體傳來的留言常夾這些
+    const text = String(rawText).normalize('NFKC').replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim();
     const me = players.get(user.id);
 
     if (isLeaveCommand(text)) { if (me) leave(me); return; }
@@ -192,7 +193,8 @@ ML.createGame = function (config, heroes) {
       return;
     }
 
-    const hit = nameTable.find(([name]) => text.includes(name));
+    const lowText = text.toLowerCase();   // 英文名字（Joy）不分大小寫：打 joy、JOY 也算
+    const hit = nameTable.find(([name]) => lowText.includes(name.toLowerCase()));
     if (!hit) return;   // 沒提到武將
     if (me) { switchHero(me, text, hit[1]); return; }
     joinHero(user, hit[1]);
@@ -284,7 +286,7 @@ ML.createGame = function (config, heroes) {
   // 已在場上的觀眾可以換武將，血量照比例帶過去（剩三成血，換過去也是三成），所以不能靠換角補血。
   // 留言必須「剛好只有武將名」才算換角，避免聊天時提到別的武將（例如「呂布好強」）就被誤換。
   function switchHero(me, text, hero) {
-    if (text !== hit_name(text) || hero === me.hero) return;
+    if (!hit_name(text) || hero === me.hero) return;
     if (race && race.entrants.has(me.id) && hero.faction !== (tr.faction || 'Meng')) { notice(`${me.name} 參賽中只能換成萌國武將`); return; }
     if (time < (me.switchReadyAt || 0)) { notice(`${me.name} 剛換過武將，請稍等`); return; }
     me.hero = hero;
@@ -295,7 +297,7 @@ ML.createGame = function (config, heroes) {
     notice(`${me.name} 換成了 ${hero.displayName}`);
   }
   // 這段留言如果剛好等於某個武將名（或別名）就回傳它，否則回傳 null
-  function hit_name(text) { const m = nameTable.find(([name]) => name === text); return m ? m[0] : null; }
+  function hit_name(text) { const low = text.toLowerCase(); const m = nameTable.find(([name]) => name.toLowerCase() === low); return m ? m[0] : null; }
 
   // ---------- 送禮 ----------
   function handleGift(user, giftId, rawCount, comboMax) {   // comboMax：這次最多算幾個（觀眾連送用 maxGiftCombo；主播文字指令放寬到 hostMaxCount）
