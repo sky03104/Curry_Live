@@ -269,6 +269,7 @@ window.GAME_CONFIG = {
       idle: { src: 'yam_idle.png', frames: 8, cw: 298, ch: 423, ground: 420, fps: 3, repeat: 2 },
       attack: { src: 'yam_attack.png', frames: 8, cw: 701, ch: 458, ground: 406, fps: 13 },
       skill: { src: 'yam_attack.png', frames: 8, cw: 701, ch: 458, ground: 406, fps: 11 },
+      walk: { src: 'yam_walk.png', frames: 12, cw: 373, ch: 392, ground: 388, fps: 10 },   // 走路循環（12 格，原圖第 10~12 格畫成面向右，已單獨翻面）
     },
     dabao: {
       eat: { src: 'dabao_drumstick.png', frames: 8, cw: 379, ch: 360, ground: 350, fps: 3 },   // 回血：吃大雞腿（一輪）
