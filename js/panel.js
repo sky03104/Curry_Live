@@ -159,7 +159,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div class="row"><select id="p-target"></select><button id="p-lock">留言 @名字（鎖定）</button></div>
         <div class="row"><button id="p-unlock">留言「解除鎖定」</button><button id="p-leave">留言「烙跑」</button></div>
         <div class="row"><button id="p-red">留言「加入紅隊」</button><button id="p-blue">留言「加入藍隊」</button></div>
-        <div class="row"><button id="p-ropen">開放報名（賽跑）</button><button id="p-rjoin">留言「我要參賽」</button></div>
+        <div class="row"><button id="p-ropen">開放報名（賽跑）</button><button id="p-hopen">開放障礙賽</button><button id="p-rjoin">留言「我要參賽」</button></div>
         <div class="row"><button id="p-rstart">提早開跑</button><button id="p-rboost">玫瑰（助力）</button><button id="p-rhinder">GG（干擾）</button></div>
         <div class="row"><button id="p-modeteam">切換陣營模式</button><button id="p-modebrawl">切換亂鬥模式</button></div>
         <div class="row"><input id="p-text" placeholder="自己打留言內容"><button id="p-say">送出留言</button></div>
@@ -503,6 +503,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   $('#p-red').onclick = () => hub.chat(me(), config.commands.joinRed[0]);
   $('#p-blue').onclick = () => hub.chat(me(), config.commands.joinBlue[0]);
   $('#p-ropen').onclick = () => game.setMode('race');
+  $('#p-hopen').onclick = () => game.setMode('hurdle');
   $('#p-rjoin').onclick = () => hub.chat(me(), config.commands.raceJoin[0]);
   $('#p-rstart').onclick = () => game.hostPress({ id: 'panel', name: '面板' }, { race: 'start' });
   $('#p-rboost').onclick = () => hub.emit({ type: 'tiktokGift', user: me(), gift: { name: config.race.giftNames.boost[0] }, count: 1 });

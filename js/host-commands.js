@@ -78,6 +78,7 @@ ML.createHostCommands = function (config) {
     press(action, count, arg) {
       if (action === REVIVE) return { revive: String(arg || '').slice(0, 40) };
       if (action === 'raceOpen') return { race: 'open', label: '開放報名' };
+      if (action === 'hurdleOpen') return { race: 'openHurdle', label: '開放障礙賽' };
       if (action === 'raceStart') return { race: 'start', label: '提早開跑' };
       if (action === 'raceCancel') return { race: 'cancel', label: '取消比賽' };
       if (action === 'modeTeam') return { setMode: 'team', label: '陣營模式' };         // 只有按鈕有：切換玩法模式

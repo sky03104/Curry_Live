@@ -34,6 +34,27 @@ window.ML = window.ML || {};
       theme: { surface: 'rgba(255,160,190,0.9)', infield: 'rgba(255,225,235,0.58)', edge: 'white', deco: 'hearts' } },
     { id: 'lshape', poly: [[-1, -1], [0.15, -1], [0.15, 0.1], [1, 0.1], [1, 1], [-1, 1]], round: 3,
       theme: { surface: 'rgba(58,62,70,0.92)', infield: 'rgba(110,120,135,0.5)', edge: 'white', center: 'rgba(255,214,60,0.85)', deco: 'city' } },
+    // ---------- 障礙賽專用的 10 種賽道（id 都以 h_ 開頭；清單在 config.race.hurdleTracks）----------
+    { id: 'h_jungle', lowStart: true, f: u => { const a = ang(u); return [Math.cos(a) + 0.14 * Math.sin(3 * a), 0.9 * Math.sin(a) + 0.12 * Math.cos(4 * a)]; },
+      theme: { surface: 'rgba(150,108,56,0.9)', infield: 'rgba(40,110,50,0.55)', edge: 'white', edgeColor: '#d8f0b0', deco: 'emoji', emojis: ['🌴', '🌿', '🦜', '🍃'] } },
+    { id: 'h_canyon', poly: [[-1, -1], [0.3, -1], [0.3, -0.2], [1, -0.2], [1, 1], [-0.3, 1], [-0.3, 0.2], [-1, 0.2]], round: 2,
+      theme: { surface: 'rgba(204,120,72,0.92)', infield: 'rgba(160,84,50,0.55)', edge: 'white', edgeColor: '#ffe2c0', deco: 'emoji', emojis: ['🌵', '🪨', '🦂'] } },
+    { id: 'h_snow', poly: [[-1, 0.9], [-0.55, 0], [-0.25, 0.3], [0.15, -1], [0.6, 0.15], [1, 0.9]], round: 2,
+      theme: { surface: 'rgba(214,232,248,0.94)', infield: 'rgba(120,160,205,0.5)', edge: 'neon', edgeColor: '#ffffff', glow: '#8fd8ff', deco: 'emoji', emojis: ['❄️', '⛄', '🏔️'] } },
+    { id: 'h_castle', poly: [[-0.36, -1], [0.36, -1], [0.36, -0.36], [1, -0.36], [1, 0.36], [0.36, 0.36], [0.36, 1], [-0.36, 1], [-0.36, 0.36], [-1, 0.36], [-1, -0.36], [-0.36, -0.36]], round: 2,
+      theme: { surface: 'rgba(120,124,136,0.94)', infield: 'rgba(70,72,86,0.6)', edge: 'curb', ticks: 'rgba(30,30,40,0.35)', deco: 'emoji', emojis: ['🏰', '🛡️', '⚔️'] } },
+    { id: 'h_candy', f: u => { const a = ang(u), r = 1 + 0.075 * Math.tanh(4 * Math.sin(10 * a)); return [r * Math.cos(a), r * Math.sin(a)]; },
+      theme: { surface: 'rgba(255,170,205,0.92)', infield: 'rgba(255,238,200,0.6)', edge: 'curb', lane: 'rgba(255,255,255,0.45)', deco: 'emoji', emojis: ['🍭', '🍬', '🧁', '🍩'] } },
+    { id: 'h_space', f: u => { const a = ang(u), r = 1 + 0.13 * Math.sin(3 * a + 1) + 0.08 * Math.sin(5 * a + 2); return [r * Math.cos(a), r * Math.sin(a)]; },
+      theme: { surface: 'rgba(62,54,110,0.94)', infield: 'rgba(16,12,40,0.7)', edge: 'neon', edgeColor: '#ffd9a0', glow: '#ff9a3c', deco: 'emoji', emojis: ['☄️', '🪐', '⭐', '🛸'] } },
+    { id: 'h_volcano', f: u => { const a = ang(u), x = Math.cos(a); let y = Math.sin(a); if (y < 0) y += 0.5 * (1 - x * x) * -y * 2.2 * 0.5; return [x, y]; },
+      theme: { surface: 'rgba(96,36,28,0.95)', infield: 'rgba(50,16,12,0.65)', edge: 'neon', edgeColor: '#ff9a5a', glow: '#ff5a1f', deco: 'emoji', emojis: ['🌋', '🔥', '💥'] } },
+    { id: 'h_river', f: u => { const a = ang(u), x = Math.cos(a); return [x, 0.5 * Math.sin(3 * x) + 0.42 * Math.sin(a)]; },
+      theme: { surface: 'rgba(70,170,230,0.92)', infield: 'rgba(210,240,255,0.55)', edge: 'white', lane: 'rgba(255,255,255,0.5)', deco: 'emoji', emojis: ['🫧', '💦', '🐟', '🦆'] } },
+    { id: 'h_terrace', poly: [[-1, 1], [1, 1], [1, 0.3], [0.4, 0.3], [0.4, -0.3], [-0.2, -0.3], [-0.2, -1], [-1, -1]], round: 2,
+      theme: { surface: 'rgba(196,164,96,0.94)', infield: 'rgba(110,170,80,0.55)', edge: 'white', edgeColor: '#fff3c4', deco: 'emoji', emojis: ['🌾', '🌱', '🐝'] } },
+    { id: 'h_circus', poly: (() => { const p = []; for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; p.push([Math.cos(a), Math.sin(a)]); } return p; })(), round: 1,
+      theme: { surface: 'rgba(170,70,200,0.92)', infield: 'rgba(255,224,120,0.55)', edge: 'curb', deco: 'emoji', emojis: ['🎈', '🎪', '🤡', '🎠'] } },
   ];
   const BY_ID = {}; TRACKS.forEach(t => { BY_ID[t.id] = t; });
   ML.raceTrackIds = TRACKS.map(t => t.id);
@@ -83,6 +104,7 @@ window.ML = window.ML || {};
       const score = p[i][1] - 0.15 * Math.abs(p[i][0]);
       if (score > bestScore) { bestScore = score; best = i; }
     }
+    if (d.lowStart) { best = 0; for (let i = 1; i < N; i++) if (p[i][1] - 0.15 * Math.abs(p[i][0]) > p[best][1] - 0.15 * Math.abs(p[best][0])) best = i; }   // 形狀太彎、找不到平順的直線時：直接用最低的點當起點
     if (best < 0) for (let i = 0; i < N; i++) if (p[i][1] > bestScore) { bestScore = p[i][1]; best = i; }
     if (!d.keepStart) p = p.slice(best).concat(p.slice(0, best));
     return (baseCache[id] = p);
@@ -156,6 +178,7 @@ window.ML = window.ML || {};
     else if (th.deco === 'lava') { ctx.strokeStyle = 'rgba(255,120,40,0.75)'; ctx.lineWidth = 2 * sc; ctx.lineJoin = 'miter'; for (let i = 0; i < D.length; i += 2) { const d = D[i], e = D[i + 1]; ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x + (e.r - 0.5) * 40 * sc, d.y + 10 * sc); ctx.lineTo(d.x + (e.r - 0.5) * 22 * sc, d.y + 22 * sc); ctx.lineTo(d.x + (d.r - 0.5) * 50 * sc, d.y + 36 * sc); ctx.stroke(); } ctx.lineJoin = 'round'; }
     else if (th.deco === 'waves') { ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2 * sc; for (const d of D) { const w = (7 + d.r * 7) * sc; ctx.beginPath(); ctx.moveTo(d.x - w, d.y); ctx.quadraticCurveTo(d.x - w / 2, d.y - w / 2, d.x, d.y); ctx.quadraticCurveTo(d.x + w / 2, d.y + w / 2, d.x + w, d.y); ctx.stroke(); } }
     else if (th.deco === 'stars') { for (const d of D) { ctx.fillStyle = `rgba(255,255,255,${0.45 + d.r * 0.5})`; const r = (0.8 + d.r * 1.8) * sc; ctx.beginPath(); ctx.arc(d.x, d.y, r, 0, TAU); ctx.fill(); if (d.k === 0) { ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(d.x - r * 3, d.y); ctx.lineTo(d.x + r * 3, d.y); ctx.moveTo(d.x, d.y - r * 3); ctx.lineTo(d.x, d.y + r * 3); ctx.stroke(); } } }
+    else if (th.deco === 'emoji') { const em = th.emojis || ['⭐']; ctx.globalAlpha = 0.6; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; for (let i = 0; i < D.length; i += 2) { const d = D[i]; ctx.font = `${Math.round((13 + d.r * 14) * sc)}px sans-serif`; ctx.fillText(em[d.k % em.length], d.x, d.y); } ctx.globalAlpha = 1; }
     else if (th.deco === 'hearts') { ctx.globalAlpha = 0.6; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; for (let i = 0; i < D.length; i += 2) { const d = D[i]; ctx.font = `${Math.round((12 + d.r * 12) * sc)}px sans-serif`; ctx.fillText(d.k % 2 ? '💗' : '💕', d.x, d.y); } ctx.globalAlpha = 1; }
     else if (th.deco === 'city') { for (let i = 0; i < D.length; i += 2) { const d = D[i], w = (14 + d.r * 22) * sc, h = (14 + D[i + 1].r * 22) * sc; ctx.fillStyle = 'rgba(70,80,100,0.55)'; ctx.fillRect(d.x - w / 2, d.y - h / 2, w, h); ctx.fillStyle = 'rgba(255,230,140,0.7)'; ctx.fillRect(d.x - w / 2 + 2, d.y - h / 2 + 2, Math.max(2, w / 4), Math.max(2, h / 5)); } }
     ctx.restore();
@@ -189,7 +212,7 @@ window.ML = window.ML || {};
   }
   // 跑道畫在一張離螢幕的圖上（尺寸不變就不重畫），每格只貼上去；「起跑線」字樣每格直接畫（要用 render 的字型函式）
   ML.drawRaceTrack = function (ctx, T, text, segs) {
-    const cv = ctx.canvas, tf = ctx.getTransform(), key = [cv.width, cv.height, tf.a.toFixed(3), tf.d.toFixed(3), T.id, T.cx, T.cy, T.rx, T.ry, T.band, T.n].join('|');
+    const cv = ctx.canvas, tf = ctx.getTransform(), key = [cv.width, cv.height, tf.a.toFixed(3), tf.d.toFixed(3), T.id, T.cx, T.cy, T.rx, T.ry, T.band, T.n, segs].join('|');
     if (!T.layer || T.layer.key !== key) {
       const c2 = document.createElement('canvas'); c2.width = cv.width; c2.height = cv.height;
       const x2 = c2.getContext('2d'); x2.setTransform(tf.a, 0, 0, tf.d, 0, 0);
