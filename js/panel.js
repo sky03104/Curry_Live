@@ -27,9 +27,9 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       </div>
     </details>
 <details class="card" data-k="cloud">
-      <summary><span class="ico">☁️</span>雲端存檔（Firebase）<em id="cl-badge"></em></summary>
+      <summary><span class="ico">☁️</span>雲端存檔（Supabase＋Firebase 備份）<em id="cl-badge"></em></summary>
       <div class="body">
-        <div class="hint">把等級備份到 Firebase：換電腦、重灌、換直播軟體都還在。<b>只有直播畫面會寫入雲端</b>，這個面板視窗只讀取（免得測試用的假觀眾污染真的存檔）。</div>
+        <div class="hint">把等級備份到雲端（主要存 Supabase，同時在 Firebase 留一份備份）：換電腦、重灌、換直播軟體都還在。<b>只有直播畫面會寫入雲端</b>，這個面板視窗只讀取（免得測試用的假觀眾污染真的存檔）。</div>
         <div class="hint" id="cl-status"></div>
         <div class="row"><input id="cl-token" placeholder="雲端代號（按「開啟」自動產生）"><button id="cl-copy" style="flex:none">複製</button></div>
         <div class="row"><button id="cl-on">開啟雲端存檔</button><button id="cl-test">測試連線</button></div>

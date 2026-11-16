@@ -182,9 +182,14 @@ window.GAME_CONFIG = {
   save: {
     enabled: true,              // false = 不存檔，每次開播等級都從 1 開始
     intervalSeconds: 5,         // 每隔幾秒存一次（有變動才存）
-    // 雲端存檔（Firebase）：要在面板按「開啟雲端存檔」產生代號後才會真的使用，詳見 js/cloud-save.js
+    // 雲端存檔（主要 Supabase、備份 Firebase）：要在面板按「開啟雲端存檔」產生代號後才會真的使用，詳見 js/cloud-save.js
     cloud: {
       enabled: true,            // false = 完全不使用雲端存檔
+      // 主要：Supabase（2026-11-16 起）。網址和公開金鑰本來就是給網頁用的，不是密碼；資料表權限由 supabase/schema.sql 鎖住。
+      supabase: { url: 'https://tjrlpthprtrlmugrofpj.supabase.co', key: 'sb_publishable_u9lUyPB8fr2jmHji_ZVAJA_OtxLQuoS' },
+      backup: true,             // true = 每次存進 Supabase 也在 Firebase 留一份備份，Supabase 連不上時自動改走 Firebase；false = 不寫 Firebase
+      primary: 'supabase',      // 想暫時退回只用 Firebase，改成 'firebase'
+      // 備份：Firebase
       projectId: 'mengzhan-sanguo',
       apiKey: 'AIzaSyBzJytVzlJv2E6_6bSgs42WHG-2YFmhSuY',   // Firebase 網頁用金鑰，本來就是公開的，不是密碼
       baseUrl: 'https://firestore.googleapis.com',
