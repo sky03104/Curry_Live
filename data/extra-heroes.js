@@ -25,4 +25,6 @@ window.HEROES_DATA = window.HEROES_DATA.concat([
   { heroId: 'joy', displayName: '九億', faction: 'Meng', troop: 'Ranger', baseHp: 540, baseAtk: 72, baseArmor: 25, skillName: '紅纓突襲', extra: true },
   // 那隻喵（2026-11-16 咖哩第九隻）：萌國的布偶貓謀士（藍紫金披風、肉球徽章、小金冠；設定稿標「貓將・智謀・輔佐・謀略」）。能力值取謀士水準（同西當普利鼠：血少、攻中、防低），技能「雲爪妙計」，演出＝法陣落雷。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
   { heroId: 'nekomeow', displayName: '那隻喵', faction: 'Meng', troop: 'Strategist', baseHp: 600, baseAtk: 68, baseArmor: 28, skillName: '雲爪妙計', extra: true },
+  // 學姊（2026-11-16 咖哩第十隻）：萌國的長髮眼鏡女孩統帥（灰色連帽、牛仔外套、黑色上衣短褲、光腳，手拿冰抹茶拿鐵）。能力值取統帥平均（同布丁），技能「學姊罩你」，演出＝光環＋光柱。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。原圖的杯子上有星巴克的商標，已在圖上把商標塗成素色綠色圓形貼紙（見 CLAUDE.md）。
+  { heroId: 'xuejie', displayName: '學姊', faction: 'Meng', troop: 'Commander', baseHp: 746, baseAtk: 55, baseArmor: 34, skillName: '學姊罩你', extra: true },
 ]);

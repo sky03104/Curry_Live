@@ -223,11 +223,11 @@ const AVAIL_H = 1920 - 130 - 300 - 90 - 140;   // 扣掉上面標題列、陣營
 for (const key of FACTION_ORDER) {
   const f = factions[key], list = heroData.filter(h => h.faction === key);
   if (!list.length) continue;
-  const rows = Math.ceil(list.length / 3), perRow = Math.min(rows === 1 ? 520 : 430, (AVAIL_H - (key === 'Meng' ? 440 : 0) - (rows - 1) * 14) / rows), imgH = Math.round(perRow - 118);
+  const rows = Math.ceil(list.length / 3), perRow = Math.min(rows === 1 ? 520 : 430, (AVAIL_H - (key === 'Meng' ? 300 : 0) - (rows - 1) * 14) / rows), imgH = Math.round(perRow - 118);
   slides.push(`<div class="slide" style="--c:${f.color}">${top(slides.length + 1)}<div class="body" style="justify-content:flex-start">
     <div class="fac-head"><div class="seal">${f.label}</div><div class="tt">${f.label + (key === 'Meng' ? '國' : '')}武將<small>${list.length} 位武將　留言名字就能選</small></div></div>
     <div class="grid3">${list.map(h => `<div class="hc"><div class="pic"><img src="${img(h.heroId + '.png')}" style="height:${imgH}px"></div><div class="nm">${h.displayName}</div><div class="sk">${h.skillName}</div></div>`).join('')}</div>
-    ${key === 'Meng' ? `<div class="card" style="margin-top:24px;padding-left:36px;text-align:center;background:#FBE9F0;border-color:#F3C4D6"><p style="font-size:46px;line-height:1.5"><b>直播亂鬥專屬的萌國角色</b><br>其他地方看不到，<br>留言名字就能選！<br>${heroData.filter(h => h.faction === 'Meng').map(h => `<span class="say">${h.displayName}</span>`).join('')}</p></div>` : ''}
+    ${key === 'Meng' ? `<div class="card" style="margin-top:24px;padding-left:36px;text-align:center;background:#FBE9F0;border-color:#F3C4D6"><p style="font-size:46px;line-height:1.5"><b>直播亂鬥專屬的萌國角色</b><br>其他地方看不到，<br>留言名字就能選！</p></div>` : ''}
   </div></div>`);
 }
 
