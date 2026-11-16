@@ -704,7 +704,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const D = game.getDuel();
     if (!D) return;
     const z = duelZoom(), cx = arena.x + arena.w / 2, x0 = arena.x + 8, x1 = arena.x + arena.w - 8, y0 = arena.y;
-    const half = Math.max(80, (x1 - x0) / 2 - 150 * z), mmss = n => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
+    const half = Math.max(80, (x1 - x0) / 2 - 76 * z), mmss = n => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
     const side = (S, left) => {
       const bx = left ? x0 : x1 - half, by = y0 + 38 * z, bh = 30 * z, ratio = clamp(S.hp / S.maxHp, 0, 1);
       ctx.save();
@@ -745,8 +745,15 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     ctx.font = `bold 26px ${FONT}`;
     text('VS', cx, y0 + 30 * z, 36 * z, '#ffd35c');
     // 連勝（2 場以上才顯示）：放在 VS 的左右兩側，左邊那位在左、右邊那位在右
-    if (D.a.streak >= 2) text(`🔥${D.a.streak}連勝`, cx - 44 * z, y0 + 32 * z, 24 * z, '#ffb13c', 'right');
-    if (D.b.streak >= 2) text(`🔥${D.b.streak}連勝`, cx + 44 * z, y0 + 32 * z, 24 * z, '#ffb13c', 'left');
+    // 左邊那位：👑 數字 連勝；右邊那位：數字 連勝 👑（左右對稱）。數字特別大，可以超出血條的上框
+    const streakDraw = (n, left) => {
+      const icon = ['👑', 30 * z], num = [String(n), 46 * z], lab = ['連勝', 26 * z], seq = left ? [icon, num, lab] : [num, lab, icon];
+      let tw = 0; const ws = seq.map(([t, f]) => { ctx.font = `bold ${f}px ${FONT}`; const w = ctx.measureText(t).width + 3; tw += w; return w; });
+      let x = left ? cx - 42 * z - tw : cx + 42 * z; const y = y0 + 22 * z;
+      seq.forEach(([t, f], k) => { text(t, x, y, f, k === (left ? 1 : 0) ? '#fff3a0' : '#ffb13c', 'left'); x += ws[k]; });
+    };
+    if (D.a.streak >= 2) streakDraw(D.a.streak, true);
+    if (D.b.streak >= 2) streakDraw(D.b.streak, false);
     if (D.phase === 'fight') text(mmss(D.timeLeft), cx, y0 + 68 * z, 30 * z, '#fff');
     if (D.phase !== 'result') {   // 圍觀者怎麼助攻：放在整個畫面的右下角
       const { lines, fz, w, h } = duelHintBox(D, lb.w), rx = lb.x + lb.w, by2 = H - 12;
