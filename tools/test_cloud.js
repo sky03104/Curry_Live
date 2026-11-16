@@ -224,5 +224,26 @@ const waitFor = async (fn, ms) => { const end = Date.now() + (ms || 1500); while
     ok(await waitFor(() => live.realtimeLive && w.sockets.some(x => x.topic === 'realtime:cmd-' + NEW && x.readyState === 1)), '換雲端代號後改連新頻道');
     ok(!w.sockets.some(x => x.topic === 'realtime:cmd-' + TOKEN && x.readyState === 1), '舊頻道已斷開'); }
 
+  // 15. 面板存檔 → 即時通知直播畫面馬上去讀
+  { const w = makeWorld(), env = loadCloud(w, { realtimeRetryMs: 20 }), live = mk(env, 'main', true), panel = mk(env, 'main', false); const syncs = [];
+    live.listenCommands(() => {}, null, s => syncs.push(s)); await waitFor(() => live.realtimeLive);
+    // 面板還沒連線：存的時候自動連起來再通知
+    ok(!panel.realtimeLive, '（前置）面板一開始沒有即時連線');
+    const r = await panel.store([P('甲', 9)], { force: true, settings: { heroes: { pool: ['liubei'] } } });
+    ok(r && w.sb.get(TOKEN + '|main').data.settings.heroes.pool[0] === 'liubei', '面板的設定已存進 Supabase');
+    ok(await waitFor(() => syncs.length === 1), '面板存完，直播畫面立刻收到「請現在去讀」的通知');
+    ok(syncs[0].kind === 'panel' && !('profiles' in syncs[0]) && !('settings' in syncs[0]), '通知本身不帶資料（資料庫才是真相）');
+    const again = await live.load(); ok(again.length === 1 && again[0].level === 9 && live.settings.heroes.pool[0] === 'liubei', '直播畫面照通知去讀，拿到面板剛存的等級和設定');
+    // 連續存兩次 → 兩次通知
+    await panel.store([P('甲', 10)], { force: true }); ok(await waitFor(() => syncs.length === 2), '再存一次又通知一次');
+    // 直播畫面自己存檔不會通知自己
+    const before = w.broadcasts; await live.store([P('乙', 3)]); await settle(); ok(w.broadcasts === before, '直播畫面自己存檔（每 10 秒那種）不發通知，避免來回迴圈'); }
+  { const w = makeWorld(), env = loadCloud(w, { realtimeRetryMs: 20 }), live = mk(env, 'main', true), panel = mk(env, 'main', false); const syncs = [];
+    live.listenCommands(() => {}, null, s => syncs.push(s)); await waitFor(() => live.realtimeLive);
+    w.sbMode = 'down'; await panel.store([P('甲', 2)], { force: true }); await settle(); ok(syncs.length === 0, 'Supabase 寫不進去（走 Firebase 備援）時不發通知');
+  }
+  { const w = makeWorld(), env = loadCloud(w, { realtime: false }), panel = mk(env, 'main', false);
+    await panel.store([P('甲', 2)], { force: true }); await settle(); ok(w.sockets.length === 0, 'realtime:false 時面板存檔也不開連線'); }
+
   console.log(`${pass} 項通過、${fail} 項失敗`); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
