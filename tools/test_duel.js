@@ -5,6 +5,7 @@ const sandbox = { window: {}, console, Math, Date };
 sandbox.window = sandbox; vm.createContext(sandbox);
 for (const f of ['js/config.js', 'data/heroes.js', 'data/extra-heroes.js', 'js/game.js', 'js/cloud-save.js']) vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), sandbox, { filename: f });
 const config = sandbox.GAME_CONFIG, heroes = sandbox.HEROES_DATA;
+config.wheel.enabled = false;   // 單挑測試用大禮物，不要讓轉輪插進來
 let pass = 0, fail = 0;
 const ok = (c, msg) => { if (c) pass++; else { fail++; console.log('  ✗ ' + msg); } };
 

@@ -96,7 +96,7 @@
     // 逼瀏覽器抓最新的（GitHub Pages 的檔案會被瀏覽器快取約 10 分鐘，不加的話更新後可能還在用舊檔）。
     (function () {
       var v = new URLSearchParams(location.search).get('_v') || '', q = v ? '?v=' + encodeURIComponent(v) : '';
-      ['js/version.js', 'js/config.js', 'data/heroes.js', 'data/extra-heroes.js', 'js/events.js', 'js/gift-settings.js', 'js/hero-settings.js', 'js/host-commands.js', 'js/save.js', 'js/cloud-save.js', 'js/game.js', 'js/hero-sprite.js', 'js/effects.js', 'js/hero-fx.js', 'js/arenas.js', 'js/race-tracks.js', 'js/render.js', 'js/panel.js', 'js/updater.js', 'js/main.js'].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
+      ['js/version.js', 'js/config.js', 'data/heroes.js', 'data/extra-heroes.js', 'js/events.js', 'js/gift-settings.js', 'js/hero-settings.js', 'js/wheel-settings.js', 'js/sound.js', 'js/host-commands.js', 'js/save.js', 'js/cloud-save.js', 'js/game.js', 'js/hero-sprite.js', 'js/effects.js', 'js/hero-fx.js', 'js/arenas.js', 'js/race-tracks.js', 'js/render.js', 'js/panel.js', 'js/updater.js', 'js/main.js'].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
     })();
   </script>
 </body>

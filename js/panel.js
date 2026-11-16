@@ -87,6 +87,25 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       </div>
     </details>
 
+    <details class="card" data-k="wheel">
+      <summary><span class="ico">🎡</span>轉輪設定<em id="wh-badge"></em></summary>
+      <div class="body">
+        <div class="hint">每位玩家送的禮物鑽石數會累積（只算這場直播），<b>每滿幾鑽就能轉一次大轉輪</b>。轉輪的格數＝下面的結果有幾項，每格自動配不同顏色。結果只是文字，由主播自己在直播裡執行。</div>
+        <div class="sub first">轉輪上的結果（一行一項，2～12 項，每項最多 10 個字）</div>
+        <textarea id="wh-items" rows="7" style="width:100%"></textarea>
+        <div class="row">每累積 <input id="wh-th" type="number" min="1" style="max-width:90px;flex:none"> 鑽轉一次</div>
+        <label class="opt"><input type="checkbox" id="wh-auto"> 有人累積滿鑽時，自動開啟轉輪（沒勾＝只有主播按「開啟轉輪」才會轉）</label>
+        <label class="opt"><input type="checkbox" id="wh-voice"> 開啟轉輪前先播語音「我要轉輪」</label>
+        <div class="row"><button id="wh-listen">試聽語音</button><button id="wh-open" class="main">開啟轉輪</button><button id="wh-close">關閉轉輪</button></div>
+        <div class="row"><button id="wh-reset">新的一場（累積歸零）</button><button id="wh-test">測試：幫選定的觀眾 +1000 鑽</button></div>
+        <div class="hint" id="wh-sync"></div>
+        <div class="sub">目前累積（這場）</div>
+        <div class="hint" id="wh-acc">（還沒有人累積）</div>
+        <div class="hint">規則：只在<b>亂鬥模式、場上沒有 BOSS</b> 時才轉，其他時候（BOSS 在場、單挑、賽跑、陣營賽）轉的次數先排隊，結束後依序轉；每人最多排 3 次；累積滿 1000 鑽轉一次後剩下的零頭會留著；累積資料存在直播軟體的瀏覽器，閒置超過 6 小時自動算新的一場。玩家留言「轉輪模式」可以看自己累積了多少。</div>
+        <div class="hint">⚠ 沒開雲端存檔時，改完要重貼直播網址才會生效。語音要在 OBS 的瀏覽器來源勾「透過 OBS 控制音訊」才會進直播。</div>
+      </div>
+    </details>
+
     <details class="card" data-k="gifts">
       <summary><span class="ico">🎁</span>禮物對應<em>普攻／全場／技能／回血</em></summary>
       <div class="body">
@@ -292,7 +311,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     if (seen.size) $('#gs-seen').innerHTML = [...seen.entries()].reverse().map(([key, g]) =>
       `<div class="seen"><span title="${esc(g.label)}">${esc(g.label)}</span><select data-seen="${esc(key)}">${options(giftSettings.actionOf(key))}</select></div>`).join('');
     root.querySelector(`input[name="gs-other"][value="${giftSettings.ignoreUnlisted ? 'ignore' : 'tier'}"]`).checked = true;
-    $('#gs-url').value = giftSettings.liveUrl({ save: $('#sv-slot').value.trim(), cloud: saving.cloud.enabled ? saving.cloud.token : '', arena: renderer.arenas.get() === 'none' ? '' : renderer.arenas.get(), ...saving.heroSettings.urlParams(), ...saving.hostCmd.urlParams() });
+    $('#gs-url').value = giftSettings.liveUrl({ save: $('#sv-slot').value.trim(), cloud: saving.cloud.enabled ? saving.cloud.token : '', arena: renderer.arenas.get() === 'none' ? '' : renderer.arenas.get(), ...saving.heroSettings.urlParams(), ...saving.wheelSettings.urlParams(), ...saving.hostCmd.urlParams() });
   }
   // 一個動作只對應一個禮物：選了新的，就取代這個動作原本的
   function setActionGift(action, name) {
@@ -392,6 +411,34 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   $('#hs-none').onclick = () => { hsel.setMany([hsel.defaultId || hsel.enabled[0]]); game.setHeroPool(hsel.enabled); game.setDefaultHero(hsel.defaultId); renderHeroPool(); renderGiftSettings(); hsSync(); };
   renderHeroPool();
   renderGiftSettings();
+
+  // 轉輪設定：改了（停 1 秒）自動存到雲端，直播畫面讀回來套用
+  const wsel = saving.wheelSettings;
+  let whTimer = null;
+  function whSync() {
+    clearTimeout(whTimer);
+    if (!saving.cloud.enabled) { $('#wh-sync').textContent = '（沒開雲端存檔：改完要重貼直播網址才會生效）'; return; }
+    $('#wh-sync').textContent = '☁ 同步中…';
+    whTimer = setTimeout(async () => {
+      let r = null; try { r = await saving.saveSettings({ wheel: wsel.exportRemote() }); } catch (e) { r = null; }
+      $('#wh-sync').textContent = r && r.state === 'ok' ? `☁ 已同步到雲端（${new Date().toLocaleTimeString()}）：直播畫面約 ${config.save.cloud.pullSeconds || 90} 秒內自動套用。` : '⚠ 同步到雲端失敗：' + ((r && r.text) || '連不上') + '（改完要重貼直播網址才會生效）';
+    }, 1000);
+  }
+  function fillWheel() { const v = wsel.value; $('#wh-items').value = v.items.join('\n'); $('#wh-th').value = v.threshold; $('#wh-auto').checked = v.autoOpen; $('#wh-voice').checked = v.voiceEnabled; $('#wh-badge').textContent = v.items.length + ' 格'; }
+  function applyWheel(o) { const v = wsel.set(o); game.setWheelSettings(v); fillWheel(); renderGiftSettings(); whSync(); }
+  fillWheel();
+  $('#wh-items').onchange = () => applyWheel({ items: $('#wh-items').value.split('\n') });
+  $('#wh-th').onchange = () => applyWheel({ threshold: $('#wh-th').value });
+  $('#wh-auto').onchange = () => applyWheel({ autoOpen: $('#wh-auto').checked });
+  $('#wh-voice').onchange = () => applyWheel({ voiceEnabled: $('#wh-voice').checked });
+  $('#wh-listen').onclick = () => { const p = saving.sound.playWheelVoice(); p.then(r => { $('#wh-sync').textContent = r === 'audio' ? '🔊 播放語音檔' : r === 'speech' ? '🔊 語音檔放不出來，改用瀏覽器內建語音唸' : '⚠ 放不出聲音（找不到語音檔、瀏覽器也沒有內建語音）'; }); };
+  const whHost = a => game.hostPress({ id: 'panel', name: '面板' }, { wheel: a });
+  $('#wh-open').onclick = () => whHost('open'); $('#wh-close').onclick = () => whHost('close'); $('#wh-reset').onclick = () => whHost('reset');
+  $('#wh-test').onclick = () => hub.emit({ type: 'tiktokGift', user: me(), gift: { name: 'Test', diamonds: 1000 }, count: 1 });
+  setInterval(() => {
+    const l = game.getWheelAccList(), w = game.getWheel();
+    $('#wh-acc').textContent = (l.length ? l.slice(0, 8).map(r => `${r.name} ${r.dia}/${wsel.value.threshold}`).join('　') : '（還沒有人累積）') + `　｜排隊 ${game.getWheelPending()} 次` + (w ? `｜轉輪：${w.phase}` : '');
+  }, 1000);
 
   // ---------- 事件紀錄 ----------
   function addLog(text) {
