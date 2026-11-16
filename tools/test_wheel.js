@@ -101,5 +101,16 @@ function setup(opts) {
   const data = game.exportWheel(); ok(data.acc.length >= 1, '有累積資料可存'); const g2 = sandbox.ML.createGame(config, heroes); g2.importWheel(JSON.parse(JSON.stringify(data)));
   ok(g2.exportWheel().acc.length === data.acc.length, '累積資料可以存、可以讀回');
 }
+// 7. 總開關
+{
+  const t = setup({ noVoice: true }); const { game } = t; t.join('甲'); t.tgift('甲', 1000); t.run(0.3);
+  ok(game.getWheel() !== null, '開著時轉輪會開');
+  game.setWheelSettings({ enabled: false });
+  ok(game.getWheel() === null && game.getWheelPending() === 0 && game.getWheelAccList().length === 0, '關掉總開關：轉輪收起、排隊與累積清空');
+  t.tgift('甲', 5000); t.run(1); ok(game.getWheel() === null && game.getWheelAccList().length === 0, '關掉後送禮不累積、不會自動開');
+  { const n0 = t.notes.length; t.chat('甲', '轉輪模式'); ok(t.notes.length === n0, '關掉後玩家留言「轉輪模式」只是普通留言（沒有任何回應）'); }
+  game.setHostMatcher(() => null, u => u.id === 'tt:主播'); t.chat('主播', '轉輪模式'); ok(game.getWheel() === null, '關掉後主播留言也不會開');
+  game.setWheelSettings({ enabled: true }); t.tgift('甲', 1000); t.run(0.3); ok(game.getWheel() !== null, '再打開又恢復');
+}
 console.log(`\n${pass} 項通過、${fail} 項失敗`);
 process.exit(fail ? 1 : 0);

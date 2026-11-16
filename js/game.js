@@ -37,7 +37,7 @@ ML.createGame = function (config, heroes) {
 
   // ---------- 轉輪模式的狀態 ----------
   const wc = config.wheel || {};
-  let ws = { items: (wc.items || []).slice(), threshold: wc.threshold || 1000, autoOpen: wc.autoOpen !== false, voiceEnabled: wc.voiceEnabled !== false };   // 主播在面板改的設定（見 setWheelSettings）
+  let ws = { enabled: wc.enabled !== false, items: (wc.items || []).slice(), threshold: wc.threshold || 1000, autoOpen: wc.autoOpen !== false, voiceEnabled: wc.voiceEnabled !== false };   // 主播在面板改的設定（見 setWheelSettings）
   const wheelAcc = new Map();  // 觀眾代號 → { dia: 累積的鑽石（不含已經換成轉輪次數的）, name }
   const wheelQueue = [];       // 排隊等著轉的次數：{ id, name }
   const wheelHistory = [];     // 轉輪結果紀錄（新的在前）：{ id, name, text, at }
@@ -1027,12 +1027,12 @@ ML.createGame = function (config, heroes) {
     return list;
   }
   function canWheel() {
-    return wc.enabled !== false && mode === 'brawl' && !duelInvite && !duel && !players.has(BOSS_ID) && !bossQueue.length;
+    return ws.enabled && mode === 'brawl' && !duelInvite && !duel && !players.has(BOSS_ID) && !bossQueue.length;
   }
   const wheelHave = id => wheelQueue.filter(q => q.id === id).length + (wheel && wheel.spinner && wheel.spinner.id === id && (wheel.phase === 'ready' || wheel.phase === 'spin') ? 1 : 0);
   // 累積鑽石：每滿 threshold 鑽排一次（每人排隊有上限，零頭留著）
   function wheelAdd(user, dia) {
-    if (wc.enabled === false || !user || !user.id || !(dia > 0)) return;
+    if (!ws.enabled || !user || !user.id || !(dia > 0)) return;
     const th = ws.threshold, rec = wheelAcc.get(user.id) || { dia: 0, name: user.name };
     rec.name = user.name || rec.name; rec.dia += dia;
     const spins = Math.floor(rec.dia / th);
@@ -1119,7 +1119,7 @@ ML.createGame = function (config, heroes) {
   function handleWheelCommand(user, text) {
     const t = plain(text), isHost = !!(hostCheck && hostCheck(user));
     if ((config.commands.wheelOpen || []).some(c => plain(c) === t)) {
-      if (wc.enabled === false) { notice('轉輪功能目前沒有開放'); return true; }
+      if (!ws.enabled) return false;   // 轉輪功能關掉時，「轉輪模式」就是一句普通留言
       if (isHost) { wheelHost('open'); return true; }
       const have = wheelHave(user.id), rec = wheelAcc.get(user.id), dia = rec ? Math.floor(rec.dia) : 0;
       if (have) notice(`${user.name} 有 ${have} 次轉輪排隊中${canWheel() ? '，馬上輪到' : '，等 BOSS／比賽結束就轉'}`);
@@ -1132,7 +1132,7 @@ ML.createGame = function (config, heroes) {
   // 主播的轉輪操作（按鈕和留言共用）：open 開啟（常駐）／close 關閉／reset 新的一場（累積歸零）
   function wheelHost(act) {
     if (act === 'open') {
-      if (wc.enabled === false) { notice('轉輪功能目前沒有開放'); return; }
+      if (!ws.enabled) { notice('轉輪功能目前關閉（面板「轉輪設定」可以打開）'); return; }
       wheelWant = true;
       if (wheel) { wheel.locked = true; notice('🎡 轉輪已經開著了'); return; }
       if (!canWheel()) { notice('🎡 現在不能開轉輪（BOSS 在場／單挑／比賽進行中），可以開的時候會自動開'); return; }
@@ -1343,12 +1343,16 @@ ML.createGame = function (config, heroes) {
     // 轉輪：畫面和面板用
     setWheelSettings(o) {
       if (!o || typeof o !== 'object') return;
+      if (typeof o.enabled === 'boolean' && o.enabled !== ws.enabled) {   // 總開關：關掉就把轉輪收起來、排隊與累積全部清掉（不再累積鑽石）
+        ws.enabled = o.enabled;
+        if (!ws.enabled) { if (wheel) { wheelWant = false; closeWheel('🎡 轉輪功能已關閉'); } wheelQueue.length = 0; wheelAcc.clear(); wheelHistory.length = 0; wheelWant = false; wheelDirty = true; }
+      }
       if (Array.isArray(o.items)) ws.items = o.items.slice();
       if (Number(o.threshold) >= 1) ws.threshold = Math.floor(Number(o.threshold));
       if (typeof o.autoOpen === 'boolean') ws.autoOpen = o.autoOpen;
       if (typeof o.voiceEnabled === 'boolean') ws.voiceEnabled = o.voiceEnabled;
     },
-    getWheelSettings() { return { items: wheelItems(), threshold: ws.threshold, autoOpen: ws.autoOpen, voiceEnabled: ws.voiceEnabled }; },
+    getWheelSettings() { return { enabled: ws.enabled, items: wheelItems(), threshold: ws.threshold, autoOpen: ws.autoOpen, voiceEnabled: ws.voiceEnabled }; },
     getWheel() {
       if (!wheel) return null;
       return { phase: wheel.phase, t: wheel.t, items: wheel.items, angle: wheel.angle, spinner: wheel.spinner, result: wheel.result, resultText: wheel.result >= 0 ? wheel.items[wheel.result] : '', locked: wheel.locked, dur: wheel.dur, pending: wheelQueue.length, threshold: ws.threshold,

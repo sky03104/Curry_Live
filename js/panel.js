@@ -147,6 +147,8 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
 <details class="card" data-k="wheel">
       <summary><span class="ico">🎡</span>轉輪設定<em id="wh-badge"></em></summary>
       <div class="body">
+        <label class="opt"><input type="checkbox" id="wh-enable"> <b>啟用轉輪模式</b>（不需要轉輪的主播取消勾選：不累積鑽石、不會自動開、小視窗的轉輪按鈕也會隱藏）</label>
+        <div id="wh-body">
         <div class="hint">每位玩家送的禮物鑽石數會累積（只算這場直播），<b>每滿幾鑽就能轉一次大轉輪</b>。轉輪的格數＝下面的結果有幾項，每格自動配不同顏色。結果只是文字，由主播自己在直播裡執行。</div>
         <div class="sub first">轉輪上的結果（一行一項，2～12 項，每項最多 10 個字）</div>
         <textarea id="wh-items" rows="7" style="width:100%"></textarea>
@@ -160,6 +162,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div class="hint" id="wh-acc">（還沒有人累積）</div>
         <div class="hint">規則：只在<b>亂鬥模式、場上沒有 BOSS</b> 時才轉，其他時候（BOSS 在場、單挑、賽跑、陣營賽）轉的次數先排隊，結束後依序轉；每人最多排 10 次；累積滿 1000 鑽轉一次後剩下的零頭會留著；累積資料存在直播軟體的瀏覽器，閒置超過 6 小時自動算新的一場。玩家留言「轉輪模式」可以看自己累積了多少。</div>
         <div class="hint">⚠ 沒開雲端存檔時，改完要重貼直播網址才會生效。語音要在 OBS 的瀏覽器來源勾「透過 OBS 控制音訊」才會進直播。</div>
+        </div>
       </div>
     </details>
     </section>
@@ -421,9 +424,10 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
       $('#wh-sync').textContent = r && r.state === 'ok' ? `☁ 已同步到雲端（${new Date().toLocaleTimeString()}）：直播畫面約 ${config.save.cloud.pullSeconds || 90} 秒內自動套用。` : '⚠ 同步到雲端失敗：' + ((r && r.text) || '連不上') + '（改完要重貼直播網址才會生效）';
     }, 1000);
   }
-  function fillWheel() { const v = wsel.value; $('#wh-items').value = v.items.join('\n'); $('#wh-th').value = v.threshold; $('#wh-auto').checked = v.autoOpen; $('#wh-voice').checked = v.voiceEnabled; $('#wh-badge').textContent = v.items.length + ' 格'; }
+  function fillWheel() { const v = wsel.value; $('#wh-items').value = v.items.join('\n'); $('#wh-th').value = v.threshold; $('#wh-auto').checked = v.autoOpen; $('#wh-voice').checked = v.voiceEnabled; $('#wh-badge').textContent = v.enabled ? v.items.length + ' 格' : '已關閉'; $('#wh-enable').checked = v.enabled; $('#wh-body').style.opacity = v.enabled ? '' : '0.45'; $('#wh-body').style.pointerEvents = v.enabled ? '' : 'none'; }
   function applyWheel(o) { const v = wsel.set(o); game.setWheelSettings(v); fillWheel(); renderGiftSettings(); whSync(); }
   fillWheel();
+  $('#wh-enable').onchange = () => applyWheel({ enabled: $('#wh-enable').checked });
   $('#wh-items').onchange = () => applyWheel({ items: $('#wh-items').value.split('\n') });
   $('#wh-th').onchange = () => applyWheel({ threshold: $('#wh-th').value });
   $('#wh-auto').onchange = () => applyWheel({ autoOpen: $('#wh-auto').checked });
