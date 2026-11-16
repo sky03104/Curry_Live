@@ -408,6 +408,8 @@ window.GAME_CONFIG = {
     },
     // 蕃薯：待機＝吃薯條（8 格，每秒 3 格連播 2 輪）；攻擊／技能＝撲出去咬（8 格，第 5 格咬下去；普攻 13 格/秒、技能 11 格/秒）
     xuejie: {
+      idle: { src: 'xuejie_idle.png', frames: 7, cw: 252, ch: 415, ground: 412, fps: 3, repeat: 2 },   // 待機：拿麥克風唱歌（用 AI 原圖只有上半身的格子接上腿拼成，共 7 格；原圖第 7 格沒拿杯子沒用）
+      eat: { src: 'xuejie_idle.png', frames: 7, cw: 252, ch: 415, ground: 412, fps: 3, repeat: 2 },   // 回血時也播同一組
       walk: { src: 'xuejie_walk.png', frames: 12, cw: 193, ch: 407, ground: 404, fps: 12 },   // 走路循環（悠閒走路，12 格；原圖 3 排各 4 格，第 3 排杯子上的星巴克商標已塗成素色貼紙）
       attack: { src: 'xuejie_attack.png', frames: 8, cw: 295, ch: 399, ground: 395, fps: 10, hitFrame: 6 },   // 普攻：吸飲料→皺眉→彈指→伸手向前（第 6 格打中）→收回（最後一格的星巴克商標已塗掉）
       skill: { src: 'xuejie_skill.png', frames: 8, cw: 223, ch: 410, ground: 407, fps: 9, hitFrame: 7 },   // 技能「學姊罩你」：舉杯→叉腰→頭髮飛揚→比讚笑→手指向前（第 7 格施放）→回站姿。原圖第 8 格只畫到腰（被格子切掉）沒用，共 8 格
