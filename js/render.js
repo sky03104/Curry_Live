@@ -471,7 +471,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       const xL = arena.x + ss * 0.8, xR = arena.x + arena.w - ss * 0.8;
       const row = (k, y, i0, xr) => { const xe = Math.max(xL + ss, Math.min(xR, xr === undefined ? xR : xr)); for (let i = 0; i < k; i++) { const p = specs[i0 + i], v = p && views.get(p.id); if (!v) continue; place(v, xL + (xe - xL) * (k === 1 ? 0.5 : i / (k - 1)), y); } };
       const place = (v, x, y) => { v.duel = true; v.tx = x; v.ty = y; v.tsize = ss; v.face = Math.sign(cx - x) || 1; v.goal = null; v.zx0 = v.zx1 = v.zy0 = v.zy1 = undefined; if (v.x === null) { v.x = x; v.y = y; v.size = ss; } };
-      row(nTop, rowTop, 0); row(nBot, rowBot, nTop, W - 12 - 430 * duelZoom() - ss * 0.8);   // 下排右邊讓出右下角的「圍觀的人」說明框
+      row(nTop, rowTop, 0); row(nBot, rowBot, nTop, W - 12 - duelHintBox(D).w - ss * 0.8);   // 下排右邊讓出右下角的「圍觀的人」說明框
       for (let i = 0; i < nSide; i++) { const p = specs[nTop + nBot + i], v = p && views.get(p.id); if (!v) continue; place(v, i % 2 ? xR : xL, rowTop + (rowBot - rowTop) * ((Math.floor(i / 2) + 1) / (Math.ceil(nSide / 2) + 1))); }
       bounds = { x0: arena.x + ss, x1: arena.x + arena.w - ss, y0: topEdge, y1: botEdge, size: ss, lg: null };
     } else if (teamMode) {
@@ -688,6 +688,12 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
   // ---------- 單挑賽：上方大血條、怒氣條、倒數、結果；申請階段的中間彈窗 ----------
   // 畫面被等比例縮小（直播橫幅）時，單挑的上方資訊要放大補回來，不然字太小
   const duelZoom = () => clamp(0.6 / viewK, 1, 1.5);
+  // 右下角「圍觀的人」說明框的大小（畫的時候、排下排圍觀者讓位置時都用它）
+  function duelHintBox(D) {
+    const fz = 30 * duelZoom(), l1 = `圍觀的人：留言「@${short(D.a.name, 6)}」或「@${short(D.b.name, 6)}」`, l2 = '再送禮物，幫他助攻！';
+    ctx.font = `bold ${fz}px ${FONT}`;
+    return { l1, l2, fz, w: Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width) + 32, h: fz * 2.9 };
+  }
   function drawDuelHud(arena) {
     const D = game.getDuel();
     if (!D) return;
@@ -734,9 +740,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     text('VS', cx, y0 + 30 * z, 36 * z, '#ffd35c');
     if (D.phase === 'fight') text(mmss(D.timeLeft), cx, y0 + 68 * z, 30 * z, '#fff');
     if (D.phase !== 'result') {   // 圍觀者怎麼助攻：放在整個畫面的右下角
-      const l1 = `圍觀的人：留言「@${short(D.a.name, 6)}」或「@${short(D.b.name, 6)}」`, l2 = '再送禮物，幫他助攻！', fz = 20 * z;
-      ctx.font = `bold ${fz}px ${FONT}`;
-      const w = Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width) + 28, h = fz * 2.9, rx = W - 12, by2 = H - 12;
+      const { l1, l2, fz, w, h } = duelHintBox(D), rx = W - 12, by2 = H - 12;
       ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.beginPath(); ctx.roundRect(rx - w, by2 - h, w, h, 12); ctx.fill(); ctx.restore();
       text(l1, rx - w / 2, by2 - h * 0.7, fz, '#fff3d0'); text(l2, rx - w / 2, by2 - h * 0.28, fz, '#ffd35c');
     }
