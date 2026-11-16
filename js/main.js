@@ -163,7 +163,7 @@
     finally { pulling = false; if (pullAgain) { pullAgain = false; pullNow(); } }
   }
   if (cloud.canWrite) setInterval(pullNow, (config.save.cloud.pullSeconds || 300) * 1000);
-  window.addEventListener('pagehide', () => flushCloud(true));    // 關掉網頁前盡力再存一次（存不到也沒關係，下次開會從本機補上去）
+  window.addEventListener('pagehide', () => { flushCloud(true); cloud.flushBackup(); });    // 關掉網頁前盡力再存一次（存不到也沒關係，下次開會從本機補上去）
   game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup' || e.type === 'bossDefeated' || e.type === 'levelSet') cloudDirty = true; });
   syncCloud();
 

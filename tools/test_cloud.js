@@ -73,7 +73,7 @@ function loadCloud(world, overrides) {
   sb.window = sb; sb.crypto = require('crypto').webcrypto; vm.createContext(sb);
   vm.runInContext(fs.readFileSync(path.join(root, 'js/config.js'), 'utf8'), sb);
   vm.runInContext(fs.readFileSync(path.join(root, 'js/cloud-save.js'), 'utf8'), sb);
-  const cfg = sb.GAME_CONFIG; Object.assign(cfg.save.cloud, overrides || {});
+  const cfg = sb.GAME_CONFIG; Object.assign(cfg.save.cloud, { backupSeconds: 0 }, overrides || {});   // 預設每次都備份，除非測試明確要測節流
   return { ML: sb.ML, config: cfg };
 }
 const TOKEN = 'abcdefghijklmnopqrstuvwxyz012345';
@@ -244,6 +244,26 @@ const waitFor = async (fn, ms) => { const end = Date.now() + (ms || 1500); while
   }
   { const w = makeWorld(), env = loadCloud(w, { realtime: false }), panel = mk(env, 'main', false);
     await panel.store([P('甲', 2)], { force: true }); await settle(); ok(w.sockets.length === 0, 'realtime:false 時面板存檔也不開連線'); }
+
+  // 16. Firebase 備份節流：最多每 N 秒寫一次，寫最新的一份
+  { const w = makeWorld(), env = loadCloud(w, { backupSeconds: 0.15 }), c = mk(env); await c.load(); const fb0 = w.calls.fbWrite;
+    await c.store([P('甲', 2)]); await settle(); ok(w.calls.fbWrite - fb0 === 1, '第一次存檔：備份馬上寫');
+    await c.store([P('甲', 3)]); await c.store([P('甲', 4)]); await c.store([P('甲', 5)]); await settle();
+    ok(w.calls.fbWrite - fb0 === 1, '間隔內連存三次：備份先不寫（省額度）');
+    ok(w.sb.get(TOKEN + '|main').data.profiles[0].level === 5 && w.sb.get(TOKEN + '|main').version === 4, 'Supabase 主要存檔每次都存（不受節流影響）');
+    await waitFor(() => w.calls.fbWrite - fb0 === 2, 1000); ok(w.calls.fbWrite - fb0 === 2, '時間到只補寫一次');
+    const doc = [...w.fb.values()][0]; ok(JSON.parse(doc.fields.data.stringValue).profiles[0].level === 5, '補寫的是最新的那份（Lv.5），不是中間的'); }
+  { const w = makeWorld(), env = loadCloud(w, { backupSeconds: 60 }), c = mk(env); await c.load(); const fb0 = w.calls.fbWrite;
+    await c.store([P('甲', 2)]); await settle(); await c.store([P('甲', 7)]); await settle();
+    ok(w.calls.fbWrite - fb0 === 1, '預設 60 秒：第二次還沒到時間，沒寫備份');
+    c.flushBackup(); await settle(); ok(w.calls.fbWrite - fb0 === 2 && JSON.parse([...w.fb.values()][0].fields.data.stringValue).profiles[0].level === 7, '關網頁前 flushBackup 立刻把最新的備份寫出去');
+    c.flushBackup(); await settle(); ok(w.calls.fbWrite - fb0 === 2, '沒有待寫的備份時 flushBackup 什麼都不做'); }
+  { const w = makeWorld(), env = loadCloud(w, { backupSeconds: 60 }), c = mk(env); await c.load(); const fb0 = w.calls.fbWrite;
+    await c.store([P('甲', 2)]); await settle(); await c.store([P('甲', 3)], { keepalive: true }); await settle();
+    ok(w.calls.fbWrite - fb0 === 2, '關網頁（keepalive）那次存檔：不等節流，立刻備份'); }
+  { const w = makeWorld(), env = loadCloud(w, { backupSeconds: 60 }), pad = mk(env, 'pad', false), live = mk(env, 'main', true); await live.load();
+    const fb0 = w.calls.fbWrite; await pad.sendCommand({ action: 'a' }); await pad.sendCommand({ action: 'b' }); await settle();
+    ok(w.calls.fbWrite - fb0 === 2, '主播按鈕指令的備份不受節流（Supabase 掛掉時直播畫面要靠它收指令）'); }
 
   console.log(`${pass} 項通過、${fail} 項失敗`); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

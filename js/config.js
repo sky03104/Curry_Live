@@ -188,6 +188,7 @@ window.GAME_CONFIG = {
       // 主要：Supabase（2026-11-16 起）。網址和公開金鑰本來就是給網頁用的，不是密碼；資料表權限由 supabase/schema.sql 鎖住。
       supabase: { url: 'https://tjrlpthprtrlmugrofpj.supabase.co', key: 'sb_publishable_u9lUyPB8fr2jmHji_ZVAJA_OtxLQuoS' },
       backup: true,             // true = 每次存進 Supabase 也在 Firebase 留一份備份，Supabase 連不上時自動改走 Firebase；false = 不寫 Firebase
+      backupSeconds: 60,        // Firebase 備份最多每幾秒寫一次（省免費寫入額度；這段時間內存幾次，只寫最新的一份；0 = 每次都寫）。主要存檔（Supabase）不受影響
       primary: 'supabase',      // 想暫時退回只用 Firebase，改成 'firebase'
       // 備份：Firebase
       projectId: 'mengzhan-sanguo',
