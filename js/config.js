@@ -68,7 +68,8 @@ window.GAME_CONFIG = {
   wheel: {
     enabled: true,
     threshold: 1000,                    // 每累積幾鑽轉一次
-    maxPending: 3,                      // 每人最多排幾次（超過的不算）
+    maxPending: 10,                     // 每人最多排幾次（超過的不算；咖哩 2026-11-16 從 3 改 10）
+    boardRows: 10,                      // 右上角「轉輪結果」榜最多顯示幾筆（原本 5 筆，咖哩嫌太少）
     autoOpen: true,                     // 有人累積滿鑽時自動開轉輪（false＝只有主播手動開才會轉）
     items: ['再來一次', '唱一首歌', '謝謝參與', '加碼獎勵', '大笑三聲', '挑戰一次', '抽一張卡', '猜拳決勝'],   // 轉輪上的結果（面板「轉輪設定」可以改；2～12 項）
     maxItems: 12, itemMaxChars: 10,

@@ -158,7 +158,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div class="hint" id="wh-sync"></div>
         <div class="sub">目前累積（這場）</div>
         <div class="hint" id="wh-acc">（還沒有人累積）</div>
-        <div class="hint">規則：只在<b>亂鬥模式、場上沒有 BOSS</b> 時才轉，其他時候（BOSS 在場、單挑、賽跑、陣營賽）轉的次數先排隊，結束後依序轉；每人最多排 3 次；累積滿 1000 鑽轉一次後剩下的零頭會留著；累積資料存在直播軟體的瀏覽器，閒置超過 6 小時自動算新的一場。玩家留言「轉輪模式」可以看自己累積了多少。</div>
+        <div class="hint">規則：只在<b>亂鬥模式、場上沒有 BOSS</b> 時才轉，其他時候（BOSS 在場、單挑、賽跑、陣營賽）轉的次數先排隊，結束後依序轉；每人最多排 10 次；累積滿 1000 鑽轉一次後剩下的零頭會留著；累積資料存在直播軟體的瀏覽器，閒置超過 6 小時自動算新的一場。玩家留言「轉輪模式」可以看自己累積了多少。</div>
         <div class="hint">⚠ 沒開雲端存檔時，改完要重貼直播網址才會生效。語音要在 OBS 的瀏覽器來源勾「透過 OBS 控制音訊」才會進直播。</div>
       </div>
     </details>

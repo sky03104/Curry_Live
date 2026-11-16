@@ -386,7 +386,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const n = list.length;
     const wide = W >= H;
     const lbW = wide ? clamp(W * 0.26, 260, 340) : W - 32;
-    const lbRows = game.getMode() === 'race' ? 5 : game.getMode() === 'duel' ? Math.max(1, (game.getDuelAssists() || []).length) : wheelOn ? Math.max(1, Math.min(5, game.getWheelHistory().length)) : Math.max(1, game.getLeaderboard().length);   // 賽跑時右上角改顯示前 5 名
+    const lbRows = game.getMode() === 'race' ? 5 : game.getMode() === 'duel' ? Math.max(1, (game.getDuelAssists() || []).length) : wheelOn ? Math.max(1, Math.min(config.wheel.boardRows || 10, game.getWheelHistory().length)) : Math.max(1, game.getLeaderboard().length);   // 賽跑時右上角改顯示前 5 名
     const lbH = 50 + lbRows * 32;
     const lb = { x: W - lbW - 16, y: 16, w: lbW, h: lbH };
     // 對 BOSS 的傷害排行榜：放在傷害排行榜正下方，場上有 BOSS 才出現（2026-11-14 咖哩要求）
@@ -855,7 +855,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     ctx.restore();
   }
   function drawWheelBoard(lb) {
-    const rows = game.getWheelHistory().slice(0, 5);
+    const rows = game.getWheelHistory().slice(0, config.wheel.boardRows || 10);
     ctx.fillStyle = 'rgba(22,26,30,0.78)'; ctx.beginPath(); ctx.roundRect(lb.x, lb.y, lb.w, lb.h, 12); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
     text('🎡 轉輪結果', lb.x + lb.w / 2, lb.y + 24, 20, '#ffd35c');
@@ -884,7 +884,12 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     if (WH.phase === 'ready' && sp) l1 = `🎡 輪到 ${short(sp.name, 8)} 轉輪！`;
     else if (WH.phase === 'spin' && sp) l1 = `${short(sp.name, 8)} 轉輪中…`;
     else if (WH.phase === 'wait') l1 = `🎡 每累積 ${WH.threshold} 鑽就能轉一次`;
-    if (l1) { ctx.font = `bold 28px ${FONT}`; const w = Math.min(arena.w - 8, ctx.measureText(l1).width + 40); ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(cx - w / 2, arena.y + 8, w, l2 ? 74 : 46, 22); ctx.fill(); ctx.restore(); text(l1, cx, arena.y + 31, 28, '#fff'); if (l2) text(l2, cx, arena.y + 62, 18, '#ffd35c'); }
+    if (l1) {   // 字太長就縮小，一定要放得進左邊的空地
+      let fz = 28; ctx.font = `bold ${fz}px ${FONT}`; const tw = ctx.measureText(l1).width; if (tw > arena.w - 40) fz = Math.max(14, fz * (arena.w - 40) / tw);
+      ctx.font = `bold ${fz}px ${FONT}`; const w = Math.min(arena.w - 8, ctx.measureText(l1).width + 40);
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(cx - w / 2, arena.y + 8, w, l2 ? 74 : 46, 22); ctx.fill(); ctx.restore();
+      text(l1, cx, arena.y + 31, fz, '#fff'); if (l2) text(l2, cx, arena.y + 62, 18, '#ffd35c');
+    }
     if (WH.phase === 'result' && sp) {   // 結果：大大一行，名字＋抽中什麼
       const by = arena.y + arena.h * 0.28, t1 = `🎉 ${short(sp.name, 8)} 抽中`, t2 = WH.resultText;
       ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.74)'; ctx.fillRect(arena.x, by - 62, arena.w, 150); ctx.restore();

@@ -27,7 +27,7 @@ function setup(opts) {
   t.tgift('甲', 400); ok(game.getWheelPending() === 1 && game.getWheelProgress('tt:甲').dia === 0, '再 400 鑽滿 1000 → 排 1 次、累積歸零');
   t.run(0.5);
   const t2 = setup(); t2.join('乙'); t2.tgift('乙', 1500, 1); ok(t2.game.getWheelPending() + (t2.game.getWheel() ? 1 : 0) === 1 && t2.game.getWheelProgress('tt:乙').dia === 500, '1500 鑽 → 1 次、零頭 500 留著');
-  const t3 = setup(); t3.join('丙'); t3.tgift('丙', 1000, 5); ok(t3.game.getWheelPending() === 3 && t3.notes.some(x => x.includes('排隊上限')), '一次送 5000 鑽只排 3 次（每人上限）');
+  const t3 = setup(); t3.join('丙'); t3.tgift('丙', 1000, 13); ok(t3.game.getWheelPending() === 10 && t3.notes.some(x => x.includes('排隊上限')), '一次送 13000 鑽只排 10 次（每人上限）');
   const t4 = setup(); t4.join('丁'); t4.game.handleEvent({ type: 'gift', user: t4.U('丁'), giftId: 'rose', count: 1000 }); ok(t4.game.getWheelPending() === 1, '面板測試禮物：玫瑰 ×1000 = 1000 鑽');
   const t5 = setup(); t5.join('戊'); t5.tgift('戊', 100, 3); ok(t5.game.getWheelProgress('tt:戊').dia === 300, '連送 ×3 的鑽石數相乘');
 }
