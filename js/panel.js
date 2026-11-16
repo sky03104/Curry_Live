@@ -162,6 +162,8 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div class="row"><button id="p-red">留言「加入紅隊」</button><button id="p-blue">留言「加入藍隊」</button></div>
         <div class="row"><button id="p-ropen">開放報名（賽跑）</button><button id="p-hopen">開放障礙賽</button><button id="p-rjoin">留言「我要參賽」</button></div>
         <div class="row"><button id="p-rstart">提早開跑</button><button id="p-rboost">玫瑰（助力）</button><button id="p-rhinder">GG（干擾）</button></div>
+        <div class="row"><button id="p-duel">留言「@名字 單挑」</button><button id="p-daccept">玫瑰（接受單挑）</button><button id="p-drefuse">GG（拒絕單挑）</button></div>
+        <div class="row"><button id="p-dcancel">取消單挑</button></div>
         <div class="row"><button id="p-modeteam">切換陣營模式</button><button id="p-modebrawl">切換亂鬥模式</button></div>
         <div class="row"><input id="p-text" placeholder="自己打留言內容"><button id="p-say">送出留言</button></div>
         <div class="sub">送禮</div>
@@ -509,6 +511,10 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   $('#p-rstart').onclick = () => game.hostPress({ id: 'panel', name: '面板' }, { race: 'start' });
   $('#p-rboost').onclick = () => hub.emit({ type: 'tiktokGift', user: me(), gift: { name: config.race.giftNames.boost[0] }, count: 1 });
   $('#p-rhinder').onclick = () => hub.emit({ type: 'tiktokGift', user: me(), gift: { name: config.race.giftNames.hinder[0] }, count: 1 });
+  $('#p-duel').onclick = () => { if (targetSel.value) hub.chat(me(), '@' + targetSel.value + ' ' + config.commands.duel[0]); };
+  $('#p-daccept').onclick = () => hub.emit({ type: 'tiktokGift', user: me(), gift: { name: config.duel.giftNames.accept[0], diamonds: 1 }, count: 1 });
+  $('#p-drefuse').onclick = () => hub.emit({ type: 'tiktokGift', user: me(), gift: { name: config.duel.giftNames.refuse[0], diamonds: 1 }, count: 1 });
+  $('#p-dcancel').onclick = () => game.hostPress({ id: 'panel', name: '面板' }, { duel: 'cancel' });
   $('#p-modeteam').onclick = () => game.setMode('team');
   $('#p-modebrawl').onclick = () => game.setMode('brawl');
   $('#p-say').onclick = () => { const t = $('#p-text').value; if (t.trim()) { hub.chat(me(), t); $('#p-text').value = ''; } };

@@ -23,6 +23,18 @@ ML.createGame = function (config, heroes) {
   let race = null;             // 賽跑：{ phase: 'signup'|'countdown'|'run'|'result', left, cd, t, resLeft, entrants: Map, order, results }
   const raceLock = new Map();  // 觀眾代號 → 他「@」的參賽者代號（沒上場的觀眾也能 @ 參賽者送禮）
 
+  // ---------- 單挑賽的狀態 ----------
+  const dc = config.duel || {};
+  let duelInvite = null;       // 單挑申請（還沒回應）：{ from, to, left }。這時還是亂鬥模式，畫面中間跳出申請
+  let duel = null;             // 單挑賽：{ phase: 'countdown'|'fight'|'result', a, b, cd, t, rage:{a,b}, nextAuto:{a,b}, skillAt:{a,b}, resLeft, result }。進行中 mode 是 'duel'
+  const duelLock = new Map();  // 圍觀者代號 → 他「@」的單挑選手代號（之後送禮就是幫那一邊助攻）
+  const duelCool = new Map();  // 觀眾代號 → 幾秒（遊戲時間）後才能再發單挑申請
+  const duelBlock = new Map(); // 「甲|乙」→ 幾秒（遊戲時間）內甲不能再挑戰乙（被拒絕之後）
+  const duelPairLog = new Map(); // 兩人的組合（代號排序後相連）→ 最近單挑過的時間們（反覆單挑刷經驗要遞減）
+  const duelNames = new Map(); // 助攻榜用：圍觀者代號 → 名字
+  const noticeAt = new Map();  // 提醒訊息的節流：key → 上次提醒的時間，免得洗版
+  let duelSkipGift = null;     // 剛當成「回應單挑」的那份 TikTok 禮物：接著那份對應的遊戲禮物（普攻）要跳過，不然同一份玫瑰又會打人
+
   // 留言比對用：武將中文名與別名 → 武將資料（名字長的先比，避免短名搶先）
   const heroById = new Map(heroes.map(h => [h.heroId, h]));
   const nameTable = heroes.map(h => [h.displayName, h]);
@@ -151,6 +163,8 @@ ML.createGame = function (config, heroes) {
     return !!t && (config.commands.leave || []).some(c => plain(c) === t);
   }
   function leave(me) {
+    if (duelInvite && (duelInvite.from === me.id || duelInvite.to === me.id)) { duelInvite = null; notice(`${me.name} 離場了，單挑申請取消`); fx({ type: 'duelInviteEnd' }); }
+    if (duel && duel.phase !== 'result' && (duel.a === me.id || duel.b === me.id)) { players.delete(me.id); left.set(me.id, time); fx({ type: 'leave', id: me.id, hero: me.hero, name: me.name }); notice(`${me.name} 烙跑了！（單挑中途離開，算棄權）`); finishDuel(duel.a === me.id ? duel.b : duel.a, '對手中途離場'); return; }
     players.delete(me.id);
     left.set(me.id, time);
     if (race && race.entrants.has(me.id)) { const e = race.entrants.get(me.id); if (race.phase === 'signup') race.entrants.delete(me.id); else { e.state = 'dnf'; } }   // 賽跑中烙跑＝棄權
@@ -164,6 +178,19 @@ ML.createGame = function (config, heroes) {
     const me = players.get(user.id);
 
     if (isLeaveCommand(text)) { if (me) leave(me); return; }
+
+    // 單挑賽：「@乙 單挑」發起申請；被挑戰的人留言「接受／拒絕」回應；單挑中圍觀者「@甲／@乙」選邊助攻
+    const inviteName = parseDuelInvite(text);
+    if (inviteName !== null) { sendDuelInvite(user, me, inviteName); return; }
+    if (duelInvite && user.id === duelInvite.to) {
+      const t = plain(text);
+      if ((config.commands.duelAccept || []).some(c => plain(c) === t)) { acceptDuel(); return; }
+      if ((config.commands.duelRefuse || []).some(c => plain(c) === t)) { refuseDuel(`${me ? me.name : user.name} 拒絕了單挑`); return; }
+    }
+    if (mode === 'duel') {
+      if (config.commands.unlock.includes(text)) { duelLock.delete(user.id); return; }
+      if (text.startsWith(config.commands.lockPrefix) || text.startsWith('＠')) { duelLockCmd(user, text.slice(1).trim()); return; }
+    }
 
     if (mode === 'race') {   // 賽跑模式：我要參賽、@參賽者、解除鎖定
       const t = plain(text);
@@ -240,6 +267,7 @@ ML.createGame = function (config, heroes) {
   function runHostGift(user, hostGift) {
     if (hostGift.setMode) { gameApi.setMode(hostGift.setMode); return; }
     if (hostGift.race) { if (hostGift.race === 'open') openRace(); else if (hostGift.race === 'openHurdle') openRace('hurdle'); else if (hostGift.race === 'start') raceStartNow(); else if (hostGift.race === 'cancel') cancelRace('主播取消了比賽'); return; }
+    if (hostGift.duel === 'cancel') { cancelDuel('主播取消了單挑'); return; }
     if (hostGift.restartMatch) { if (mode === 'team') restartMatch(true); else notice('現在是亂鬥模式，沒有陣營賽可以重開'); return; }
     if (hostGift.revive !== undefined) { hostRevive(user, hostGift.revive); return; }
     if (hostGift.healAll) { healEveryone(); return; }
@@ -287,6 +315,7 @@ ML.createGame = function (config, heroes) {
   // 留言必須「剛好只有武將名」才算換角，避免聊天時提到別的武將（例如「呂布好強」）就被誤換。
   function switchHero(me, text, hero) {
     if (!hit_name(text) || hero === me.hero) return;
+    if (duel && (duel.a === me.id || duel.b === me.id)) { notice(`${me.name} 單挑中不能換武將`); return; }
     if (race && race.entrants.has(me.id) && hero.faction !== (tr.faction || 'Meng')) { notice(`${me.name} 參賽中只能換成萌國武將`); return; }
     if (time < (me.switchReadyAt || 0)) { notice(`${me.name} 剛換過武將，請稍等`); return; }
     me.hero = hero;
@@ -309,6 +338,13 @@ ML.createGame = function (config, heroes) {
       const kind = openKind === 'random' ? (Math.random() < 0.5 ? 'normal' : 'hurdle') : openKind;
       notice(`🎁 ${user.name} 送禮開放了${kind === 'hurdle' ? '障礙賽' : '賽跑'}！`);
       openRace(kind);
+      return;
+    }
+    if (mode === 'duel') {   // 單挑中：沒有鑽石數的禮物（面板測試、主播按鈕）照 duel.fakeDiamonds 換算；真的 TikTok 禮物走 tiktokGift（見 handleEvent）。不能回血、不能招換 BOSS
+      if (gift.action === 'heal') { notice(`單挑中不能回血，${user.name} 的禮物沒有生效`); return; }
+      const fd = (dc.fakeDiamonds || {})[gift.action];
+      if (!fd) return;
+      duelGift(user, fd, Math.max(1, Math.floor(rawCount) || 1));
       return;
     }
     if (mode === 'race') {   // 賽跑中：一般禮物（普攻、技能…）全部停用；招換 BOSS 也暫停。玫瑰／GG 走 tiktokGift（見 handleEvent）
@@ -438,7 +474,7 @@ ML.createGame = function (config, heroes) {
   // 每秒回血（藍BUFF）：每滿 1 秒補一次，畫面上每 2 秒跳一次小小的綠色加號
   function tickBuffs(p, dt) {
     const rg = p.prof.buffs && p.prof.buffs.regen;
-    if (!rg || rg.until <= time || p.down) { p.regenAcc = 0; p.regenShown = 0; return; }
+    if (!rg || rg.until <= time || p.down || (mode === 'duel' && duel && (duel.a === p.id || duel.b === p.id))) { p.regenAcc = 0; p.regenShown = 0; return; }   // 單挑中不能回血（藍BUFF 也暫停）
     p.regenAcc = (p.regenAcc || 0) + dt;
     while (p.regenAcc >= 1 - 1e-6) {   // 留一點浮點誤差的空間（0.1 加十次會是 0.9999999）
       p.regenAcc -= 1;
@@ -637,6 +673,8 @@ ML.createGame = function (config, heroes) {
   }
   // 主播開放報名（按鈕或留言）：進入賽跑模式，報名倒數開始
   function openRace(kind) {
+    if (mode === 'duel') { notice('單挑賽進行中，結束後才能開放報名'); return; }
+    if (duelInvite) { duelInvite = null; fx({ type: 'duelInviteEnd' }); notice('主播開放了賽跑，單挑申請取消'); }
     if (mode === 'race') { notice(race && race.phase === 'signup' ? '已經在報名中了' : '比賽進行中，結束後才能再開放報名'); return; }
     mode = 'race';
     teamOf.clear(); swaps.clear(); structs.clear(); match = { winner: null, restartAt: 0, time: 0 };
@@ -765,6 +803,206 @@ ML.createGame = function (config, heroes) {
     else if (race.t >= (tr.maxSeconds || 300)) finishRace(true);
   }
 
+  // ---------- 單挑賽 ----------
+  // 流程見 config.duel 上面的說明。重點規則：
+  //   ・申請階段還是亂鬥模式（畫面中間跳出申請）；接受後 mode 變 'duel'，雙方用「單挑血量」（config.duel.hp，一樣多）。
+  //   ・只有亂鬥模式、沒有 BOSS 時能發起；雙方都要在場上而且活著。
+  //   ・攻擊力看禮物的鑽石數；兩人都會自動小攻擊；怒氣滿了自動放技能；單挑中不能回血。
+  //   ・單挑結束：贏的人加經驗（連勝加成）、輸的人扣經驗（可能掉等級）、打倒連勝者拿大量經驗；兩人恢復滿血，回亂鬥模式。
+  const pairKey = (a, b) => [a, b].sort().join('|');
+  const nameOfId = id => { const p = players.get(id), sc = scores.get(id); return p ? p.name : (sc && sc.name) || '觀眾'; };
+  function throttle(key, sec) { if (time - (noticeAt.get(key) || -1e9) < sec) return false; noticeAt.set(key, time); return true; }
+  // 「@乙 單挑」或「單挑 @乙」→ 回傳乙的名字（沒有符合回傳 null）
+  function parseDuelInvite(text) {
+    const esc = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), tail = '[\\s!！~～。.]*$';
+    for (const w of (config.commands.duel || [])) {
+      const m = text.match(new RegExp('^[@＠]\\s*(.+?)\\s*' + esc(w) + tail)) || text.match(new RegExp('^' + esc(w) + '\\s*[@＠]\\s*(.+?)' + tail));
+      if (m && m[1].trim()) return m[1].trim();
+    }
+    return null;
+  }
+  function sendDuelInvite(user, me, rest) {
+    const nm = user.name;
+    if (!dc.enabled) { if (throttle('duelOff', 20)) notice('單挑功能目前沒有開放'); return; }
+    if (mode !== 'brawl') { if (throttle('duelMode:' + user.id, 8)) notice(`${nm} 現在不能發起單挑（${mode === 'duel' ? '單挑賽進行中' : mode === 'race' ? '比賽進行中' : '陣營賽進行中'}，只有亂鬥模式可以）`); return; }
+    if (!me) { if (throttle('duelJoin:' + user.id, 8)) notice(`${nm} 請先留言武將名字上場，才能發起單挑`); return; }
+    if (me.down) { notice(`${nm} 倒地中，不能發起單挑`); return; }
+    if (duelInvite) { if (throttle('duelBusy', 8)) notice('目前已經有一個單挑申請在等回應，請稍候'); return; }
+    if (players.has(BOSS_ID) || bossQueue.length) { if (throttle('duelBoss', 8)) notice(`${nm} BOSS 在場上（或排隊中），不能發起單挑`); return; }
+    const wait = (duelCool.get(user.id) || 0) - time;
+    if (wait > 0) { notice(`${nm} 剛發過單挑申請，還要 ${Math.ceil(wait)} 秒才能再發`); return; }
+    if (me.name === rest || (plain(me.name) && plain(me.name) === plain(rest))) { notice(`${nm} 不能挑戰自己`); return; }
+    const t = findLockTarget(me, rest);
+    if (!t || t.isStruct) { notice(`${nm} 找不到「${rest.length > 10 ? rest.slice(0, 10) + '…' : rest}」`); return; }
+    if (t.isBoss) { notice(`${nm} 不能向 BOSS 單挑`); return; }
+    if (t === me) { notice(`${nm} 不能挑戰自己`); return; }
+    if (t.down) { notice(`${nm} ${t.name} 倒地中，不能挑戰`); return; }
+    const blk = (duelBlock.get(me.id + '|' + t.id) || 0) - time;
+    if (blk > 0) { notice(`${nm} 剛被 ${t.name} 拒絕過，還要 ${Math.ceil(blk)} 秒才能再挑戰他`); return; }
+    duelInvite = { from: me.id, to: t.id, left: dc.inviteSeconds || 60 };
+    duelCool.set(me.id, time + (dc.inviteCooldown || 300));
+    fx({ type: 'duelInvite', from: me.id, to: t.id });
+    notice(`⚔ ${me.name} 向 ${t.name} 發出單挑申請！${t.name} 請在 ${dc.inviteSeconds || 60} 秒內送一朵玫瑰接受（送 GG 或不理＝拒絕）`);
+  }
+  function refuseDuel(why) {
+    if (!duelInvite) return;
+    const inv = duelInvite; duelInvite = null;
+    duelBlock.set(inv.from + '|' + inv.to, time + (dc.refuseBlock || 600));
+    fx({ type: 'duelInviteEnd' });
+    notice(why || '單挑申請被拒絕了');
+  }
+  function acceptDuel() {
+    if (!duelInvite) return;
+    const inv = duelInvite, pa = players.get(inv.from), pb = players.get(inv.to);
+    duelInvite = null; fx({ type: 'duelInviteEnd' });
+    const cancel = why => notice(`單挑取消：${why}`);
+    if (mode !== 'brawl') { cancel('現在不是亂鬥模式'); return; }
+    if (!pa || !pb) { cancel('有人離場了'); return; }
+    if (pa.down || pb.down) { cancel('有人倒地了'); return; }
+    if (players.has(BOSS_ID) || bossQueue.length) { cancel('BOSS 出現了'); return; }
+    mode = 'duel'; duelLock.clear(); raceLock.clear();
+    for (const p of players.values()) p.lockId = null;
+    for (const p of [pa, pb]) { p.maxHp = p.hp = dc.hp; p.down = false; }
+    duel = { phase: 'countdown', a: pa.id, b: pb.id, cd: dc.countdown || 3, t: 0, rage: { a: 0, b: 0 }, nextAuto: { a: 0, b: 0 }, skillAt: { a: 0, b: 0 }, skillCharge: { a: 0, b: 0 }, assist: new Map(), resLeft: 0, result: null };
+    notice(`⚔ ${pb.name} 接受了挑戰！${pa.name} VS ${pb.name} 單挑開始`);
+    fx({ type: 'modeChange', mode });
+  }
+  // 圍觀者留言「@甲」「@乙」：之後送禮就是幫那一邊助攻（打對面）
+  function duelLockCmd(user, rest) {
+    if (!rest || !duel || user.id === duel.a || user.id === duel.b) return;
+    const dummy = players.get(user.id) || { id: user.id };
+    const t = findLockTarget(dummy, rest);
+    if (t && (t.id === duel.a || t.id === duel.b)) { duelLock.set(user.id, t.id); notice(`${user.name} 選擇幫 ${t.name} 助攻`); }
+    else notice(`${user.name} 只能幫單挑的兩位選手助攻（找不到「${rest.length > 10 ? rest.slice(0, 10) + '…' : rest}」）`);
+  }
+  // 一次攻擊：from 打 to，扣血、被打的一方加怒氣、通知畫面
+  function duelStrike(side, dmg, kind, rageGain) {
+    if (!duel || duel.phase !== 'fight') return 0;
+    const other = side === 'a' ? 'b' : 'a', pf = players.get(duel[side]), pt = players.get(duel[other]);
+    if (!pf || !pt) return 0;
+    dmg = Math.min(pt.hp, Math.max(1, Math.round(dmg)));
+    pt.hp -= dmg;
+    duel.rage[side] = Math.min(dc.rageMax, duel.rage[side] + (rageGain || 0));
+    duel.rage[other] = Math.min(dc.rageMax, duel.rage[other] + dmg / pt.maxHp * dc.rageHit);   // 被打也加怒氣：落後的人比較有機會翻盤
+    fx({ type: 'attack', id: pf.id, action: kind === 'skill' ? 'skill' : 'attack', icon: '', skillName: pf.hero.skillName, hits: [{ id: pt.id, dmg, down: false }] });
+    if (pt.hp <= 0) finishDuel(pf.id, `${pf.name} 把 ${pt.name} 打倒了`);
+    return dmg;
+  }
+  // 一份禮物：選手自己送 → 打對手；圍觀者要先 @ 選手 → 幫那一邊打（打折）
+  function duelGift(user, diamonds, rawCount) {
+    if (!duel || duel.phase !== 'fight') return;
+    const d = Math.max(1, Number(diamonds) || 1), n = Math.max(1, Math.min(dc.maxGiftCombo || 20, Math.floor(rawCount) || 1));
+    let side = user.id === duel.a ? 'a' : user.id === duel.b ? 'b' : null, factor = 1;
+    if (!side) {
+      const sid = duelLock.get(user.id); side = sid === duel.a ? 'a' : sid === duel.b ? 'b' : null;
+      if (!side) { if (throttle('duelNoLock:' + user.id, 15)) notice(`${user.name} 請先留言「@${nameOfId(duel.a)}」或「@${nameOfId(duel.b)}」，再送禮幫他助攻`); return; }
+      factor = dc.audienceFactor === undefined ? 0.5 : dc.audienceFactor;
+    }
+    const pow = Math.pow(d, dc.giftExp === undefined ? 0.5 : dc.giftExp), maxHp = dc.hp;
+    const dmg = Math.min(maxHp * (dc.giftCapPercent || 0.35), dc.giftBase * pow * n) * factor;
+    if (factor < 1 && d >= (dc.supportNoticeMin || 20)) notice(`${user.name} 幫 ${nameOfId(duel[side])} 助攻！`);
+    const dealt = duelStrike(side, dmg, 'attack', dc.rageGift * pow * n * factor);
+    if (factor < 1 && dealt > 0) { const rec = duel.assist.get(user.id) || { dmg: 0, side }; rec.dmg += dealt; rec.side = side; duel.assist.set(user.id, rec); duelNames.set(user.id, user.name); }   // 助攻榜：記下圍觀者幫忙打了多少
+  }
+  // 結果：winnerId 贏；null ＝ 和局
+  function finishDuel(winnerId, why) {
+    if (!duel || duel.phase === 'result') return;
+    const pa = players.get(duel.a), pb = players.get(duel.b);
+    // 先把血量復原（升降級要用正常的最大血量算）
+    for (const p of [pa, pb]) if (p) { p.maxHp = stats(p).maxHp; p.hp = p.maxHp; }
+    const res = { winnerId, loserId: null, draw: !winnerId, why: why || '', winXp: 0, loseXp: 0, streak: 0, broke: 0, levelDown: false };
+    if (winnerId) {
+      const loserId = winnerId === duel.a ? duel.b : duel.a, wp = scores.get(winnerId), lp = scores.get(loserId);
+      res.loserId = loserId;
+      if (wp && lp) applyDuelXp(wp, lp, res);
+    }
+    duel.phase = 'result'; duel.resLeft = dc.resultSeconds || 15; duel.result = res;
+    const loser = res.loserId && players.get(res.loserId);
+    if (loser) { loser.down = true; loser.downAt = time; loser.hp = 0; }   // 輸的人躺下（只是演出；結果顯示完就恢復，不套用倒地冷卻）
+    fx({ type: 'duelEnd', winner: winnerId, draw: res.draw });
+    notice(res.draw ? '⚔ 單挑時間到，雙方平手！' : `🏆 ${nameOfId(winnerId)} 單挑獲勝！`);
+    if (why && !res.draw) notice(why);
+  }
+  // 贏的人加經驗（連勝加成、打倒連勝者獎勵、等級差折扣、同一對人反覆單挑折扣）；輸的人扣經驗（可能掉等級）
+  function applyDuelXp(w, l, res) {
+    const x = dc.xp || {}, g = config.leveling;
+    const ws = (w.streak || 0) + 1, ls = l.streak || 0;
+    const streakMult = Math.min(1 + (x.streakStep || 0) * (ws - 1), x.streakMaxMult || 3);
+    const brk = ls >= (x.breakMinStreak || 2) ? Math.min(x.breakMax || 2000, (x.breakPerStreak || 0) * ls) : 0;
+    const gap = w.level - l.level, over = Math.max(0, gap - (g.levelGapFree || 0));
+    const gapF = Math.max(g.levelGapMinFactor === undefined ? 0.1 : g.levelGapMinFactor, 1 - over * (g.levelGapPenalty || 0));
+    const key = pairKey(w.id, l.id), win = x.pairWindow || 600, log = (duelPairLog.get(key) || []).filter(t => time - t < win);
+    const pairF = Math.max(x.pairMinFactor === undefined ? 0.1 : x.pairMinFactor, 1 - log.length * (x.pairPenalty || 0)); log.push(time); duelPairLog.set(key, log);
+    res.winXp = Math.max(1, Math.round(((x.winBase || 0) + (x.winPerLevel || 0) * l.level) * streakMult * gapF * pairF + brk * gapF * pairF));
+    res.streak = ws; res.broke = brk > 0 ? ls : 0;
+    res.loseXp = Math.max(1, Math.round(((x.loseBase || 0) + (x.losePerLevel || 0) * l.level) * (1 + Math.min(x.loserStreakExtraMax || 1, (x.loserStreakExtra || 0) * ls))));
+    w.streak = ws; l.streak = 0;
+    w.adj = l.adj = Date.now();   // 輸家的經驗是「扣」的，雲端合併時不能被舊的高等級蓋回去：標上調整時間，以這次為準（贏家一起標，連勝數才會一起存）
+    grantXp(w, res.winXp);
+    const before = l.level;
+    l.xp -= res.loseXp;
+    while (l.xp < 0 && l.level > 1) { l.level--; l.xp += xpNeed(l.level); }
+    if (l.xp < 0) l.xp = 0;
+    if (l.level < before) {
+      res.levelDown = true;
+      const lp = players.get(l.id); if (lp) { lp.maxHp = stats(lp).maxHp; }
+      fx({ type: 'leveldown', id: l.id, level: l.level });
+      notice(`${l.name || '觀眾'} 掉到 Lv.${l.level}…`);
+    }
+    notice(`${w.name} +${res.winXp} 經驗（${ws} 連勝${res.broke ? `，打倒 ${res.broke} 連勝！` : ''}）　${l.name} −${res.loseXp} 經驗`);
+  }
+  // 單挑結束（或被取消）：兩人恢復滿血、站起來，回亂鬥模式
+  function endDuelMode(msg) {
+    if (!duel) return;
+    for (const id of [duel.a, duel.b]) { const p = players.get(id); if (p) { p.maxHp = stats(p).maxHp; p.hp = p.maxHp; p.down = false; p.deaths = 0; } }
+    duel = null; duelLock.clear(); mode = 'brawl';
+    notice(msg || '🥊 回到亂鬥模式');
+    fx({ type: 'modeChange', mode });
+  }
+  function cancelDuel(why) {
+    if (duelInvite) { duelInvite = null; fx({ type: 'duelInviteEnd' }); notice(`單挑申請取消：${why}`); return; }
+    if (!duel) { notice('現在沒有單挑'); return; }
+    notice(`單挑取消：${why}`);
+    endDuelMode();
+  }
+  function duelInviteTick(dt) {
+    if (!duelInvite) return;
+    const pa = players.get(duelInvite.from), pb = players.get(duelInvite.to);
+    if (!pa || !pb || pa.down || pb.down) { duelInvite = null; fx({ type: 'duelInviteEnd' }); notice('單挑申請取消：有人離場或倒地了'); return; }
+    if (players.has(BOSS_ID)) { duelInvite = null; fx({ type: 'duelInviteEnd' }); notice('單挑申請取消：BOSS 出現了'); return; }
+    if ((duelInvite.left -= dt) <= 0) refuseDuel(`${pb.name} 沒有回應，單挑申請視為拒絕`);
+  }
+  function duelTick(dt) {
+    if (!duel) return;
+    if (duel.phase === 'result') { if ((duel.resLeft -= dt) <= 0) endDuelMode(); return; }
+    const pa = players.get(duel.a), pb = players.get(duel.b);
+    if (!pa || !pb) { if (pa || pb) finishDuel(pa ? duel.a : duel.b, '對手離場了'); else { duel = null; mode = 'brawl'; fx({ type: 'modeChange', mode }); } return; }
+    if (duel.phase === 'countdown') {
+      duel.cd -= dt;
+      if (duel.cd <= 0) { duel.phase = 'fight'; duel.t = 0; duel.nextAuto = { a: time + 1, b: time + 1 + (dc.autoAtkEvery || 4) / 2 }; fx({ type: 'duelGo' }); notice('⚔ 開打！'); }
+      return;
+    }
+    duel.t += dt;
+    for (const side of ['a', 'b']) {   // 自動小攻擊（沒送禮的人也有動作）；怒氣滿了、技能冷卻好了就自動放技能
+      if (!duel || duel.phase !== 'fight') return;
+      if (time >= duel.nextAuto[side]) {
+        duel.nextAuto[side] = time + (dc.autoAtkEvery || 4);
+        duelStrike(side, (dc.autoAtkDmg || 30) * (1 + (Math.random() * 2 - 1) * config.damageVariance), 'attack', dc.autoRage || 0);
+      }
+      if (duel && duel.phase === 'fight' && duel.rage[side] >= dc.rageMax) {   // 怒氣滿了：先閃爍一下（skillDelay 秒，畫面上整條怒氣變彩色閃爍），再放技能，放完怒氣歸零
+        if (!duel.skillCharge[side]) duel.skillCharge[side] = Math.max(time + (dc.skillDelay === undefined ? 1.5 : dc.skillDelay), duel.skillAt[side]);
+        if (time >= duel.skillCharge[side]) {
+          duel.skillCharge[side] = 0; duel.rage[side] = 0; duel.skillAt[side] = time + (dc.skillCooldown || 3);
+          duelStrike(side, dc.skillDmg, 'skill', 0);
+        }
+      }
+    }
+    if (duel && duel.phase === 'fight' && duel.t >= (dc.maxSeconds || 180)) {   // 時間到：比剩餘血量，一樣多＝和局
+      const d = pa.hp - pb.hp;
+      finishDuel(Math.abs(d) < 1 ? null : d > 0 ? duel.a : duel.b, Math.abs(d) < 1 ? '' : '時間到，比剩餘血量');
+    }
+  }
+
   const gameApi = {
     setHeroPool,
     setHostMatcher(fn, isHost) { hostMatch = fn; hostCheck = isHost || null; },
@@ -785,7 +1023,17 @@ ML.createGame = function (config, heroes) {
         if (hostCheck && hostCheck(ev.user) && hostLevelCommand(ev.text)) return;   // 主播留言「等級 名字 30」：調整等級
         handleChat(ev.user, ev.text);
       }
-      else if (ev.type === 'gift') handleGift(ev.user, ev.giftId, ev.count);
+      else if (ev.type === 'gift') {
+        if (ev.tiktokGift && ev.tiktokGift === duelSkipGift) { duelSkipGift = null; return; }   // 這份禮物剛被當成「回應單挑」，不要同時當普攻
+        if (mode === 'duel' && ev.tiktokGift) return;                                          // 單挑中：真的 TikTok 禮物改用鑽石數算（見下面 tiktokGift）
+        handleGift(ev.user, ev.giftId, ev.count);
+      }
+      else if (ev.type === 'tiktokGift' && duelInvite && ev.user.id === duelInvite.to) {   // 被挑戰的人送禮：玫瑰＝接受、GG＝拒絕，其他禮物不算回應
+        const nm = plain((ev.gift && ev.gift.name) || ''), gn = dc.giftNames || {};
+        if ((gn.accept || []).some(n => plain(n) === nm)) { duelSkipGift = ev.gift; acceptDuel(); }
+        else if ((gn.refuse || []).some(n => plain(n) === nm)) { duelSkipGift = ev.gift; refuseDuel(`${nameOfId(ev.user.id)} 送 GG 拒絕了單挑`); }
+      }
+      else if (ev.type === 'tiktokGift' && mode === 'duel') duelGift(ev.user, (ev.gift && ev.gift.diamonds) || 1, ev.count || 1);
       else if (ev.type === 'tiktokGift' && mode === 'race') {   // 賽跑：用禮物名稱判斷是助力還是干擾
         const nm = plain((ev.gift && ev.gift.name) || ''), gn = tr.giftNames || {};
         const kind = (gn.boost || []).some(n => plain(n) === nm) ? 'boost' : (gn.hinder || []).some(n => plain(n) === nm) ? 'hinder' : null;
@@ -797,6 +1045,7 @@ ML.createGame = function (config, heroes) {
       time += dt;
       if (mode === 'team') teamTick(dt);
       if (mode === 'race') raceTick(dt);
+      if (mode === 'duel') duelTick(dt); else duelInviteTick(dt);
       for (const p of [...players.values()]) {
         if (p.isBoss) { bossUpdate(p); continue; }
         tickBuffs(p, dt);
@@ -812,12 +1061,13 @@ ML.createGame = function (config, heroes) {
     // 清空場上。keepProgress = true 時保留每位觀眾的等級、經驗值、擊倒數（只把場上武將和傷害排行榜清掉）
     reset(keepProgress) {
       players.clear(); left.clear(); killLog.clear(); bossQueue.length = 0; time = 0;
+      duelInvite = null; duelLock.clear(); duelCool.clear(); duelBlock.clear(); duelPairLog.clear(); noticeAt.clear(); if (duel) { duel = null; mode = 'brawl'; }
       teamOf.clear(); swaps.clear(); match = { winner: null, restartAt: 0, time: 0 }; if (mode === 'team') initStructs();
       scores.forEach(s => { s.buffs = null; });   // 遊戲時間歸零，BUFF 也一併清掉
       if (keepProgress) scores.forEach(s => { s.damage = 0; }); else scores.clear();
     },
     // 存檔用：交出每位觀眾目前的進度
-    exportProfiles() { return [...scores.values()].map(s => ({ id: s.id, name: s.name, level: s.level, xp: s.xp, kills: s.kills, adj: s.adj || 0 })); },
+    exportProfiles() { return [...scores.values()].map(s => ({ id: s.id, name: s.name, level: s.level, xp: s.xp, kills: s.kills, adj: s.adj || 0, streak: s.streak || 0 })); },
     // 讀檔用：把之前存的進度放回來（傷害從 0 開始，所以不會出現在排行榜上，要重新上場才算）
     // merge = true（接上雲端存檔時用）：跟目前已有的進度合併，每位觀眾取比較高的那份，
     //   而且直接改現有的紀錄（場上正在打的武將也會立刻吃到新等級）；不是整個換掉。
@@ -829,13 +1079,13 @@ ML.createGame = function (config, heroes) {
         const xp = level >= max ? 0 : Math.max(0, Math.floor(p.xp) || 0), kills = Math.max(0, Math.floor(p.kills) || 0);
         const cur = scores.get(p.id), adj = Math.floor(Number(p.adj)) || 0;
         if (!cur || !merge) {
-          scores.set(p.id, { id: p.id, name: p.name || '', heroName: '', damage: 0, kills, level, xp, adj });
+          scores.set(p.id, { id: p.id, name: p.name || '', heroName: '', damage: 0, kills, level, xp, adj, streak: Math.max(0, Math.floor(Number(p.streak)) || 0) });
           continue;
         }
         if (adj !== (cur.adj || 0)) {   // 有一方是主播手動調整過的：最後一次調整的算數（可以調低）
           if (adj > (cur.adj || 0)) {
             const leveled = level !== cur.level;
-            cur.level = level; cur.xp = xp; cur.adj = adj;
+            cur.level = level; cur.xp = xp; cur.adj = adj; cur.streak = Math.max(0, Math.floor(Number(p.streak)) || 0);
             const onStage = players.get(p.id);
             if (leveled && onStage) refreshHp(onStage);
           }
@@ -845,7 +1095,7 @@ ML.createGame = function (config, heroes) {
         }
         if (level > cur.level || (level === cur.level && xp > cur.xp)) {
           const leveled = level !== cur.level;
-          cur.level = level; cur.xp = xp;
+          cur.level = level; cur.xp = xp; cur.streak = Math.max(0, Math.floor(Number(p.streak)) || 0);
           const onStage = players.get(p.id);
           if (leveled && onStage) refreshHp(onStage);
         }
@@ -920,10 +1170,31 @@ ML.createGame = function (config, heroes) {
         entrants: [...race.entrants.values()].map(e => ({ id: e.id, cp: e.cp, fails: e.fails, lane: e.lane, progress: e.progress, state: e.state, rank: e.rank,
           boost: e.boost.reduce((a, b) => a + (b.until > race.t ? b.delta : 0), 0), hinder: e.hinder.reduce((a, b) => a + (b.until > race.t ? b.delta : 0), 0) })) };
     },
+    // 單挑賽：畫面和面板用
+    getDuelInvite() {
+      if (!duelInvite) return null;
+      return { from: duelInvite.from, to: duelInvite.to, fromName: nameOfId(duelInvite.from), toName: nameOfId(duelInvite.to), left: Math.max(0, duelInvite.left), total: dc.inviteSeconds || 60 };
+    },
+    getDuel() {
+      if (!duel) return null;
+      const side = k => { const p = players.get(duel[k]), sc = scores.get(duel[k]) || {}; return { id: duel[k], name: nameOfId(duel[k]), hp: p ? Math.max(0, p.hp) : 0, maxHp: p ? p.maxHp : dc.hp, rage: duel.rage[k], rageMax: dc.rageMax, streak: sc.streak || 0, level: sc.level || 1 }; };
+      const r = duel.result;
+      return { phase: duel.phase, a: side('a'), b: side('b'), cd: Math.max(0, duel.cd), t: duel.t, timeLeft: Math.max(0, (dc.maxSeconds || 180) - duel.t), resLeft: Math.max(0, duel.resLeft),
+        result: r ? { winnerId: r.winnerId, loserId: r.loserId, draw: r.draw, why: r.why, winXp: r.winXp, loseXp: r.loseXp, streak: r.streak, broke: r.broke, levelDown: r.levelDown, winnerName: r.winnerId ? nameOfId(r.winnerId) : '', loserName: r.loserId ? nameOfId(r.loserId) : '' } : null };
+    },
+    // 單挑的助攻榜：圍觀者在這場幫忙打了多少傷害（前幾名）
+    getDuelAssists() {
+      if (!duel) return null;
+      const rows = [...duel.assist.entries()].map(([id, r]) => ({ id, name: duelNames.get(id) || '觀眾', damage: r.dmg, side: r.side, sideName: nameOfId(duel[r.side]) })).sort((x, y) => y.damage - x.damage).slice(0, config.leaderboardSize);
+      return rows;
+    },
+    duelBusy() { return !!duelInvite || mode === 'duel'; },
     raceBusy() { return mode === 'race' && !!race && (race.phase === 'countdown' || race.phase === 'run'); },
     raceGift(user, kind, count) { raceGift(user, kind, count); },
     setMode(m) {
       if (m === 'race') { openRace(); return; }
+      if (duelInvite) { duelInvite = null; fx({ type: 'duelInviteEnd' }); notice('切換模式，單挑申請取消'); }
+      if (mode === 'duel') { cancelDuel('主播切換了模式'); if (m === 'brawl') return; }
       if (m === 'hurdle') { openRace('hurdle'); return; }
       if (m === mode) { notice(m === 'team' ? '已經是陣營模式了' : '已經是亂鬥模式了'); return; }
       race = null; raceLock.clear();

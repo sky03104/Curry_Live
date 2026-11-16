@@ -21,6 +21,7 @@ const args = {};
 for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, '')] = process.argv[i + 1];
 const gift = k => args[k] || '主播公布';
 const bossGift = (k, def) => args[k] || def;
+const brand = 'data:image/jpeg;base64,' + fs.readFileSync(path.join(root, 'assets/brand/curry_ai_studio_banner.jpg')).toString('base64');
 const img = f => 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/heroes', f)).toString('base64');
 const hero = (f, name, c) => `<div class="h"><img src="${img(f)}"><span style="background:${c}">${name}</span></div>`;
 const TOTAL = 8 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 8 張玩法（含陣營模式、賽跑模式、障礙賽、障礙賽賽道）+ 每個陣營一張
@@ -60,13 +61,14 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .boss .b strong { display: block; font-size: 40px; margin-top: 6px; } .boss .b em { font-style: normal; color: #ffd35c; font-size: 40px; font-weight: 900; }
 .buffs { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
 .buff { border-radius: 22px; padding: 22px 30px; font-size: 42px; color: #fff; line-height: 1.45; } .buff b { font-size: 48px; }
-.cover { background: linear-gradient(170deg,#2b3a42,#3E4A46 60%,#2b3a42); color: #fff; padding: 160px 110px 300px 60px; text-align: center; justify-content: center; }
-.cover h1 { font-size: 100px; font-weight: 900; letter-spacing: 6px; line-height: 1.2; } .cover h1 b { color: #ffd35c; display: block; }
-.cover .sub { font-size: 44px; color: #e8dcc0; margin-top: 18px; }
-.cover .row { display: flex; justify-content: center; margin: 46px 0 30px; } .cover .row img { height: 330px; margin: 0 -26px; filter: drop-shadow(0 8px 10px rgba(0,0,0,.4)); }
-.steps { display: flex; flex-direction: column; gap: 16px; margin-top: 10px; text-align: left; }
-.steps div { background: rgba(255,255,255,.1); border: 3px solid rgba(255,255,255,.25); border-radius: 22px; padding: 16px 26px; font-size: 44px; font-weight: 700; }
-.steps i { font-style: normal; display: inline-block; width: 60px; height: 60px; line-height: 60px; text-align: center; border-radius: 50%; background: #D9563E; margin-right: 16px; font-weight: 900; }
+.cover { background: linear-gradient(170deg,#2b3a42,#3E4A46 60%,#2b3a42); color: #fff; padding: 100px 110px 630px 60px; text-align: center; justify-content: center; }
+.cover h1 { font-size: 84px; font-weight: 900; letter-spacing: 6px; line-height: 1.2; } .cover h1 b { color: #ffd35c; display: block; }
+.cover .sub { font-size: 38px; color: #e8dcc0; margin-top: 12px; }
+.cover .row { display: flex; justify-content: center; margin: 26px 0 20px; } .cover .row img { height: 250px; margin: 0 -26px; filter: drop-shadow(0 8px 10px rgba(0,0,0,.4)); }
+.steps { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; text-align: left; }
+.steps div { background: rgba(255,255,255,.1); border: 3px solid rgba(255,255,255,.25); border-radius: 22px; padding: 12px 24px; font-size: 40px; font-weight: 700; }
+.steps .new { border-color: #ffd35c; background: rgba(255,211,92,.12); } .steps .new i { background: #ffd35c; color: #3E4A46; } .steps em { font-style: normal; display: block; margin-left: 70px; font-size: 38px; color: #ffd35c; font-weight: 900; }
+.steps i { font-style: normal; display: inline-block; width: 54px; height: 54px; line-height: 54px; text-align: center; border-radius: 50%; background: #D9563E; margin-right: 16px; font-weight: 900; }
 .fac-head { display: flex; align-items: center; gap: 22px; margin-bottom: 18px; }
 .fac-head .seal { width: 120px; height: 120px; border-radius: 26px; background: var(--c); color: #fff; font-size: 84px; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 0 rgba(0,0,0,.2); }
 .fac-head .tt { font-size: 66px; font-weight: 900; color: var(--c); line-height: 1.1; } .fac-head .tt small { display: block; font-size: 36px; color: #8C9490; font-weight: 700; margin-top: 6px; }
@@ -83,7 +85,10 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .race3 { display: flex; gap: 14px; margin-top: 16px; } .race3 div { flex: 1; border-radius: 18px; padding: 16px 10px; text-align: center; color: #fff; font-size: 38px; font-weight: 900; line-height: 1.35; } .race3 small { display: block; font-size: 30px; font-weight: 700; opacity: .95; }
 .tracks10 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 18px; } .tc { background: #fff; border-radius: 16px; padding: 8px 4px 6px; text-align: center; min-width: 0; } .tc svg { width: 100%; height: auto; display: block; } .tc span { display: block; font-size: 23px; font-weight: 700; line-height: 1.2; }
 .gates { display: flex; gap: 10px; margin-top: 18px; } .gt { flex: 1; background: #fff; border-radius: 16px; padding: 10px 4px 8px; text-align: center; min-width: 0; } .gt i { display: block; font-style: normal; font-size: 64px; line-height: 1.1; } .gt b { display: block; font-size: 30px; } .gt span { display: block; font-size: 30px; font-weight: 900; color: #D9563E; }
-.swipe { margin-top: 30px; font-size: 38px; color: #ffd35c; font-weight: 900; }
+.brand { display: flex; align-items: center; justify-content: center; gap: 22px; position: absolute; left: 60px; right: 110px; bottom: 305px; }
+.brand img { width: 800px; border-radius: 34px; display: block; }
+.brand span { font-size: 44px; font-weight: 900; color: #fff; letter-spacing: 3px; } .brand small { display: block; font-size: 28px; font-weight: 700; color: #e8dcc0; letter-spacing: 1px; margin-top: 4px; }
+.swipe { margin-top: 20px; font-size: 36px; color: #ffd35c; font-weight: 900; }
 `;
 const top = n => `<div class="top"><div class="t">萌戰三國・<b>直播亂鬥</b></div><div class="pg">${n}/${TOTAL}</div></div>`;
 
@@ -92,8 +97,9 @@ const slides = [
   <h1>萌戰三國<b>直播亂鬥</b></h1>
   <div class="sub">留言選武將、送禮打架　30 秒看懂玩法</div>
   <div class="row"><img src="${img('lvbu.png')}"><img src="${img('guanyu.png')}"><img src="${img('diaochan.png')}"><img src="${img('michelin.png')}"></div>
-  <div class="steps"><div><i>1</i>留言武將名字　上場！</div><div><i>2</i>送禮物　你的武將出手</div><div><i>3</i>一起打倒大 BOSS</div></div>
-  <div class="swipe">往左滑　看玩法＋全部武將 ➜</div></div>`,
+  <div class="steps"><div><i>1</i>留言武將名字　上場！</div><div><i>2</i>送禮物　你的武將出手</div><div><i>3</i>一起打倒大 BOSS</div><div class="new"><i>4</i>全新陣營模式<em>紅藍大對決</em></div><div class="new"><i>5</i>全新創意賽跑及障礙賽模式<em>一起來跑步</em></div></div>
+  <div class="swipe">往左滑　看玩法＋全部武將 ➜</div>
+  <div class="brand"><img src="${brand}"></div></div>`,
 
 `<div class="slide">${top(2)}<div class="body">
   <div class="card"><div class="no">1</div><h2>留言選武將上場</h2>

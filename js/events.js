@@ -17,7 +17,7 @@ ML.createEventHub = function () {
     on(fn) { listeners.push(fn); },
     emit(ev) { listeners.forEach(fn => fn(ev)); },
     chat(user, text) { hub.emit({ type: 'chat', user, text: String(text) }); },
-    gift(user, giftId, count) { hub.emit({ type: 'gift', user, giftId, count: count || 1 }); },
+    gift(user, giftId, count, tiktokGift) { hub.emit({ type: 'gift', user, giftId, count: count || 1, tiktokGift: tiktokGift || null }); },   // tiktokGift：這份禮物如果是真的 TikTok 禮物，把原本的禮物資料（名字、鑽石數）一起帶著（單挑賽要用）
   };
   return hub;
 };
@@ -137,7 +137,7 @@ ML.connectWebSocket = function (hub, url, config, onStatus, sourceName) {
         const giftId = ev.giftId || (ev.tiktokGift && ML.mapTikTokGift(config, ev.tiktokGift));
         // 先通知面板「收到了什麼 TikTok 禮物、對應到哪個動作」（沒對應到也通知，才看得出為什麼沒反應）
         if (ev.tiktokGift) hub.emit({ type: 'tiktokGift', user: ev.user, gift: ev.tiktokGift, count: ev.count, mapped: giftId || null });
-        if (giftId) hub.gift(ev.user, giftId, ev.count);
+        if (giftId) hub.gift(ev.user, giftId, ev.count, ev.tiktokGift);
       }
     };
     ws.onclose = () => { report(false, `連不到${name}，3 秒後重試（請確認電腦上的${name}有開著）`); setTimeout(connect, 3000); };

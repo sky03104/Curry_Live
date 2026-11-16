@@ -90,8 +90,24 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       quake = 1.6;
       return;
     }
+    if (e.type === 'duelInvite') {   // 單挑申請：兩位的腳下各一圈金光
+      for (const id of [e.from, e.to]) { const iv = views.get(id); if (iv) { rings.push({ v: iv, age: 0, life: 0.7, color: '#ffd35c', max: 2, width: 7 }); iv.hop = 1; iv.hopH = 0.7; } }
+      return;
+    }
+    if (e.type === 'duelGo') { quake = Math.max(quake, 1.2); return; }
+    if (e.type === 'duelEnd') {      // 單挑結束：贏的人金色光柱、整個畫面震一下
+      const d = game.getDuel();
+      if (d && d.result && d.result.winnerId) { const wv = views.get(d.result.winnerId); if (wv && wv.x !== null) { effects.pillar(wv.x, feet(wv), wv.size * 1.2, wv.size * 2.8, '#ffd35c'); effects.sparks(wv.x, wv.y, '#ffd35c', 50, 620, 6, 1); rings.push({ v: wv, age: 0, life: 1, color: '#ffd35c', max: 2.6, width: 10 }); } }
+      quake = Math.max(quake, 1.4);
+      return;
+    }
     const v = views.get(e.id);
     if (!v) return;
+    if (e.type === 'leveldown') {     // 單挑輸了掉等級：紅色字樣
+      v.shake = 1; effects.sparks(v.x, v.y, '#ff6b6b', 14, 300, 4, 0.7);
+      floats.push({ v, text: `掉到 Lv.${e.level}…`, color: '#ff8a8a', scale: 1.1, age: 0, life: 2 });
+      return;
+    }
     if (e.type === 'structDown') {         // 防禦塔／主堡被打爆：碎石、火花、震動
       v.shake = 1.2; quake = 1.4;
       effects.sparks(v.x, v.y, '#ffb347', 50, 640, 7, 1);
@@ -351,7 +367,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const n = list.length;
     const wide = W >= H;
     const lbW = wide ? clamp(W * 0.26, 260, 340) : W - 32;
-    const lbRows = game.getMode() === 'race' ? 5 : Math.max(1, game.getLeaderboard().length);   // 賽跑時右上角改顯示前 5 名
+    const lbRows = game.getMode() === 'race' ? 5 : game.getMode() === 'duel' ? Math.max(1, (game.getDuelAssists() || []).length) : Math.max(1, game.getLeaderboard().length);   // 賽跑時右上角改顯示前 5 名
     const lbH = 50 + lbRows * 32;
     const lb = { x: W - lbW - 16, y: 16, w: lbW, h: lbH };
     // 對 BOSS 的傷害排行榜：放在傷害排行榜正下方，場上有 BOSS 才出現（2026-11-14 咖哩要求）
@@ -366,7 +382,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     //   空間不夠（排行榜佔了很多、或畫面很扁）就整排縮小，最小縮到一半。）
     toastBox = null;
     const arenaFullW = arena.w;   // 還沒被禮物提示列擠窄的場地寬度（武將走動範圍用：提示列上方的空地也可以走）
-    const items = getLegend ? getLegend(game.getMode() === 'race' ? 'race' : '') : [];   // 賽跑模式：右下角改顯示助力（玫瑰）、干擾（GG）的禮物指令
+    const items = getLegend ? getLegend(game.getMode() === 'race' ? 'race' : game.getMode() === 'duel' ? 'duel' : '') : [];   // 賽跑模式：右下角改顯示助力（玫瑰）、干擾（GG）的禮物指令
     let legend = null;
     if (items.length) {
       // 2026-11-14 咖哩用手機看說「還是霧霧的」：直播影片壓縮會把彩色的字糊掉（顏色資訊被壓得很粗，只有明暗保得住），
@@ -396,9 +412,10 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const wander = config.wander && config.wander.enabled;
     const teamMode = game.getMode() === 'team';
     const modeNow = game.getMode();
-    if (modeNow !== lastModeName) {   // 任何模式切換（含賽跑）：所有武將重新排位置
+    if (modeNow !== lastModeName) {   // 任何模式切換（含賽跑）：所有武將重新排位置（進出單挑賽不重排，讓大家慢慢走到定位）
+      const smooth = modeNow === 'duel' || lastModeName === 'duel';
       lastModeName = modeNow;
-      for (const v of views.values()) if (!v.boss && !v.fixed) { v.x = null; v.y = null; v.goal = null; v.tx = undefined; v.rest = undefined; v.race = false; }
+      for (const v of views.values()) if (!v.boss && !v.fixed) { if (!smooth) { v.x = null; v.y = null; } v.goal = null; v.tx = undefined; v.rest = undefined; v.race = false; v.duel = false; }
     }
     if (teamMode !== lastTeamMode) {   // 切換亂鬥／陣營模式：所有武將重新排位置（不然切回亂鬥後會留在原本地盤的位置、站成一排）
       lastTeamMode = teamMode;
@@ -439,6 +456,24 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       }
       const xr = wide ? arena.x + arenaFullW : arena.x + arena.w;
       bounds = { x0: arena.x + es * 0.6, x1: xr - es * 0.6, y0: arena.y, y1: arena.y + arena.h, size: es, lg: null };
+    } else if (modeNow === 'duel' && game.getDuel()) {
+      // 單挑賽：兩位選手在中間面對面（大），其他人在四周圍觀（小）：上排、下排，人多再排左右兩側
+      const D = game.getDuel(), specs = list.filter(p => p.id !== D.a.id && p.id !== D.b.id), ns = specs.length;
+      const ss = ns ? clamp(Math.min(arena.h * 0.2, arena.w * 0.055), 28, 64) : 0;
+      const topEdge = arena.y + 118 * duelZoom(), botEdge = arena.y + arena.h - 6;
+      const rowTop = topEdge + ss * 0.8 + 22, rowBot = botEdge - ss * 0.5 - 34;
+      const midY = ns ? (rowTop + rowBot) / 2 : (topEdge + botEdge) / 2;
+      const sd = clamp(Math.min((botEdge - topEdge) * (ns ? 0.7 : 0.85), arena.w * 0.34), 50, 380);
+      const cx = arena.x + arena.w / 2, gapX = clamp(arena.w * 0.22, sd * 0.85, sd * 2.2);
+      const at = [[D.a.id, cx - gapX, 1], [D.b.id, cx + gapX, -1]];
+      for (const [id, x, face] of at) { const v = views.get(id); if (!v) continue; v.duel = true; v.tx = x; v.ty = midY; v.tsize = sd; v.face = face; v.goal = null; v.zx0 = v.zx1 = v.zy0 = v.zy1 = undefined; if (v.x === null) { v.x = x; v.y = midY; v.size = sd; } }
+      const nTop = Math.ceil(ns * 0.4), nBot = Math.ceil(ns * 0.4), nSide = Math.max(0, ns - nTop - nBot);
+      const xL = arena.x + ss * 0.8, xR = arena.x + arena.w - ss * 0.8;
+      const row = (k, y, i0, xr) => { const xe = Math.max(xL + ss, Math.min(xR, xr === undefined ? xR : xr)); for (let i = 0; i < k; i++) { const p = specs[i0 + i], v = p && views.get(p.id); if (!v) continue; place(v, xL + (xe - xL) * (k === 1 ? 0.5 : i / (k - 1)), y); } };
+      const place = (v, x, y) => { v.duel = true; v.tx = x; v.ty = y; v.tsize = ss; v.face = Math.sign(cx - x) || 1; v.goal = null; v.zx0 = v.zx1 = v.zy0 = v.zy1 = undefined; if (v.x === null) { v.x = x; v.y = y; v.size = ss; } };
+      row(nTop, rowTop, 0); row(nBot, rowBot, nTop, (W - 16 - lbW) - ss * 0.8);   // 下排右邊讓出右下角的「圍觀的人」說明框
+      for (let i = 0; i < nSide; i++) { const p = specs[nTop + nBot + i], v = p && views.get(p.id); if (!v) continue; place(v, i % 2 ? xR : xL, rowTop + (rowBot - rowTop) * ((Math.floor(i / 2) + 1) / (Math.ceil(nSide / 2) + 1))); }
+      bounds = { x0: arena.x + ss, x1: arena.x + arena.w - ss, y0: topEdge, y1: botEdge, size: ss, lg: null };
     } else if (teamMode) {
       // 陣營模式：紅方主堡｜紅隊武將｜紅方塔｜藍方塔｜藍隊武將｜藍方主堡
       const sB = clamp(Math.min(arena.h * 0.5, arena.w * 0.15), 60, 170), sT = sB * 0.75;   // 2026-11-15 咖哩看直播覺得塔堡太小：放大
@@ -549,6 +584,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     }
     if (config.wander && config.wander.enabled && bounds) roam(dt);
     driveRace(dt);
+    for (const v of views.values()) if (v.duel) v.moving = v.tx !== undefined && Math.hypot(v.tx - v.x, v.ty - v.y) > v.size * 0.15;   // 單挑賽：走到定位前是走路，到了就站定
     floats.forEach(f => f.age += dt); floats = floats.filter(f => f.age < (f.life || 1) && views.has(f.v.id));
     rings.forEach(r => r.age += dt); rings = rings.filter(r => r.age < r.life);
     toasts.forEach(t => t.age += dt); toasts = toasts.filter(t => t.age < toastLife);
@@ -648,6 +684,130 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     }
   }
 
+
+  // ---------- 單挑賽：上方大血條、怒氣條、倒數、結果；申請階段的中間彈窗 ----------
+  // 畫面被等比例縮小（直播橫幅）時，單挑的上方資訊要放大補回來，不然字太小
+  const duelZoom = () => clamp(0.6 / viewK, 1, 1.5);
+  // 右下角「圍觀的人」說明框：寬度跟右上角的助攻榜一樣，字太長就換行（最多三行，字會自動縮小到放得下）
+  function duelHintBox(D, w) {
+    // 一小段一小段排（不在「@名字」中間斷行）：放得下就接在同一行，放不下才換行
+    const parts = ['圍觀的人：', `留言「@${short(D.a.name, 6)}」`, `或「@${short(D.b.name, 6)}」，`, '再送禮物，', '幫他助攻！'], inner = w - 28;
+    for (let fz = 28 * duelZoom(); ; fz -= 1) {
+      ctx.font = `bold ${fz}px ${FONT}`;
+      const lines = []; let cur = '';
+      for (const t of parts) { if (cur && ctx.measureText(cur + t).width > inner) { lines.push(cur); cur = t; } else cur += t; }
+      if (cur) lines.push(cur);
+      if ((lines.length <= 3 && lines.every(l => ctx.measureText(l).width <= inner)) || fz <= 12) return { lines, fz, w, h: lines.length * fz * 1.3 + 20 };
+    }
+  }
+  function drawDuelHud(arena, lb) {
+    const D = game.getDuel();
+    if (!D) return;
+    const z = duelZoom(), cx = arena.x + arena.w / 2, x0 = arena.x + 8, x1 = arena.x + arena.w - 8, y0 = arena.y;
+    const half = Math.max(80, (x1 - x0) / 2 - 76 * z), mmss = n => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
+    const side = (S, left) => {
+      const bx = left ? x0 : x1 - half, by = y0 + 38 * z, bh = 30 * z, ratio = clamp(S.hp / S.maxHp, 0, 1);
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(bx - 3, by - 3, half + 6, bh + 6, 12); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(bx, by, half, bh, 9); ctx.clip();
+      ctx.fillStyle = '#3a2a2e'; ctx.fillRect(bx, by, half, bh);
+      const fw = half * ratio, fx0 = left ? bx : bx + half - fw;
+      ctx.fillStyle = ratio > 0.5 ? '#6fdc8c' : ratio > 0.25 ? '#ffd24d' : '#ff6b81'; ctx.fillRect(fx0, by, fw, bh);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(fx0, by + 2, fw, 5);
+      ctx.restore();
+      text(`${Math.ceil(S.hp)}`, bx + half / 2, by + bh / 2 + 1, 38 * z, '#fff');   // 血量數字比血條大，可以超出條的上下
+      // 怒氣條：左邊（或右邊）一個火焰＋「怒氣」大字；滿了整條變彩色閃爍，放完技能歸零
+      const ry = by + bh + 14 * z, rh = 12 * z, rr = clamp(S.rage / S.rageMax, 0, 1), full = rr >= 0.999;
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(bx - 2, ry - 2, half + 4, rh + 4, rh / 2 + 2); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(bx, ry, half, rh, rh / 2); ctx.clip();
+      ctx.fillStyle = '#3a2a2e'; ctx.fillRect(bx, ry, half, rh);
+      const gx0 = left ? bx : bx + half - half * rr, gw = half * rr;
+      if (full) {   // 彩虹色一直流動、整條一明一暗地閃
+        const g = ctx.createLinearGradient(bx, 0, bx + half, 0), off = time * 260;
+        for (let k = 0; k <= 6; k++) g.addColorStop(k / 6, `hsl(${(off + k * 60) % 360},100%,${Math.sin(time * 16) > 0 ? 62 : 50}%)`);
+        ctx.fillStyle = g; ctx.fillRect(bx, ry, half, rh);
+        ctx.fillStyle = `rgba(255,255,255,${0.25 + 0.25 * Math.sin(time * 16)})`; ctx.fillRect(bx, ry, half, rh * 0.45);
+      } else if (gw > 0) {
+        const g = ctx.createLinearGradient(gx0, 0, gx0 + gw, 0); g.addColorStop(0, '#ff7a2a'); g.addColorStop(1, '#ffc23c');
+        ctx.fillStyle = g; ctx.fillRect(gx0, ry, gw, rh);
+        ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(gx0, ry + rh * 0.12, gw, rh * 0.28);
+      }
+      ctx.restore();
+      // 字和火焰比細細的怒氣條大，可以超出條的上下（不用關在框框裡）
+      const fs2 = 26 * z, flame = full ? 1 + 0.12 * Math.sin(time * 18) : 1;   // 滿了火焰一跳一跳
+      text('🔥', left ? bx + 18 * z : bx + half - 18 * z, ry + rh / 2, 34 * z * flame, '#fff');
+      text(full ? '怒氣滿了！' : '怒氣', left ? bx + 42 * z : bx + half - 42 * z, ry + rh / 2 + 1, fs2, full ? '#ffffff' : '#fff3d0', left ? 'left' : 'right');
+      // 名字、等級、連勝
+      const nm = `${short(S.name, 8)}`;
+      text(`Lv.${S.level} ${nm}`, left ? bx : bx + half, y0 + 17 * z, 26 * z, '#fff', left ? 'left' : 'right');
+    };
+    side(D.a, true); side(D.b, false);
+    ctx.font = `bold 26px ${FONT}`;
+    text('VS', cx, y0 + 30 * z, 36 * z, '#ffd35c');
+    // 連勝（2 場以上才顯示）：放在 VS 的左右兩側，左邊那位在左、右邊那位在右
+    // 左邊那位：👑 數字 連勝；右邊那位：數字 連勝 👑（左右對稱）。數字特別大，可以超出血條的上框
+    const streakDraw = (n, left) => {
+      const icon = ['🏆', 30 * z], num = [String(n), 46 * z], lab = ['連勝', 26 * z], seq = left ? [icon, num, lab] : [num, lab, icon];
+      let tw = 0; const ws = seq.map(([t, f]) => { ctx.font = `bold ${f}px ${FONT}`; const w = ctx.measureText(t).width + 3; tw += w; return w; });
+      let x = left ? cx - 42 * z - tw : cx + 42 * z; const y = y0 + 22 * z;
+      seq.forEach(([t, f], k) => { text(t, x, y, f, k === (left ? 1 : 0) ? '#fff3a0' : '#ffb13c', 'left'); x += ws[k]; });
+    };
+    if (D.a.streak >= 2) streakDraw(D.a.streak, true);
+    if (D.b.streak >= 2) streakDraw(D.b.streak, false);
+    if (D.phase === 'fight') text(mmss(D.timeLeft), cx, y0 + 68 * z, 30 * z, '#fff');
+    if (D.phase !== 'result') {   // 圍觀者怎麼助攻：放在整個畫面的右下角
+      const { lines, fz, w, h } = duelHintBox(D, lb.w), rx = lb.x + lb.w, by2 = H - 12;
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.beginPath(); ctx.roundRect(rx - w, by2 - h, w, h, 12); ctx.fill(); ctx.restore();
+      lines.forEach((ln, k) => text(ln, rx - w / 2, by2 - h + 10 + fz * 1.3 * (k + 0.5), fz, k === lines.length - 1 ? '#ffd35c' : '#fff3d0'));
+    }
+    const mid = arena.y + arena.h * 0.5;
+    if (D.phase === 'countdown') {
+      ctx.save(); ctx.globalAlpha = 0.9; text(String(Math.ceil(D.cd)), cx, mid, 130 - (D.cd % 1) * 30, '#ffd35c'); ctx.restore();
+    } else if (D.phase === 'fight' && D.t < 1.2) text('開打！', cx, mid, 90, '#ff7a5c');
+    if (D.phase === 'result' && D.result) {
+      const R = D.result, by = arena.y + arena.h * 0.5;
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.74)'; ctx.fillRect(arena.x, by - 78, arena.w, 164); ctx.restore();
+      if (R.draw) { text('⚔ 平手！', cx, by - 40, 40, '#ffd35c'); text('雙方經驗值都沒有變動', cx, by + 12, 22, '#fff'); return; }
+      text(`🏆 ${short(R.winnerName, 8)} 獲勝！`, cx, by - 50, 38, '#ffd35c');
+      text(`+${R.winXp} 經驗　${R.streak} 連勝${R.broke ? `　打倒 ${R.broke} 連勝！` : ''}`, cx, by - 10, 24, '#b8ffb0');
+      text(`${short(R.loserName, 8)}　−${R.loseXp} 經驗${R.levelDown ? '　掉等級了…' : ''}`, cx, by + 26, 22, '#ff9a9a');
+      if (R.why) text(R.why, cx, by + 62, 15, '#e8dcc0', 'center', false);
+    }
+  }
+  // 單挑時右上角的「助攻榜」：圍觀者幫忙打了多少傷害（取代亂鬥的傷害排行榜）
+  function drawAssistBoard(lb) {
+    const rows = game.getDuelAssists() || [];
+    ctx.fillStyle = 'rgba(22,26,30,0.78)'; ctx.beginPath(); ctx.roundRect(lb.x, lb.y, lb.w, lb.h, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+    text('🤝 助攻榜', lb.x + lb.w / 2, lb.y + 24, 20, '#ffd35c');
+    if (!rows.length) { text('還沒有人助攻', lb.x + lb.w / 2, lb.y + 62, 14, '#aaa', 'center', false); return; }
+    rows.forEach((r, i) => {
+      const y = lb.y + 62 + i * 32;
+      text(String(i + 1), lb.x + 22, y, 18, ['#ffd35c', '#dcdcdc', '#d99a6c'][i] || '#fff');
+      text(short(r.name, 6), lb.x + 42, y, 16, '#fff', 'left');
+      text(`→${short(r.sideName, 3)}`, lb.x + lb.w - 78, y, 13, '#9ad0ff', 'right', false);
+      text(String(Math.round(r.damage)), lb.x + lb.w - 14, y, 16, '#ffb13c', 'right');
+    });
+  }
+  function drawDuelInvite(arena) {
+    const I = game.getDuelInvite();
+    if (!I) return;
+    const cx = arena.x + arena.w / 2, w = Math.min(arena.w - 16, 640), h = Math.min(arena.h - 12, 196), cy = arena.y + arena.h * 0.5, x = cx - w / 2, y = cy - h / 2;
+    const sc = Math.min(1, w / 560, h / 190);
+    ctx.save();
+    ctx.fillStyle = 'rgba(14,16,24,0.88)'; ctx.beginPath(); ctx.roundRect(x, y, w, h, 20); ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = '#ffd35c'; ctx.stroke();
+    ctx.restore();
+    text('⚔ 單挑申請', cx, y + h * 0.15, 30 * sc, '#ffd35c');
+    text(`${short(I.fromName, 8)} 向 ${short(I.toName, 8)} 發出單挑申請`, cx, y + h * 0.36, 24 * sc, '#fff');
+    text(`請 ${short(I.toName, 8)} 送一朵玫瑰 🌹 接受挑戰`, cx, y + h * 0.54, 24 * sc, '#ff9ec4');
+    text('送 GG、留言「拒絕」或時間到沒反應＝拒絕', cx, y + h * 0.7, 16 * sc, '#c9c9d4', 'center', false);
+    const bw = w - 40, bx = x + 20, by = y + h - 24 * sc, k = clamp(I.left / I.total, 0, 1);
+    ctx.save(); ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.beginPath(); ctx.roundRect(bx, by, bw, 10, 5); ctx.fill();
+    ctx.fillStyle = k > 0.3 ? '#ffd35c' : '#ff6b5c'; ctx.beginPath(); ctx.roundRect(bx, by, Math.max(10, bw * k), 10, 5); ctx.fill(); ctx.restore();
+    text(`${Math.ceil(I.left)} 秒`, x + w - 22, y + h * 0.15, 20 * sc, k > 0.3 ? '#fff' : '#ff9a9a', 'right');
+  }
+
   // 待機時在場上隨意走動：走到一個隨機地點 → 停一下 → 再挑下一個地點
   // 兩隻武將「隔多開」的算法：左右隔一個身寬即可，上下要隔更開（因為頭上有名字血條、腳下有字）。
   // 回傳值小於 1 代表太近、會互相擋到。
@@ -677,7 +837,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       if (v.zx0 !== undefined && (v.x < v.zx0 || v.x > v.zx1)) v.x += (clamp(v.x, v.zx0, v.zx1) - v.x) * Math.min(1, dt * 4);
       if (v.zy0 !== undefined && (v.y < v.zy0 || v.y > v.zy1)) v.y += (clamp(v.y, v.zy0, v.zy1) - v.y) * Math.min(1, dt * 4);   // 賽跑：沒參賽的被擠出內場就慢慢走回來   // 陣營模式：被推出自己那隊的地盤就慢慢走回來
       // 倒地、正在出招或挨打時不走動（BOSS 固定站著）
-      if (v.boss || v.fixed || v.race || v.down || v.lunge || v.pending > 0 || v.hold > 0) continue;
+      if (v.boss || v.fixed || v.race || v.duel || v.down || v.lunge || v.pending > 0 || v.hold > 0) continue;
       if (!v.goal) {
         if ((v.rest = (v.rest === undefined ? Math.random() * cfg.restMax : v.rest) - dt) > 0) continue;
         // 隨機挑幾個候選地點，只考慮「走過去不會擠到別人」的，從中選最空的；
@@ -705,7 +865,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     // 互相靠太近就輕輕推開，避免疊在一起；倒地的不會被推走
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
       const a = list[i], c = list[j];
-      if (a.fixed || c.fixed) continue;   // 塔堡不推武將、武將也不推塔堡
+      if (a.fixed || c.fixed || a.duel || c.duel) continue;   // 單挑賽時大家有固定位置，不互相推；塔堡不推武將、武將也不推塔堡
       const g = gap(a.x, a.y, c.x, c.y, (a.size + c.size) / 2);
       if (g >= 1 || (a.down && c.down)) continue;
       const dx = c.x - a.x || 0.01, dy = c.y - a.y, d = Math.hypot(dx, dy);
@@ -714,7 +874,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       a.x -= dx * push * wa; a.y -= dy * push * wa; c.x += dx * push * (1 - wa); c.y += dy * push * (1 - wa);
     }
     for (const v of list) {
-      if (!v.down && !v.boss && !v.fixed && !v.race) { v.x = clamp(v.x, v.zx0 !== undefined ? Math.min(b.x0, v.zx0) : b.x0, v.zx1 !== undefined ? Math.max(b.x1, v.zx1) : b.x1); v.y = capY(b, v.x, clamp(v.y, v.zy0 !== undefined ? v.zy0 : b.y0, v.zy1 !== undefined ? v.zy1 : b.y1)); }
+      if (!v.down && !v.boss && !v.fixed && !v.race && !v.duel) { v.x = clamp(v.x, v.zx0 !== undefined ? Math.min(b.x0, v.zx0) : b.x0, v.zx1 !== undefined ? Math.max(b.x1, v.zx1) : b.x1); v.y = capY(b, v.x, clamp(v.y, v.zy0 !== undefined ? v.zy0 : b.y0, v.zy1 !== undefined ? v.zy1 : b.y1)); }
       if (!v.want) continue;
       // 這一格實際有沒有前進？有前進才算「走路中」（才會一顛一顛）。
       // 一直被擋住走不動超過半秒，就放棄這個目的地、休息一下再換地方，不會卡在原地踏步。
@@ -859,7 +1019,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     else lean = clamp(v.kbx / size * 1.4, -0.35, 0.35) + (v.moving ? v.dir * 0.06 : 0);   // 走路時微微往前進方向傾
     sprite.draw(ctx, p.hero, x, y, size, { pose, poseTime: v.lunge ? v.lunge.t : time, flash: v.flash, lean, facing: v.faceShown, phase: v.phase, moving: v.moving, anim: v.anim });
 
-    const raceMode = game.getMode() === 'race';
+    const raceMode = game.getMode() === 'race' || game.getMode() === 'duel';   // 賽跑、單挑賽：不畫小血條（單挑有上方的大血條）
     // 血條（賽跑時不畫血條、經驗條、BUFF 章，只留名字）
     if (raceMode) ctx.globalAlpha = 0;
     const bw = Math.max(54, size * 0.95), bh = Math.max(7, size * 0.09);
@@ -929,7 +1089,9 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
 
     // 最下面一行：倒地倒數 或 鎖定對象
     const ly = y + r + fs * 1.85;
-    if (v.down) {
+    if (v.down && game.getMode() === 'duel') {
+      // 單挑結果顯示期間輸的人躺著，不寫倒地倒數
+    } else if (v.down) {
       const wait = Math.ceil(game.reviveRemaining(p));
       if (wait > 0) text(`倒地 ${wait} 秒後可復活`, x, ly, fs * 0.78, '#ffb0a6');
       else if (Math.sin(time * 6) > -0.3) text('送禮復活！', x, ly, fs * 0.9, '#ffe27a');
@@ -1148,10 +1310,12 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
 
     drawTeamHud(arena);
     drawRaceHud(arena);
-    if (game.getRace()) drawRaceBoard(lb, game.getRace()); else drawLeaderboard(lb);
+    drawDuelHud(arena, lb);
+    if (game.getRace()) drawRaceBoard(lb, game.getRace()); else if (game.getMode() === 'duel' && game.getDuel()) drawAssistBoard(lb); else drawLeaderboard(lb);
     if (lb2) drawBossLeaderboard(lb2);
     if (legend) drawLegend(legend);
     drawBossQueue(arena, lb2 && W >= H ? lb2 : lb);
+    drawDuelInvite(arena);
 
     // 訊息：橫式放在排行榜下方，直式放在畫面最底下（都不會蓋到武將）
     const wide = W >= H;
