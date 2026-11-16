@@ -460,18 +460,18 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       // 單挑賽：兩位選手在中間面對面（大），其他人在四周圍觀（小）：上排、下排，人多再排左右兩側
       const D = game.getDuel(), specs = list.filter(p => p.id !== D.a.id && p.id !== D.b.id), ns = specs.length;
       const ss = ns ? clamp(Math.min(arena.h * 0.2, arena.w * 0.055), 28, 64) : 0;
-      const topEdge = arena.y + 134 * duelZoom(), botEdge = arena.y + arena.h - 6;
+      const topEdge = arena.y + 100 * duelZoom(), botEdge = arena.y + arena.h - 6;
       const rowTop = topEdge + ss * 0.8 + 22, rowBot = botEdge - ss * 0.5 - 34;
       const midY = ns ? (rowTop + rowBot) / 2 : (topEdge + botEdge) / 2;
-      const sd = clamp(Math.min((botEdge - topEdge) * (ns ? 0.46 : 0.62), arena.w * 0.21), 50, 210);
-      const cx = arena.x + arena.w / 2, gapX = clamp(arena.w * 0.19, sd * 0.85, sd * 2.2);
+      const sd = clamp(Math.min((botEdge - topEdge) * (ns ? 0.56 : 0.72), arena.w * 0.27), 50, 290);
+      const cx = arena.x + arena.w / 2, gapX = clamp(arena.w * 0.2, sd * 0.85, sd * 2.2);
       const at = [[D.a.id, cx - gapX, 1], [D.b.id, cx + gapX, -1]];
       for (const [id, x, face] of at) { const v = views.get(id); if (!v) continue; v.duel = true; v.tx = x; v.ty = midY; v.tsize = sd; v.face = face; v.goal = null; v.zx0 = v.zx1 = v.zy0 = v.zy1 = undefined; if (v.x === null) { v.x = x; v.y = midY; v.size = sd; } }
       const nTop = Math.ceil(ns * 0.4), nBot = Math.ceil(ns * 0.4), nSide = Math.max(0, ns - nTop - nBot);
       const xL = arena.x + ss * 0.8, xR = arena.x + arena.w - ss * 0.8;
-      const row = (k, y, i0) => { for (let i = 0; i < k; i++) { const p = specs[i0 + i], v = p && views.get(p.id); if (!v) continue; place(v, xL + (xR - xL) * (k === 1 ? 0.5 : i / (k - 1)), y); } };
+      const row = (k, y, i0, xr) => { const xe = Math.max(xL + ss, Math.min(xR, xr === undefined ? xR : xr)); for (let i = 0; i < k; i++) { const p = specs[i0 + i], v = p && views.get(p.id); if (!v) continue; place(v, xL + (xe - xL) * (k === 1 ? 0.5 : i / (k - 1)), y); } };
       const place = (v, x, y) => { v.duel = true; v.tx = x; v.ty = y; v.tsize = ss; v.face = Math.sign(cx - x) || 1; v.goal = null; v.zx0 = v.zx1 = v.zy0 = v.zy1 = undefined; if (v.x === null) { v.x = x; v.y = y; v.size = ss; } };
-      row(nTop, rowTop, 0); row(nBot, rowBot, nTop);
+      row(nTop, rowTop, 0); row(nBot, rowBot, nTop, W - 12 - 430 * duelZoom() - ss * 0.8);   // 下排右邊讓出右下角的「圍觀的人」說明框
       for (let i = 0; i < nSide; i++) { const p = specs[nTop + nBot + i], v = p && views.get(p.id); if (!v) continue; place(v, i % 2 ? xR : xL, rowTop + (rowBot - rowTop) * ((Math.floor(i / 2) + 1) / (Math.ceil(nSide / 2) + 1))); }
       bounds = { x0: arena.x + ss, x1: arena.x + arena.w - ss, y0: topEdge, y1: botEdge, size: ss, lg: null };
     } else if (teamMode) {
@@ -719,7 +719,13 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     ctx.font = `bold 26px ${FONT}`;
     text('VS', cx, y0 + 30 * z, 36 * z, '#ffd35c');
     if (D.phase === 'fight') text(mmss(D.timeLeft), cx, y0 + 68 * z, 30 * z, '#fff');
-    if (D.phase !== 'result') text(`圍觀的人：留言「@${short(D.a.name, 6)}」或「@${short(D.b.name, 6)}」，再送禮幫他助攻`, cx, y0 + 112 * z, 20 * z, '#fff3d0');
+    if (D.phase !== 'result') {   // 圍觀者怎麼助攻：放在整個畫面的右下角
+      const l1 = `圍觀的人：留言「@${short(D.a.name, 6)}」或「@${short(D.b.name, 6)}」`, l2 = '再送禮物，幫他助攻！', fz = 20 * z;
+      ctx.font = `bold ${fz}px ${FONT}`;
+      const w = Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width) + 28, h = fz * 2.9, rx = W - 12, by2 = H - 12;
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.beginPath(); ctx.roundRect(rx - w, by2 - h, w, h, 12); ctx.fill(); ctx.restore();
+      text(l1, rx - w / 2, by2 - h * 0.7, fz, '#fff3d0'); text(l2, rx - w / 2, by2 - h * 0.28, fz, '#ffd35c');
+    }
     const mid = arena.y + arena.h * 0.5;
     if (D.phase === 'countdown') {
       ctx.save(); ctx.globalAlpha = 0.9; text(String(Math.ceil(D.cd)), cx, mid, 130 - (D.cd % 1) * 30, '#ffd35c'); ctx.restore();
