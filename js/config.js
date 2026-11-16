@@ -16,6 +16,7 @@ window.GAME_CONFIG = {
     hamster:  { attack: { style: 'projectile', emoji: '🧀', color: '#ffd35c' }, skill: { style: 'emojiStorm', emoji: '🧀', n: 18, color: '#ffd35c' } },   // 西當普利鼠：丟起司、起司旋風
     yam:      { attack: { style: 'claw', color: '#b06cff' }, skill: { style: 'tigerPounce', color: '#b06cff' } },                      // 蕃薯：紫色爪痕、猛虎撲殺
     joy:      { attack: { style: 'claw', color: '#ff5a4d' }, skill: { style: 'emojiRain', emoji: '🍗', n: 10, big: 0.6, color: '#ffb36b' } },   // Joy：紅色爪痕、大雞腿雨
+    nekomeow: { attack: { style: 'claw', color: '#8f9bff' }, skill: { style: 'emojiStorm', emoji: '🐾', n: 16, color: '#8f9bff' } },   // 那隻喵：藍紫爪痕、肉球旋風
     xiaoni:   { attack: { style: 'shockSmash', color: '#ffd35c' }, skill: { style: 'stampSmash', text: '100T', color: '#ffd35c' } },   // 小妮：重擊震波、100T 大字砸下來
   },
   heroFxAuto: true,   // 沒登記的萌國角色自動配一組專屬特效（false＝不配，維持依兵種的演出）
