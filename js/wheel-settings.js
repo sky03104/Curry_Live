@@ -7,12 +7,13 @@ window.ML = window.ML || {};
 ML.createWheelSettings = function (config, params) {
   const KEY = 'curryLive.wheelSettings.v1', wc = config.wheel || {};
   const MAXI = wc.maxItems || 12, MAXC = wc.itemMaxChars || 10;
-  const defaults = () => ({ items: (wc.items || []).slice(), threshold: wc.threshold || 1000, autoOpen: wc.autoOpen !== false, voiceEnabled: wc.voiceEnabled !== false });
+  const defaults = () => ({ enabled: wc.enabled !== false, items: (wc.items || []).slice(), threshold: wc.threshold || 1000, autoOpen: wc.autoOpen !== false, voiceEnabled: wc.voiceEnabled !== false });
   let st = defaults(), appliedAt = 0;
 
   function clean(o) {
     const out = defaults();
     if (!o || typeof o !== 'object') return out;
+    if (typeof o.enabled === 'boolean') out.enabled = o.enabled;
     if (Array.isArray(o.items)) { const l = o.items.map(t => String(t).trim().slice(0, MAXC)).filter(Boolean).slice(0, MAXI); if (l.length >= 2) out.items = l; }
     const th = Math.floor(Number(o.threshold)); if (th >= 1 && th <= 10000000) out.threshold = th;
     if (typeof o.autoOpen === 'boolean') out.autoOpen = o.autoOpen;
@@ -29,7 +30,7 @@ ML.createWheelSettings = function (config, params) {
 
   return {
     maxItems: MAXI, maxChars: MAXC,
-    get value() { return { items: st.items.slice(), threshold: st.threshold, autoOpen: st.autoOpen, voiceEnabled: st.voiceEnabled }; },
+    get value() { return { enabled: st.enabled, items: st.items.slice(), threshold: st.threshold, autoOpen: st.autoOpen, voiceEnabled: st.voiceEnabled }; },
     // 面板改了：o 可以只給要改的欄位
     set(o) { st = clean({ ...st, ...o }); persist(); return this.value; },
     exportRemote() { return { ...this.value, at: Date.now() }; },

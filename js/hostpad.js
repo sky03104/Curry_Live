@@ -11,6 +11,8 @@
   const fresh = () => ML.createHostCommands(config, new URLSearchParams());   // 每次重新讀（面板改了主播、次數，這裡跟著變）
   let hc = fresh(), lastKey = '';
 
+  // 面板「轉輪設定」的總開關（跟面板在同一個瀏覽器，直接讀它存的設定）；沒開轉輪就不顯示轉輪按鈕
+  function wheelOn() { try { const s = JSON.parse(localStorage.getItem('curryLive.wheelSettings.v1')); if (s && s.enabled === false) return false; } catch (e) { /* 讀不到就當開著 */ } return config.wheel ? config.wheel.enabled !== false : false; }
   function render() {
     hc = fresh();
     const cnt = a => hc.countOf(a) > 1 ? ` ×${hc.countOf(a)}` : '';
@@ -19,13 +21,13 @@
     const gen = ['attack', 'aoe', 'skill', 'heal'].filter(has).map(a => b('act', a, hc.label(a) + cnt(a)));
     gen.push(b('rv', 'healall', '全部回血'));
     const boss = hc.actions.filter(a => /^boss/.test(a)).map(a => b('boss', a, hc.label(a) + cnt(a)));
-    const key = JSON.stringify([gen, boss, hc.hostId, cloud.enabled]);
+    const key = JSON.stringify([gen, boss, hc.hostId, cloud.enabled, wheelOn()]);
     if (key !== lastKey) {   // 沒變就不重畫（免得點到一半按鈕被換掉）
       lastKey = key;
       $('#pad').innerHTML = `<div class="grp"><b>一般</b><div class="row">${gen.join('')}</div></div>
         <div class="grp"><b>復活</b><div class="row">${b('rv', 'revive', '復活自己')}${b('rv', 'revive', '復活全部', '全部')}</div></div>
         <div class="grp"><b>賽跑</b><div class="row">${b('mode', 'raceOpen', '開放報名')}${b('mode', 'hurdleOpen', '開放障礙賽')}${b('rv', 'raceStart', '提早開跑')}${b('rv', 'raceCancel', '取消比賽')}</div></div>
-        <div class="grp"><b>轉輪</b><div class="row">${b('mode', 'wheelOpen', '開啟轉輪')}${b('rv', 'wheelClose', '關閉轉輪')}${b('rv', 'wheelReset', '新的一場（累積歸零）')}</div></div>
+        ${wheelOn() ? `<div class="grp"><b>轉輪</b><div class="row">${b('mode', 'wheelOpen', '開啟轉輪')}${b('rv', 'wheelClose', '關閉轉輪')}${b('rv', 'wheelReset', '新的一場（累積歸零）')}</div></div>` : ''}
         <div class="grp"><b>單挑</b><div class="row">${b('rv', 'duelCancel', '取消單挑')}</div></div>
         <div class="grp"><b>玩法模式</b><div class="row">${b('mode', 'modeTeam', '切換陣營模式')}${b('mode', 'modeBrawl', '切換亂鬥模式')}${b('rv', 'matchRestart', '重開陣營賽')}</div></div>
         <div class="grp"><b>招換</b><div class="row">${boss.join('')}</div></div>`;
