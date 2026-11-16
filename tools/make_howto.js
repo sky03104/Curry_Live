@@ -85,7 +85,7 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .tracks10 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 18px; } .tc { background: #fff; border-radius: 16px; padding: 8px 4px 6px; text-align: center; min-width: 0; } .tc svg { width: 100%; height: auto; display: block; } .tc span { display: block; font-size: 23px; font-weight: 700; line-height: 1.2; }
 .gates { display: flex; gap: 10px; margin-top: 18px; } .gt { flex: 1; background: #fff; border-radius: 16px; padding: 10px 4px 8px; text-align: center; min-width: 0; } .gt i { display: block; font-style: normal; font-size: 64px; line-height: 1.1; } .gt b { display: block; font-size: 30px; } .gt span { display: block; font-size: 30px; font-weight: 900; color: #D9563E; }
 .brand { display: flex; align-items: center; justify-content: center; gap: 22px; position: absolute; left: 60px; right: 110px; bottom: 310px; }
-.brand img { width: 150px; height: 150px; border-radius: 50%; border: 5px solid #ffd35c; background: #F7F1E3; }
+.brand img { width: 190px; height: 190px; border-radius: 50%; border: 5px solid #ffd35c; background: #F7F1E3; }
 .brand span { font-size: 44px; font-weight: 900; color: #fff; letter-spacing: 3px; } .brand small { display: block; font-size: 28px; font-weight: 700; color: #e8dcc0; letter-spacing: 1px; margin-top: 4px; }
 .swipe { margin-top: 30px; font-size: 38px; color: #ffd35c; font-weight: 900; }
 `;
@@ -98,7 +98,7 @@ const slides = [
   <div class="row"><img src="${img('lvbu.png')}"><img src="${img('guanyu.png')}"><img src="${img('diaochan.png')}"><img src="${img('michelin.png')}"></div>
   <div class="steps"><div><i>1</i>留言武將名字　上場！</div><div><i>2</i>送禮物　你的武將出手</div><div><i>3</i>一起打倒大 BOSS</div></div>
   <div class="swipe">往左滑　看玩法＋全部武將 ➜</div>
-  <div class="brand"><img src="${brand}"><div style="text-align:left"><span>咖哩AI工作室</span><small>出品</small></div></div></div>`,
+  <div class="brand"><img src="${brand}"></div></div>`,
 
 `<div class="slide">${top(2)}<div class="body">
   <div class="card"><div class="no">1</div><h2>留言選武將上場</h2>
