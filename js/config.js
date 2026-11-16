@@ -71,7 +71,7 @@ window.GAME_CONFIG = {
     inviteCooldown: 300,                // 甲發出申請後，幾秒內不能再發（防刷屏）
     refuseBlock: 600,                   // 被拒絕（含沒反應）後，甲幾秒內不能再挑戰同一個人
     countdown: 3, maxSeconds: 180, resultSeconds: 15,   // 開打倒數、一場最長幾秒（時間到比剩餘血量，一樣多＝和局）、結果顯示幾秒
-    hp: 4000,                           // 雙方血量（一樣，不吃等級加成）
+    hp: 5000,                           // 雙方血量（一樣，不吃等級加成）
     autoAtkEvery: 4, autoAtkDmg: 30, autoRage: 1.5,   // 自動小攻擊：每幾秒一下、每下傷害、每下增加的怒氣
     giftBase: 40, giftExp: 0.5,         // 每個禮物的傷害 = giftBase × 鑽石數^giftExp（0.5＝開根號：大禮比小禮強，但不會強幾百倍）
     giftCapPercent: 0.35,               // 單一份禮物最多打掉血量的幾成（防止一份大禮秒殺）

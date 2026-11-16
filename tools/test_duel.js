@@ -84,12 +84,13 @@ function startDuel(t, a, b) {
 {
   const t = setup(); const { game } = t; startDuel(t, '甲', '乙'); t.join('丙'); t.join('丁');
   const pb = game.getPlayer('tt:乙');
-  t.tgift('甲', 'Rose', 1); const d1 = config.duel.hp - pb.hp; ok(d1 >= 35 && d1 <= 45, `1 鑽傷害約 40（${d1}）`);
+  t.tgift('甲', 'Rose', 1); const d1 = config.duel.hp - pb.hp; ok(config.duel.hp === 5000 && d1 >= 35 && d1 <= 45, `1 鑽傷害約 40（${d1}）`);
   const hp1 = pb.hp; t.tgift('甲', 'Galaxy', 1000); const d2 = hp1 - pb.hp; ok(d2 > 1000 && d2 <= config.duel.hp * 0.35 + 1, `1000 鑽傷害有上限（${d2}）`);
   const hp2 = pb.hp; t.tgift('甲', 'Universe', 34999); const d3 = hp2 - pb.hp; ok(Math.abs(d3 - config.duel.hp * 0.35) < 2, `大禮最多打 35%（${d3}）`);
   t.tgift('丙', 'Rose', 1); ok(t.notes.some(x => x.includes('請先留言「@')), '圍觀者沒 @ 就送禮 → 提醒');
   t.chat('丙', '@甲'); ok(t.notes.some(x => x.includes('丙 選擇幫 甲 助攻')), '圍觀者 @甲');
   const hp3 = pb.hp; t.tgift('丙', 'Rose', 100); const d4 = hp3 - pb.hp; ok(d4 > 150 && d4 < 250, `助攻打對面、打 5 折（${d4}）`);
+  { const A = game.getDuelAssists(); ok(A.length === 1 && A[0].name === '丙' && A[0].damage > 150 && A[0].sideName === '甲', `助攻榜記下丙幫甲打了 ${A[0] && Math.round(A[0].damage)}`); }
   t.chat('丁', '@戊'); ok(t.notes.some(x => x.includes('只能幫單挑的兩位選手助攻')), '圍觀者只能 @ 選手');
   const pa = game.getPlayer('tt:甲'), hpa = pa.hp; game.handleEvent({ type: 'gift', user: t.U('甲'), giftId: 'heart', count: 1 });
   ok(pa.hp === hpa && t.notes.some(x => x.includes('單挑中不能回血')), '單挑中不能回血');

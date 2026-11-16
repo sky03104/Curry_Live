@@ -31,6 +31,7 @@ ML.createGame = function (config, heroes) {
   const duelCool = new Map();  // 觀眾代號 → 幾秒（遊戲時間）後才能再發單挑申請
   const duelBlock = new Map(); // 「甲|乙」→ 幾秒（遊戲時間）內甲不能再挑戰乙（被拒絕之後）
   const duelPairLog = new Map(); // 兩人的組合（代號排序後相連）→ 最近單挑過的時間們（反覆單挑刷經驗要遞減）
+  const duelNames = new Map(); // 助攻榜用：圍觀者代號 → 名字
   const noticeAt = new Map();  // 提醒訊息的節流：key → 上次提醒的時間，免得洗版
   let duelSkipGift = null;     // 剛當成「回應單挑」的那份 TikTok 禮物：接著那份對應的遊戲禮物（普攻）要跳過，不然同一份玫瑰又會打人
 
@@ -862,7 +863,7 @@ ML.createGame = function (config, heroes) {
     mode = 'duel'; duelLock.clear(); raceLock.clear();
     for (const p of players.values()) p.lockId = null;
     for (const p of [pa, pb]) { p.maxHp = p.hp = dc.hp; p.down = false; }
-    duel = { phase: 'countdown', a: pa.id, b: pb.id, cd: dc.countdown || 3, t: 0, rage: { a: 0, b: 0 }, nextAuto: { a: 0, b: 0 }, skillAt: { a: 0, b: 0 }, skillCharge: { a: 0, b: 0 }, resLeft: 0, result: null };
+    duel = { phase: 'countdown', a: pa.id, b: pb.id, cd: dc.countdown || 3, t: 0, rage: { a: 0, b: 0 }, nextAuto: { a: 0, b: 0 }, skillAt: { a: 0, b: 0 }, skillCharge: { a: 0, b: 0 }, assist: new Map(), resLeft: 0, result: null };
     notice(`⚔ ${pb.name} 接受了挑戰！${pa.name} VS ${pb.name} 單挑開始`);
     fx({ type: 'modeChange', mode });
   }
@@ -876,15 +877,16 @@ ML.createGame = function (config, heroes) {
   }
   // 一次攻擊：from 打 to，扣血、被打的一方加怒氣、通知畫面
   function duelStrike(side, dmg, kind, rageGain) {
-    if (!duel || duel.phase !== 'fight') return;
+    if (!duel || duel.phase !== 'fight') return 0;
     const other = side === 'a' ? 'b' : 'a', pf = players.get(duel[side]), pt = players.get(duel[other]);
-    if (!pf || !pt) return;
+    if (!pf || !pt) return 0;
     dmg = Math.min(pt.hp, Math.max(1, Math.round(dmg)));
     pt.hp -= dmg;
     duel.rage[side] = Math.min(dc.rageMax, duel.rage[side] + (rageGain || 0));
     duel.rage[other] = Math.min(dc.rageMax, duel.rage[other] + dmg / pt.maxHp * dc.rageHit);   // 被打也加怒氣：落後的人比較有機會翻盤
     fx({ type: 'attack', id: pf.id, action: kind === 'skill' ? 'skill' : 'attack', icon: '', skillName: pf.hero.skillName, hits: [{ id: pt.id, dmg, down: false }] });
     if (pt.hp <= 0) finishDuel(pf.id, `${pf.name} 把 ${pt.name} 打倒了`);
+    return dmg;
   }
   // 一份禮物：選手自己送 → 打對手；圍觀者要先 @ 選手 → 幫那一邊打（打折）
   function duelGift(user, diamonds, rawCount) {
@@ -899,7 +901,8 @@ ML.createGame = function (config, heroes) {
     const pow = Math.pow(d, dc.giftExp === undefined ? 0.5 : dc.giftExp), maxHp = dc.hp;
     const dmg = Math.min(maxHp * (dc.giftCapPercent || 0.35), dc.giftBase * pow * n) * factor;
     if (factor < 1 && d >= (dc.supportNoticeMin || 20)) notice(`${user.name} 幫 ${nameOfId(duel[side])} 助攻！`);
-    duelStrike(side, dmg, 'attack', dc.rageGift * pow * n * factor);
+    const dealt = duelStrike(side, dmg, 'attack', dc.rageGift * pow * n * factor);
+    if (factor < 1 && dealt > 0) { const rec = duel.assist.get(user.id) || { dmg: 0, side }; rec.dmg += dealt; rec.side = side; duel.assist.set(user.id, rec); duelNames.set(user.id, user.name); }   // 助攻榜：記下圍觀者幫忙打了多少
   }
   // 結果：winnerId 贏；null ＝ 和局
   function finishDuel(winnerId, why) {
@@ -1178,6 +1181,12 @@ ML.createGame = function (config, heroes) {
       const r = duel.result;
       return { phase: duel.phase, a: side('a'), b: side('b'), cd: Math.max(0, duel.cd), t: duel.t, timeLeft: Math.max(0, (dc.maxSeconds || 180) - duel.t), resLeft: Math.max(0, duel.resLeft),
         result: r ? { winnerId: r.winnerId, loserId: r.loserId, draw: r.draw, why: r.why, winXp: r.winXp, loseXp: r.loseXp, streak: r.streak, broke: r.broke, levelDown: r.levelDown, winnerName: r.winnerId ? nameOfId(r.winnerId) : '', loserName: r.loserId ? nameOfId(r.loserId) : '' } : null };
+    },
+    // 單挑的助攻榜：圍觀者在這場幫忙打了多少傷害（前幾名）
+    getDuelAssists() {
+      if (!duel) return null;
+      const rows = [...duel.assist.entries()].map(([id, r]) => ({ id, name: duelNames.get(id) || '觀眾', damage: r.dmg, side: r.side, sideName: nameOfId(duel[r.side]) })).sort((x, y) => y.damage - x.damage).slice(0, config.leaderboardSize);
+      return rows;
     },
     duelBusy() { return !!duelInvite || mode === 'duel'; },
     raceBusy() { return mode === 'race' && !!race && (race.phase === 'countdown' || race.phase === 'run'); },

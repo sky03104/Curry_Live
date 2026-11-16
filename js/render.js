@@ -367,7 +367,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     const n = list.length;
     const wide = W >= H;
     const lbW = wide ? clamp(W * 0.26, 260, 340) : W - 32;
-    const lbRows = game.getMode() === 'race' ? 5 : Math.max(1, game.getLeaderboard().length);   // 賽跑時右上角改顯示前 5 名
+    const lbRows = game.getMode() === 'race' ? 5 : game.getMode() === 'duel' ? Math.max(1, (game.getDuelAssists() || []).length) : Math.max(1, game.getLeaderboard().length);   // 賽跑時右上角改顯示前 5 名
     const lbH = 50 + lbRows * 32;
     const lb = { x: W - lbW - 16, y: 16, w: lbW, h: lbH };
     // 對 BOSS 的傷害排行榜：放在傷害排行榜正下方，場上有 BOSS 才出現（2026-11-14 咖哩要求）
@@ -703,7 +703,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       ctx.fillStyle = ratio > 0.5 ? '#6fdc8c' : ratio > 0.25 ? '#ffd24d' : '#ff6b81'; ctx.fillRect(fx0, by, fw, bh);
       ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(fx0, by + 2, fw, 5);
       ctx.restore();
-      text(`${Math.ceil(S.hp)}`, bx + half / 2, by + bh / 2 + 1, 22 * z, '#fff');
+      text(`${Math.ceil(S.hp)}`, bx + half / 2, by + bh / 2 + 1, 38 * z, '#fff');   // 血量數字比血條大，可以超出條的上下
       // 怒氣條：左邊（或右邊）一個火焰＋「怒氣」大字；滿了整條變彩色閃爍，放完技能歸零
       const ry = by + bh + 14 * z, rh = 12 * z, rr = clamp(S.rage / S.rageMax, 0, 1), full = rr >= 0.999;
       ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(bx - 2, ry - 2, half + 4, rh + 4, rh / 2 + 2); ctx.fill();
@@ -753,6 +753,21 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       text(`${short(R.loserName, 8)}　−${R.loseXp} 經驗${R.levelDown ? '　掉等級了…' : ''}`, cx, by + 26, 22, '#ff9a9a');
       if (R.why) text(R.why, cx, by + 62, 15, '#e8dcc0', 'center', false);
     }
+  }
+  // 單挑時右上角的「助攻榜」：圍觀者幫忙打了多少傷害（取代亂鬥的傷害排行榜）
+  function drawAssistBoard(lb) {
+    const rows = game.getDuelAssists() || [];
+    ctx.fillStyle = 'rgba(22,26,30,0.78)'; ctx.beginPath(); ctx.roundRect(lb.x, lb.y, lb.w, lb.h, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+    text('🤝 助攻榜', lb.x + lb.w / 2, lb.y + 24, 20, '#ffd35c');
+    if (!rows.length) { text('還沒有人助攻', lb.x + lb.w / 2, lb.y + 62, 14, '#aaa', 'center', false); return; }
+    rows.forEach((r, i) => {
+      const y = lb.y + 62 + i * 32;
+      text(String(i + 1), lb.x + 22, y, 18, ['#ffd35c', '#dcdcdc', '#d99a6c'][i] || '#fff');
+      text(short(r.name, 6), lb.x + 42, y, 16, '#fff', 'left');
+      text(`→${short(r.sideName, 3)}`, lb.x + lb.w - 78, y, 13, '#9ad0ff', 'right', false);
+      text(String(Math.round(r.damage)), lb.x + lb.w - 14, y, 16, '#ffb13c', 'right');
+    });
   }
   function drawDuelInvite(arena) {
     const I = game.getDuelInvite();
@@ -1276,7 +1291,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     drawTeamHud(arena);
     drawRaceHud(arena);
     drawDuelHud(arena);
-    if (game.getRace()) drawRaceBoard(lb, game.getRace()); else drawLeaderboard(lb);
+    if (game.getRace()) drawRaceBoard(lb, game.getRace()); else if (game.getMode() === 'duel' && game.getDuel()) drawAssistBoard(lb); else drawLeaderboard(lb);
     if (lb2) drawBossLeaderboard(lb2);
     if (legend) drawLegend(legend);
     drawBossQueue(arena, lb2 && W >= H ? lb2 : lb);
