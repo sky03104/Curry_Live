@@ -269,6 +269,7 @@ ML.createCloudSave = function (config, params, slot, opts) {
             fbAhead = false;
             setStatus('ok', `雲端存檔：已存到雲端（${merged.length} 位觀眾）`);
             mirror(merged, settings, o);
+            if (!canWrite) rtPing('panel').catch(() => { /* 通知不到沒關係，直播畫面定時會讀 */ });   // 只有面板（不是直播畫面自己存檔）才需要通知直播畫面
             return merged;
           }
           if (r.ok && r.body && r.body.reason === 'conflict' && !(o && o.keepalive)) { remote.known = false; continue; }   // 別的視窗剛寫過：重新讀一次再合併
@@ -335,7 +336,7 @@ ML.createCloudSave = function (config, params, slot, opts) {
   // 不用等直播畫面下一次詢問。直播畫面平常改成每幾秒才看一次資料庫（只是保險）；連線斷了就自動回到每秒詢問。
   // 做法：不用程式庫，直接用瀏覽器的 WebSocket 講 Supabase Realtime 的通訊協定（Phoenix）。頻道名稱由雲端代號組成，不知道代號的人進不來。
   const rtOn = () => sbOn && cfg.realtime !== false && typeof WebSocket !== 'undefined';
-  const rt = { ws: null, state: 'off', joined: false, ref: 0, hb: null, retry: 0, timer: null, want: false, lastRx: 0, onCmd: null, onState: null };
+  const rt = { ws: null, state: 'off', joined: false, ref: 0, hb: null, retry: 0, timer: null, want: false, lastRx: 0, onCmd: null, onState: null, onSync: null };
   const rtTopic = () => 'realtime:cmd-' + token;
   const rtRaw = obj => { try { rt.ws.send(JSON.stringify(obj)); return true; } catch (e) { return false; } };
   function rtSet(state) { if (rt.state === state) return; rt.state = state; if (rt.onState) { try { rt.onState(state); } catch (e) { /* 不讓畫面的錯誤影響連線 */ } } }
@@ -367,6 +368,10 @@ ML.createCloudSave = function (config, params, slot, opts) {
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
       if (m.topic !== topic) return;
       if (m.event === 'phx_reply' && !rt.joined) { if (m.payload && m.payload.status === 'ok') { rt.joined = true; rt.retry = 0; rtSet('live'); } else { try { ws.close(); } catch (e) { /* 已經關了 */ } } return; }
+      if (m.event === 'broadcast' && m.payload && m.payload.event === 'sync') {   // 面板剛存了設定／等級：叫直播畫面現在就去讀
+        if (rt.onSync) { try { rt.onSync(m.payload.payload || {}); } catch (e) { /* 不弄斷連線 */ } }
+        return;
+      }
       if (m.event === 'broadcast' && m.payload && m.payload.event === 'cmd') {
         const c = m.payload.payload;
         if (c && typeof c === 'object' && Number(c.seq) > 0 && rt.onCmd) { try { rt.onCmd(c); } catch (e) { /* 一個指令的錯誤不要弄斷連線 */ } }
@@ -377,7 +382,15 @@ ML.createCloudSave = function (config, params, slot, opts) {
   }
   function rtStop() { rt.want = false; clearTimeout(rt.timer); clearInterval(rt.hb); const ws = rt.ws; rt.ws = null; rt.joined = false; if (ws) { try { ws.close(); } catch (e) { /* 已經關了 */ } } rtSet('off'); }
   // 直播畫面：開始接收即時推送。onCmd(指令)；onState('live' / 'connecting' / 'off') 連線狀態變化時通知（連上時主程式可順便補讀一次資料庫，避免漏掉斷線期間的指令）
-  function listenCommands(onCmd, onState) { rt.onCmd = onCmd; rt.onState = onState || null; if (token) rtConnect(); }
+  // onSync(通知)：面板存了設定或調整了等級，要直播畫面現在就重新讀雲端（不用等定時讀取）
+  function listenCommands(onCmd, onState, onSync) { rt.onCmd = onCmd; rt.onState = onState || null; rt.onSync = onSync || null; if (token) rtConnect(); }
+  // 面板存完之後呼叫：通知直播畫面「有更新，請現在去讀」。通知本身不帶資料，資料庫才是唯一的真相；沒連線時先連（最多等 1.5 秒），連不上就算了（直播畫面的定時讀取會補上）
+  async function rtPing(kind) {
+    if (!rtOn() || !token) return false;
+    if (!rt.joined) { rtConnect(); const end = Date.now() + 1500; while (!rt.joined && Date.now() < end) await new Promise(r => setTimeout(r, 25)); }
+    if (!rt.joined) return false;
+    return rtRaw({ topic: rtTopic(), event: 'broadcast', payload: { type: 'broadcast', event: 'sync', payload: { kind: kind || 'save', at: Date.now() } }, ref: String(++rt.ref) });
+  }
   // 主播按鈕小視窗：先把連線開著，按下去才不用等連線
   function connectRealtime(onState) { if (onState) rt.onState = onState; if (token) rtConnect(); }
 

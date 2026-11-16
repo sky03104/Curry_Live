@@ -369,7 +369,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     say('☁ 同步中…');
     gsTimer = setTimeout(async () => {
       let r = null; try { r = await saving.saveSettings({ gifts: giftSettings.exportRemote(), arena: { key: renderer.arenas.get(), at: Date.now() } }); } catch (e) { r = null; }
-      say(r && r.state === 'ok' ? `☁ 禮物對應與場地已同步到雲端（${new Date().toLocaleTimeString()}）：直播畫面約 ${config.save.cloud.pullSeconds || 90} 秒內自動套用，不用重貼網址。` : '⚠ 同步到雲端失敗：' + ((r && r.text) || '連不上') + '（改完要重貼直播網址才會生效）');
+      say(r && r.state === 'ok' ? `☁ 禮物對應與場地已同步到雲端（${new Date().toLocaleTimeString()}）：直播畫面馬上套用（即時推送沒連上時約 ${config.save.cloud.pullSeconds || 90} 秒內），不用重貼網址。` : '⚠ 同步到雲端失敗：' + ((r && r.text) || '連不上') + '（改完要重貼直播網址才會生效）');
     }, 1000);
   }
   giftSettings.onChange(gsSync);
@@ -394,7 +394,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     $('#hs-sync').textContent = '☁ 同步中…';
     hsTimer = setTimeout(async () => {
       let r = null; try { r = await saving.saveSettings({ heroes: hsel.exportRemote() }); } catch (e) { r = null; }
-      $('#hs-sync').textContent = r && r.state === 'ok' ? `☁ 已同步到雲端（${new Date().toLocaleTimeString()}）：直播畫面約 ${config.save.cloud.pullSeconds || 90} 秒內自動套用，不用重貼網址。` : '⚠ 同步到雲端失敗：' + ((r && r.text) || '連不上') + '（改完要重貼直播網址才會生效）';
+      $('#hs-sync').textContent = r && r.state === 'ok' ? `☁ 已同步到雲端（${new Date().toLocaleTimeString()}）：直播畫面馬上套用（即時推送沒連上時約 ${config.save.cloud.pullSeconds || 90} 秒內），不用重貼網址。` : '⚠ 同步到雲端失敗：' + ((r && r.text) || '連不上') + '（改完要重貼直播網址才會生效）';
     }, 1000);
   }
   const facOrder = Object.keys(config.factions).filter(f => heroes.some(h => h.faction === f));
@@ -421,7 +421,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     $('#wh-sync').textContent = '☁ 同步中…';
     whTimer = setTimeout(async () => {
       let r = null; try { r = await saving.saveSettings({ wheel: wsel.exportRemote() }); } catch (e) { r = null; }
-      $('#wh-sync').textContent = r && r.state === 'ok' ? `☁ 已同步到雲端（${new Date().toLocaleTimeString()}）：直播畫面約 ${config.save.cloud.pullSeconds || 90} 秒內自動套用。` : '⚠ 同步到雲端失敗：' + ((r && r.text) || '連不上') + '（改完要重貼直播網址才會生效）';
+      $('#wh-sync').textContent = r && r.state === 'ok' ? `☁ 已同步到雲端（${new Date().toLocaleTimeString()}）：直播畫面馬上套用（即時推送沒連上時約 ${config.save.cloud.pullSeconds || 90} 秒內）。` : '⚠ 同步到雲端失敗：' + ((r && r.text) || '連不上') + '（改完要重貼直播網址才會生效）';
     }, 1000);
   }
   function fillWheel() { const v = wsel.value; $('#wh-items').value = v.items.join('\n'); $('#wh-th').value = v.threshold; $('#wh-auto').checked = v.autoOpen; $('#wh-voice').checked = v.voiceEnabled; $('#wh-badge').textContent = v.enabled ? v.items.length + ' 格' : '已關閉'; $('#wh-enable').checked = v.enabled; $('#wh-body').style.opacity = v.enabled ? '' : '0.45'; $('#wh-body').style.pointerEvents = v.enabled ? '' : 'none'; }
@@ -492,7 +492,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     $('#hc-sync').textContent = '☁ 同步中…';
     hcTimer = setTimeout(async () => {
       let r = null; try { r = await saving.saveSettings({ host: hc.exportRemote() }); } catch (e) { r = null; }
-      $('#hc-sync').textContent = r && r.state === 'ok' ? `☁ 已同步到雲端（${new Date().toLocaleTimeString()}）：直播畫面約 ${config.save.cloud.pullSeconds || 90} 秒內自動套用，不用重貼網址。` : '⚠ 同步到雲端失敗：' + ((r && r.text) || '連不上') + '（改完要重貼直播網址才會生效）';
+      $('#hc-sync').textContent = r && r.state === 'ok' ? `☁ 已同步到雲端（${new Date().toLocaleTimeString()}）：直播畫面馬上套用（即時推送沒連上時約 ${config.save.cloud.pullSeconds || 90} 秒內），不用重貼網址。` : '⚠ 同步到雲端失敗：' + ((r && r.text) || '連不上') + '（改完要重貼直播網址才會生效）';
     }, 1000);
   };
   const hcUrlState = () => { const n = Object.keys(hc.cmds).length, c = Object.keys(hc.urlParams().cnt ? JSON.parse(hc.urlParams().cnt) : {}).length; $('#hc-urlstate').innerHTML = hc.hostId ? `📋 目前「直播用網址」帶著：主播 ✔、指令 ${n} 個、次數設定 ${c} 個。${saving.cloud.enabled ? '有開雲端存檔：改完會自動同步，<b>不用重貼網址</b>（直播軟體至少要貼過一次含雲端代號的網址）。' : '<b>改完要重貼網址</b>。'}直播時主播打指令，畫面訊息區會寫「主播指令：普攻 ×10」，次數不對就代表還沒套用。` : ''; };

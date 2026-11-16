@@ -141,7 +141,8 @@
     if (!cloud.enabled) return;
     if (cmdSeq === null || c.seq > cmdSeq) { cmdSeq = c.seq; runButton(c); }
   }
-  if (cloud.canWrite) cloud.listenCommands(onPushedCommand, st => { if (st === 'live') pollCommand().catch(() => { /* 連上時補看一次，斷線期間的指令才不會漏 */ }); });
+  if (!cloud.canWrite && cloud.enabled) cloud.connectRealtime();   // 面板：先把即時連線開著，存完設定才能馬上通知直播畫面
+  if (cloud.canWrite) cloud.listenCommands(onPushedCommand, st => { if (st === 'live') { pollCommand().catch(() => { /* 連上時補看一次，斷線期間的指令才不會漏 */ }); pullNow(); } }, () => pullNow());
   // 平常每 cmdPollSeconds 秒看一次；剛收到按鈕指令後的一段時間（cmdBurstHold 秒）改成更密（cmdBurstSeconds 秒），連按幾下的反應更快、又不會整場都密集讀取
   let fastUntil = 0;
   function schedulePoll() {
@@ -152,7 +153,16 @@
   if (cloud.canWrite) schedulePoll();
   setInterval(() => flushCloud(), config.save.cloud.intervalSeconds * 1000);
   // 直播畫面每隔一段時間重讀一次雲端：主播在面板調整的等級才會套用進來（每 5 分鐘一次，免費額度夠用）
-  if (cloud.canWrite) setInterval(async () => { if (!cloud.enabled) return; try { game.importProfiles(await cloud.load(), true); applyCloudSettings(); } catch (e) { /* 這次讀不到下次再試 */ } }, (config.save.cloud.pullSeconds || 300) * 1000);
+  // 重新讀雲端並套用（等級、主播設定）。定時做一次當保險；面板存完時也會即時通知直播畫面馬上做（見下方 onSync）。讀的途中又有通知就讀完再補一次
+  let pulling = false, pullAgain = false;
+  async function pullNow() {
+    if (!cloud.enabled) return;
+    if (pulling) { pullAgain = true; return; }
+    pulling = true;
+    try { game.importProfiles(await cloud.load(), true); applyCloudSettings(); } catch (e) { /* 這次讀不到下次再試 */ }
+    finally { pulling = false; if (pullAgain) { pullAgain = false; pullNow(); } }
+  }
+  if (cloud.canWrite) setInterval(pullNow, (config.save.cloud.pullSeconds || 300) * 1000);
   window.addEventListener('pagehide', () => flushCloud(true));    // 關掉網頁前盡力再存一次（存不到也沒關係，下次開會從本機補上去）
   game.onFx(e => { if (e.type === 'attack' || e.type === 'levelup' || e.type === 'bossDefeated' || e.type === 'levelSet') cloudDirty = true; });
   syncCloud();
