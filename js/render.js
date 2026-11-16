@@ -747,7 +747,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     // 連勝（2 場以上才顯示）：放在 VS 的左右兩側，左邊那位在左、右邊那位在右
     // 左邊那位：👑 數字 連勝；右邊那位：數字 連勝 👑（左右對稱）。數字特別大，可以超出血條的上框
     const streakDraw = (n, left) => {
-      const icon = ['👑', 30 * z], num = [String(n), 46 * z], lab = ['連勝', 26 * z], seq = left ? [icon, num, lab] : [num, lab, icon];
+      const icon = ['🏆', 30 * z], num = [String(n), 46 * z], lab = ['連勝', 26 * z], seq = left ? [icon, num, lab] : [num, lab, icon];
       let tw = 0; const ws = seq.map(([t, f]) => { ctx.font = `bold ${f}px ${FONT}`; const w = ctx.measureText(t).width + 3; tw += w; return w; });
       let x = left ? cx - 42 * z - tw : cx + 42 * z; const y = y0 + 22 * z;
       seq.forEach(([t, f], k) => { text(t, x, y, f, k === (left ? 1 : 0) ? '#fff3a0' : '#ffb13c', 'left'); x += ws[k]; });
