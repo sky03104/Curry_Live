@@ -463,8 +463,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       const topEdge = arena.y + 100 * duelZoom(), botEdge = arena.y + arena.h - 6;
       const rowTop = topEdge + ss * 0.8 + 22, rowBot = botEdge - ss * 0.5 - 34;
       const midY = ns ? (rowTop + rowBot) / 2 : (topEdge + botEdge) / 2;
-      const sd = clamp(Math.min((botEdge - topEdge) * (ns ? 0.56 : 0.72), arena.w * 0.27), 50, 290);
-      const cx = arena.x + arena.w / 2, gapX = clamp(arena.w * 0.2, sd * 0.85, sd * 2.2);
+      const sd = clamp(Math.min((botEdge - topEdge) * (ns ? 0.7 : 0.85), arena.w * 0.34), 50, 380);
+      const cx = arena.x + arena.w / 2, gapX = clamp(arena.w * 0.22, sd * 0.85, sd * 2.2);
       const at = [[D.a.id, cx - gapX, 1], [D.b.id, cx + gapX, -1]];
       for (const [id, x, face] of at) { const v = views.get(id); if (!v) continue; v.duel = true; v.tx = x; v.ty = midY; v.tsize = sd; v.face = face; v.goal = null; v.zx0 = v.zx1 = v.zy0 = v.zy1 = undefined; if (v.x === null) { v.x = x; v.y = midY; v.size = sd; } }
       const nTop = Math.ceil(ns * 0.4), nBot = Math.ceil(ns * 0.4), nSide = Math.max(0, ns - nTop - nBot);
