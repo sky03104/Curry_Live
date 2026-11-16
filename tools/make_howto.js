@@ -21,6 +21,7 @@ const args = {};
 for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, '')] = process.argv[i + 1];
 const gift = k => args[k] || '主播公布';
 const bossGift = (k, def) => args[k] || def;
+const brand = 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/brand/curry_ai_studio.png')).toString('base64');
 const img = f => 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/heroes', f)).toString('base64');
 const hero = (f, name, c) => `<div class="h"><img src="${img(f)}"><span style="background:${c}">${name}</span></div>`;
 const TOTAL = 8 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 8 張玩法（含陣營模式、賽跑模式、障礙賽、障礙賽賽道）+ 每個陣營一張
@@ -60,7 +61,7 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .boss .b strong { display: block; font-size: 40px; margin-top: 6px; } .boss .b em { font-style: normal; color: #ffd35c; font-size: 40px; font-weight: 900; }
 .buffs { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
 .buff { border-radius: 22px; padding: 22px 30px; font-size: 42px; color: #fff; line-height: 1.45; } .buff b { font-size: 48px; }
-.cover { background: linear-gradient(170deg,#2b3a42,#3E4A46 60%,#2b3a42); color: #fff; padding: 160px 110px 300px 60px; text-align: center; justify-content: center; }
+.cover { background: linear-gradient(170deg,#2b3a42,#3E4A46 60%,#2b3a42); color: #fff; padding: 130px 110px 520px 60px; text-align: center; justify-content: center; }
 .cover h1 { font-size: 100px; font-weight: 900; letter-spacing: 6px; line-height: 1.2; } .cover h1 b { color: #ffd35c; display: block; }
 .cover .sub { font-size: 44px; color: #e8dcc0; margin-top: 18px; }
 .cover .row { display: flex; justify-content: center; margin: 46px 0 30px; } .cover .row img { height: 330px; margin: 0 -26px; filter: drop-shadow(0 8px 10px rgba(0,0,0,.4)); }
@@ -83,6 +84,9 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .race3 { display: flex; gap: 14px; margin-top: 16px; } .race3 div { flex: 1; border-radius: 18px; padding: 16px 10px; text-align: center; color: #fff; font-size: 38px; font-weight: 900; line-height: 1.35; } .race3 small { display: block; font-size: 30px; font-weight: 700; opacity: .95; }
 .tracks10 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 18px; } .tc { background: #fff; border-radius: 16px; padding: 8px 4px 6px; text-align: center; min-width: 0; } .tc svg { width: 100%; height: auto; display: block; } .tc span { display: block; font-size: 23px; font-weight: 700; line-height: 1.2; }
 .gates { display: flex; gap: 10px; margin-top: 18px; } .gt { flex: 1; background: #fff; border-radius: 16px; padding: 10px 4px 8px; text-align: center; min-width: 0; } .gt i { display: block; font-style: normal; font-size: 64px; line-height: 1.1; } .gt b { display: block; font-size: 30px; } .gt span { display: block; font-size: 30px; font-weight: 900; color: #D9563E; }
+.brand { display: flex; align-items: center; justify-content: center; gap: 22px; position: absolute; left: 60px; right: 110px; bottom: 310px; }
+.brand img { width: 150px; height: 150px; border-radius: 50%; border: 5px solid #ffd35c; background: #F7F1E3; }
+.brand span { font-size: 44px; font-weight: 900; color: #fff; letter-spacing: 3px; } .brand small { display: block; font-size: 28px; font-weight: 700; color: #e8dcc0; letter-spacing: 1px; margin-top: 4px; }
 .swipe { margin-top: 30px; font-size: 38px; color: #ffd35c; font-weight: 900; }
 `;
 const top = n => `<div class="top"><div class="t">萌戰三國・<b>直播亂鬥</b></div><div class="pg">${n}/${TOTAL}</div></div>`;
@@ -93,7 +97,8 @@ const slides = [
   <div class="sub">留言選武將、送禮打架　30 秒看懂玩法</div>
   <div class="row"><img src="${img('lvbu.png')}"><img src="${img('guanyu.png')}"><img src="${img('diaochan.png')}"><img src="${img('michelin.png')}"></div>
   <div class="steps"><div><i>1</i>留言武將名字　上場！</div><div><i>2</i>送禮物　你的武將出手</div><div><i>3</i>一起打倒大 BOSS</div></div>
-  <div class="swipe">往左滑　看玩法＋全部武將 ➜</div></div>`,
+  <div class="swipe">往左滑　看玩法＋全部武將 ➜</div>
+  <div class="brand"><img src="${brand}"><div style="text-align:left"><span>咖哩AI工作室</span><small>出品</small></div></div></div>`,
 
 `<div class="slide">${top(2)}<div class="body">
   <div class="card"><div class="no">1</div><h2>留言選武將上場</h2>
