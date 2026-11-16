@@ -94,31 +94,35 @@ function pageAll() {
 
 // 全武將清單：只有陣營、武將名稱、技能名稱（沒有武將圖），一個陣營一欄
 function pageList() {
+  const COLS = 5;
   const keys = Object.keys(factions).filter(k => heroes.some(h => h.faction === k));
   const sec = key => {
     const f = factions[key], list = heroes.filter(h => h.faction === key);
-    return `<section style="--c:${f.color}"><div class="hd"><span class="seal">${f.label}</span><span class="cnt">${list.length} 位</span></div>
-      <div class="grid">${list.map(h => `<div class="it"><div class="nm">${h.displayName}</div><div class="sk">${h.skillName}</div></div>`).join('')}</div></section>`;
+    const rows = Math.ceil(list.length / COLS);
+    return `<section style="--c:${f.color};flex:${rows} 1 0"><div class="hd"><span class="seal">${f.label}</span><span class="cnt">${list.length} 位</span></div>
+      <div class="grid" style="grid-template-rows:repeat(${rows},1fr)">${list.map(h => `<div class="it"><div class="nm${h.displayName.length > 4 ? ' long' : ''}">${h.displayName}</div><div class="sk">${h.skillName}</div></div>`).join('')}</div></section>`;
   };
   return `<!doctype html><meta charset="utf-8"><style>
   * { box-sizing: border-box; margin: 0; }
-  body { width: 1080px; background: #F7F1E3; color: #3E4A46; padding: 36px 36px 28px;
+  html, body { width: 1080px; height: 1920px; }
+  body { background: #F7F1E3; color: #3E4A46; padding: 40px 30px 30px; display: flex; flex-direction: column; gap: 12px;
     font-family: "Noto Sans TC","Microsoft JhengHei","PingFang TC","WenQuanYi Zen Hei",sans-serif; }
-  header { text-align: center; margin-bottom: 18px; }
-  header h1 { font-size: 58px; letter-spacing: 4px; color: #B23F2B; }
-  header .sub { font-size: 32px; letter-spacing: 3px; margin-top: 4px; }
-  header .how { display: block; margin: 14px auto 0; width: max-content; padding: 8px 28px; border-radius: 999px; background: #D9563E; color: #fff; font-size: 28px; font-weight: bold; }
-  section { background: #fff; border: 4px solid var(--c); border-radius: 20px; padding: 12px 16px 8px; margin-top: 16px; }
-  .hd { display: flex; align-items: center; gap: 12px; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 3px solid var(--c); }
-  .seal { display: inline-flex; width: 60px; height: 60px; align-items: center; justify-content: center; border-radius: 14px; background: var(--c); color: #fff; font-size: 40px; font-weight: bold; }
-  .cnt { font-size: 28px; color: var(--c); font-weight: bold; }
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); }
-  .it { padding: 8px 6px 10px; border-bottom: 1px dashed #E3D9BE; text-align: center; }
-  .nm { font-size: 46px; font-weight: bold; white-space: nowrap; line-height: 1.2; }
-  .sk { font-size: 26px; color: var(--c); font-weight: bold; white-space: nowrap; margin-top: 2px; }
-  footer { text-align: center; margin-top: 16px; font-size: 24px; color: #8C9490; }
+  header { text-align: center; }
+  header h1 { font-size: 56px; letter-spacing: 4px; color: #B23F2B; display: inline; }
+  header .sub { font-size: 30px; letter-spacing: 2px; margin-left: 14px; }
+  header .how { display: block; margin: 10px auto 0; width: max-content; padding: 6px 26px; border-radius: 999px; background: #D9563E; color: #fff; font-size: 28px; font-weight: bold; }
+  section { display: flex; flex-direction: column; background: #fff; border: 4px solid var(--c); border-radius: 18px; padding: 8px 12px 6px; min-height: 0; }
+  .hd { display: flex; align-items: center; gap: 10px; padding-bottom: 6px; border-bottom: 3px solid var(--c); }
+  .seal { display: inline-flex; width: 52px; height: 52px; align-items: center; justify-content: center; border-radius: 12px; background: var(--c); color: #fff; font-size: 34px; font-weight: bold; }
+  .cnt { font-size: 26px; color: var(--c); font-weight: bold; }
+  .grid { flex: 1; display: grid; grid-template-columns: repeat(${COLS}, 1fr); }
+  .it { display: flex; flex-direction: column; justify-content: center; align-items: center; border-bottom: 1px dashed #E3D9BE; }
+  .nm.long { font-size: 34px; }
+  .nm { font-size: 42px; font-weight: bold; white-space: nowrap; line-height: 1.15; }
+  .sk { font-size: 22px; color: var(--c); font-weight: bold; white-space: nowrap; }
+  footer { text-align: center; font-size: 22px; color: #8C9490; }
   </style>
-  <header><h1>萌戰三國・直播亂鬥</h1><div class="sub">全武將清單（共 ${heroes.length} 位）</div><span class="how">在直播間留言武將名字，就能上場！</span></header>
+  <header><h1>萌戰三國・直播亂鬥</h1><span class="sub">全武將清單（共 ${heroes.length} 位）</span><span class="how">在直播間留言武將名字，就能上場！</span></header>
   ${keys.map(sec).join('')}
   <footer>大字是武將名字（留言它就能上場），小字是技能名稱</footer>`;
 }
@@ -134,8 +138,9 @@ function pageList() {
     await tab.screenshot({ path: path.join(root, 'roster', file), fullPage: true, type: 'jpeg', quality: 92 });
     console.log('已產生 roster/' + file);
   }
-  await tab.setContent(pageList());
-  await tab.screenshot({ path: path.join(root, 'roster', '全武將清單.jpg'), fullPage: true, type: 'jpeg', quality: 92 });
+  const tab2 = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
+  await tab2.setContent(pageList());
+  await tab2.screenshot({ path: path.join(root, 'roster', '全武將清單.jpg'), type: 'jpeg', quality: 92 });
   console.log('已產生 roster/全武將清單.jpg');
   await browser.close();
 })();
