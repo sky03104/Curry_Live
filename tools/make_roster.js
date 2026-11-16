@@ -1,6 +1,7 @@
 // 產生「武將名冊」圖片（發給觀眾看有哪些武將可以選）。
 // 用法：node tools/make_roster.js [Curry_Games 的路徑，預設 ../Curry_Games]
 // 需要 Playwright（用它開一個看不見的瀏覽器把網頁拍成圖）。
+// 另外有一張「全武將清單」：只有陣營、武將名稱、技能名稱，沒有武將圖（純文字一覽表）。
 // 輸出到 roster/：一張全武將總覽圖（橫式、一張就看完，不是長圖）+ 蜀魏吳群萌各一張。
 // 武將圖用 Curry_Games 的原尺寸全身圖（比遊戲裡縮小過的清楚），資料用 data/heroes.js 加上 data/extra-heroes.js。
 // 自己新增的角色（extra: true，例如米其林）不在 Curry_Games 裡，改用 assets/heroes 裡的圖。
@@ -91,6 +92,37 @@ function pageAll() {
   <footer>送禮可以攻擊、放技能、回血　｜　留言「@對方名字」鎖定目標　｜　想換武將？直接留言新的武將名字　｜　想下場？留言「烙跑」</footer>`;
 }
 
+// 全武將清單：只有陣營、武將名稱、技能名稱（沒有武將圖），一個陣營一欄
+function pageList() {
+  const keys = Object.keys(factions).filter(k => heroes.some(h => h.faction === k));
+  const rows = Math.max(...keys.map(k => heroes.filter(h => h.faction === k).length));
+  const col = key => {
+    const f = factions[key], list = heroes.filter(h => h.faction === key);
+    return `<div class="col" style="--c:${f.color}"><div class="hd"><span class="seal">${f.label}</span><span class="cnt">${list.length} 位</span></div>
+      ${list.map(h => `<div class="it"><span class="nm">${h.displayName}</span><span class="sk">${h.skillName}</span></div>`).join('')}</div>`;
+  };
+  return `<!doctype html><meta charset="utf-8"><style>
+  * { box-sizing: border-box; margin: 0; }
+  body { width: ${keys.length * 330 + 60}px; background: #F7F1E3; color: #3E4A46; padding: 26px 30px 22px;
+    font-family: "Noto Sans TC","Microsoft JhengHei","PingFang TC","WenQuanYi Zen Hei",sans-serif; }
+  header { text-align: center; margin-bottom: 14px; }
+  header h1 { font-size: 48px; letter-spacing: 4px; color: #B23F2B; display: inline; } header .sub { font-size: 28px; letter-spacing: 3px; margin-left: 20px; }
+  header .how { display: block; margin: 10px auto 0; width: max-content; padding: 6px 22px; border-radius: 999px; background: #D9563E; color: #fff; font-size: 24px; font-weight: bold; }
+  .wrap { display: flex; gap: 12px; margin-top: 14px; }
+  .col { flex: 1; min-width: 0; background: #fff; border: 3px solid var(--c); border-radius: 18px; padding: 10px 12px 12px; }
+  .hd { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 3px solid var(--c); }
+  .seal { display: inline-flex; width: 56px; height: 56px; align-items: center; justify-content: center; border-radius: 14px; background: var(--c); color: #fff; font-size: 36px; font-weight: bold; }
+  .cnt { font-size: 24px; color: var(--c); font-weight: bold; }
+  .it { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 7px 4px; border-bottom: 1px dashed #E3D9BE; min-height: 46px; }
+  .it:last-child { border-bottom: 0; }
+  .nm { font-size: 30px; font-weight: bold; white-space: nowrap; } .sk { font-size: 22px; color: var(--c); font-weight: bold; white-space: nowrap; }
+  footer { text-align: center; margin-top: 14px; font-size: 22px; color: #8C9490; }
+  </style>
+  <header><h1>萌戰三國・直播亂鬥</h1><span class="sub">全武將清單（共 ${heroes.length} 位）</span><span class="how">在直播間留言武將名字，就能上場！</span></header>
+  <div class="wrap">${keys.map(col).join('')}</div>
+  <footer>左邊是武將名字（留言它就能上場），右邊是技能名稱</footer>`;
+}
+
 (async () => {
   const browser = await chromium.launch();
   const tab = await browser.newPage({ viewport: { width: 1080, height: 800 }, deviceScaleFactor: 1.5 });
@@ -102,5 +134,8 @@ function pageAll() {
     await tab.screenshot({ path: path.join(root, 'roster', file), fullPage: true, type: 'jpeg', quality: 92 });
     console.log('已產生 roster/' + file);
   }
+  await tab.setContent(pageList());
+  await tab.screenshot({ path: path.join(root, 'roster', '全武將清單.jpg'), fullPage: true, type: 'jpeg', quality: 92 });
+  console.log('已產生 roster/全武將清單.jpg');
   await browser.close();
 })();
