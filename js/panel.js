@@ -108,8 +108,8 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
         <div id="gs-actions"></div>
         <details class="sub-details">
           <summary>📥 貼上 TikFinity 的禮物清單<em id="gi-count"></em></summary>
-          <div class="hint">在 TikFinity 的 Gift Browser 把禮物名稱複製下來（一行一個，後面可以接鑽石數，例如「玫瑰 1」），貼在這裡按「匯入」，上面的下拉選單就會多一組「已匯入的禮物」，名稱跟實際收到的一樣，不會抄錯。圖片還是要等有人送過才會出現。</div>
-          <textarea id="gi-text" rows="5" placeholder="玫瑰 1&#10;愛心 5&#10;獅子 29999"></textarea>
+          <div class="hint">在 TikFinity 的 Gift Browser 把禮物名稱複製下來（一行一個，後面可以接鑽石數，例如「玫瑰 1」），貼在這裡按「匯入」，上面的下拉選單就會多一組「已匯入的禮物」，名稱跟實際收到的一樣，不會抄錯。圖片還是要等有人送過才會出現。<br><b>想連圖片也一次有：</b>用橋接資料夾的 <code>抓禮物清單.bat</code>（或 <code>node gifts.js 帳號</code>，要找一個正在直播的帳號）抓下整份禮物清單，存成 gifts.json，把<b>整個檔案內容</b>貼在這裡匯入，選好的禮物就會自動帶圖片，不用等有人送。</div>
+          <textarea id="gi-text" rows="5" placeholder="玫瑰 1&#10;愛心 5&#10;獅子 29999　（或貼上 gifts.json 的內容）"></textarea>
           <div class="row"><button id="gi-add" class="main">匯入</button><button id="gi-clear">清空已匯入</button></div>
           <div class="hint" id="gi-msg"></div>
         </details>
@@ -316,7 +316,7 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
   // 一個動作只對應一個禮物：選了新的，就取代這個動作原本的
   function setActionGift(action, name) {
     Object.keys(giftSettings.map).filter(n => giftSettings.map[n] === action).forEach(n => giftSettings.set(n, ''));
-    if (name) giftSettings.set(name, action);
+    if (name) { giftSettings.set(name, action); applyImportedIcons(); }   // 選的禮物如果在匯入清單裡有圖片網址，直接用，不用等有人送
   }
   const onActionChange = e => {
     const sel = e.target.closest('[data-action]');
@@ -338,13 +338,26 @@ ML.createPanel = function (root, hub, game, renderer, config, heroes, giftSettin
     renderGiftSettings();
   };
   const importCount = () => { $('#gi-count').textContent = imported.length ? imported.length + ' 個' : ''; };
+  // 已經指定給動作、但還不知道圖片網址的禮物：從匯入的清單裡找圖片（不用等有人送過）
+  function applyImportedIcons() {
+    let n = 0;
+    for (const name of Object.keys(giftSettings.map)) {
+      if (giftSettings.iconOf(name)) continue;
+      const g = imported.find(x => x.icon && x.name.trim().toLowerCase() === name.trim().toLowerCase());
+      if (g && giftSettings.rememberIcon(name, g.icon)) n++;
+    }
+    return n;
+  }
   $('#gi-add').onclick = () => {
-    const list = parseGiftList($('#gi-text').value);
-    if (!list.length) { $('#gi-msg').textContent = '沒有讀到任何禮物名稱。請一行貼一個。'; return; }
-    for (const g of list) { const i = imported.findIndex(x => x.name.toLowerCase() === g.name.toLowerCase()); if (i >= 0) imported[i] = g; else imported.push(g); }
-    if (imported.length > 400) imported = imported.slice(-400);
+    const text = $('#gi-text').value, cat = ML.parseGiftCatalog(text);
+    if (cat && cat.error) { $('#gi-msg').textContent = '⚠ ' + cat.error; return; }
+    const list = cat ? cat.list : parseGiftList(text);
+    if (!list.length) { $('#gi-msg').textContent = '沒有讀到任何禮物名稱。請一行貼一個，或貼上 gifts.json 的內容。'; return; }
+    for (const g of list) { const i = imported.findIndex(x => x.name.toLowerCase() === g.name.toLowerCase()); if (i >= 0) imported[i] = { ...imported[i], ...g, icon: g.icon || imported[i].icon || '' }; else imported.push(g); }
+    if (imported.length > 1000) imported = imported.slice(-1000);
     saveImported(); importCount(); $('#gi-text').value = '';
-    $('#gi-msg').textContent = `已匯入 ${list.length} 個禮物（共 ${imported.length} 個）。上面的下拉選單裡找「已匯入的禮物」。`;
+    const gotIcon = applyImportedIcons(), withIcon = list.filter(g => g.icon).length;
+    $('#gi-msg').textContent = `已匯入 ${list.length} 個禮物（共 ${imported.length} 個）${withIcon ? `，其中 ${withIcon} 個有圖片網址${gotIcon ? `，已替 ${gotIcon} 個設定好的禮物補上圖片` : ''}` : '（沒有圖片網址：圖片要等有人送過那個禮物才有）'}。上面的下拉選單裡找「已匯入的禮物」。`;
     renderGiftSettings();
   };
   $('#gi-clear').onclick = () => { if (imported.length && !window.confirm('清空已匯入的禮物清單？（已經設定好的對應不會受影響）')) return; imported = []; saveImported(); importCount(); $('#gi-msg').textContent = '已清空。'; renderGiftSettings(); };

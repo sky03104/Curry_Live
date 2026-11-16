@@ -1,7 +1,7 @@
 // 產生「玩法說明」圖片（發給觀眾看怎麼玩；版面是給 TikTok 圖文貼文用的）。
 // 用法：node tools/make_howto.js [--attack 玫瑰] [--aoe 煙火] [--skill 皇冠] [--heal 愛心] [--boss1 …] [--boss2 …] [--boss3 …]
 //   後面的禮物名稱是「主播自己指定的禮物」，沒給就寫「主播公布」（招換 BOSS 沒給就寫預設鑽石數）。想換說明文字就改下面各張的內容。
-// 需要 Playwright。輸出：roster/玩法說明_1.jpg … _13.jpg（前 8 張是玩法（第 5 張陣營模式、第 6 張賽跑模式、第 7 張障礙賽、第 8 張障礙賽 10 種賽道），後面蜀魏吳群萌各一張陣營武將圖，附武將名稱和技能名），每張 1080x1920（9:16），照順序當 TikTok 圖文貼文的輪播圖（滑著看）。
+// 需要 Playwright。輸出：roster/玩法說明_1.jpg … _15.jpg（前 10 張是玩法（第 5 張陣營模式、第 6 張賽跑模式、第 7 張障礙賽、第 8 張障礙賽 10 種賽道、第 9 張單挑賽、第 10 張轉輪模式），後面蜀魏吳群萌各一張陣營武將圖，附武將名稱和技能名），每張 1080x1920（9:16），照順序當 TikTok 圖文貼文的輪播圖（滑著看）。
 // 版面為 TikTok 留的安全區：上面 130px、下面 300px（標題文字和按鈕會蓋住）、右邊 110px（愛心、留言按鈕）不放重要內容。
 // 數字（60 秒復活、99 級、BOSS 鑽石數）請對照 js/config.js；改了設定要回頭改這裡。風格跟武將名冊一致（米白宣紙底）。
 const fs = require('fs');
@@ -24,7 +24,7 @@ const bossGift = (k, def) => args[k] || def;
 const brand = 'data:image/jpeg;base64,' + fs.readFileSync(path.join(root, 'assets/brand/curry_ai_studio_banner.jpg')).toString('base64');
 const img = f => 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/heroes', f)).toString('base64');
 const hero = (f, name, c) => `<div class="h"><img src="${img(f)}"><span style="background:${c}">${name}</span></div>`;
-const TOTAL = 8 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 8 張玩法（含陣營模式、賽跑模式、障礙賽、障礙賽賽道）+ 每個陣營一張
+const TOTAL = 10 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 10 張玩法（含陣營模式、賽跑模式、障礙賽、障礙賽賽道、單挑賽、轉輪模式）+ 每個陣營一張
 
 // 10 種賽道的小圖：直接用遊戲裡的形狀與路面顏色畫成 SVG，賽道改了重跑就會跟著更新
 const trackChips = (list) => (list || window.GAME_CONFIG.race.tracks || []).map(t => {
@@ -32,6 +32,19 @@ const trackChips = (list) => (list || window.GAME_CONFIG.race.tracks || []).map(
   const col = T.theme.surface.replace(/rgba\((\d+),(\d+),(\d+),[^)]+\)/, 'rgb($1,$2,$3)'), inf = T.theme.infield.replace(/rgba\((\d+),(\d+),(\d+),[^)]+\)/, 'rgb($1,$2,$3)');
   return `<div class="tc"><svg viewBox="0 0 100 64"><path d="${d}" fill="${inf}" stroke="#fff" stroke-width="13" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${col}" stroke-width="9" stroke-linejoin="round"/></svg><span>${t.name}</span></div>`;
 }).join('');
+
+// 轉輪小圖：用遊戲設定裡的結果項目與顏色畫成 SVG（項目有改，重跑就會跟著更新）
+const wheelSvg = () => {
+  const W = window.GAME_CONFIG.wheel, items = W.items, n = items.length, R = 150, C = 160;
+  const pt = (a, r) => [C + r * Math.cos(a), C + r * Math.sin(a)];
+  const slices = items.map((s, i) => {
+    const a0 = -Math.PI / 2 + i * 2 * Math.PI / n, a1 = a0 + 2 * Math.PI / n, am = (a0 + a1) / 2, [x0, y0] = pt(a0, R), [x1, y1] = pt(a1, R), [tx, ty] = pt(am, R * 0.62);
+    const rot = am * 180 / Math.PI + (Math.cos(am) < 0 ? 180 : 0);
+    return `<path d="M${C} ${C}L${x0.toFixed(1)} ${y0.toFixed(1)}A${R} ${R} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}Z" fill="${W.colors[i % W.colors.length]}" stroke="#fff" stroke-width="4"/>` +
+      `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" transform="rotate(${rot.toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)})" text-anchor="middle" dominant-baseline="central" font-size="${s.length > 4 ? 18 : 23}" font-weight="900" fill="#fff" stroke="#000" stroke-opacity=".55" stroke-width="4" paint-order="stroke">${s}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 330 320" style="width:420px;display:block;margin:6px auto 0"><circle cx="${C}" cy="${C}" r="${R + 8}" fill="#3E4A46"/>${slices}<circle cx="${C}" cy="${C}" r="22" fill="#fff" stroke="#3E4A46" stroke-width="6"/><path d="M${C - R - 14} ${C - 16}L${C - R + 20} ${C}L${C - R - 14} ${C + 16}Z" fill="#ffd35c" stroke="#3E4A46" stroke-width="4"/></svg>`;
+};
 const css = `
 * { box-sizing: border-box; margin: 0; }
 body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingFang TC","WenQuanYi Zen Hei",sans-serif; color: #3E4A46; }
@@ -61,13 +74,13 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .boss .b strong { display: block; font-size: 40px; margin-top: 6px; } .boss .b em { font-style: normal; color: #ffd35c; font-size: 40px; font-weight: 900; }
 .buffs { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
 .buff { border-radius: 22px; padding: 22px 30px; font-size: 42px; color: #fff; line-height: 1.45; } .buff b { font-size: 48px; }
-.cover { background: linear-gradient(170deg,#2b3a42,#3E4A46 60%,#2b3a42); color: #fff; padding: 100px 110px 630px 60px; text-align: center; justify-content: center; }
-.cover h1 { font-size: 84px; font-weight: 900; letter-spacing: 6px; line-height: 1.2; } .cover h1 b { color: #ffd35c; display: block; }
-.cover .sub { font-size: 38px; color: #e8dcc0; margin-top: 12px; }
-.cover .row { display: flex; justify-content: center; margin: 26px 0 20px; } .cover .row img { height: 250px; margin: 0 -26px; filter: drop-shadow(0 8px 10px rgba(0,0,0,.4)); }
-.steps { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; text-align: left; }
-.steps div { background: rgba(255,255,255,.1); border: 3px solid rgba(255,255,255,.25); border-radius: 22px; padding: 12px 24px; font-size: 40px; font-weight: 700; }
-.steps .new { border-color: #ffd35c; background: rgba(255,211,92,.12); } .steps .new i { background: #ffd35c; color: #3E4A46; } .steps em { font-style: normal; display: block; margin-left: 70px; font-size: 38px; color: #ffd35c; font-weight: 900; }
+.cover { background: linear-gradient(170deg,#2b3a42,#3E4A46 60%,#2b3a42); color: #fff; padding: 100px 110px 640px 60px; text-align: center; justify-content: center; }
+.cover h1 { font-size: 72px; font-weight: 900; letter-spacing: 6px; line-height: 1.2; } .cover h1 b { color: #ffd35c; display: block; }
+.cover .sub { font-size: 36px; color: #e8dcc0; margin-top: 8px; }
+.cover .row { display: flex; justify-content: center; margin: 14px 0 12px; } .cover .row img { height: 190px; margin: 0 -26px; filter: drop-shadow(0 8px 10px rgba(0,0,0,.4)); }
+.steps { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; text-align: left; }
+.steps div { background: rgba(255,255,255,.1); border: 3px solid rgba(255,255,255,.25); border-radius: 22px; padding: 8px 22px; font-size: 38px; font-weight: 700; }
+.steps .new { border-color: #ffd35c; background: rgba(255,211,92,.12); } .steps .new i { background: #ffd35c; color: #3E4A46; } .steps em { font-style: normal; display: inline; margin-left: 14px; font-size: 34px; color: #ffd35c; font-weight: 900; }
 .steps i { font-style: normal; display: inline-block; width: 54px; height: 54px; line-height: 54px; text-align: center; border-radius: 50%; background: #D9563E; margin-right: 16px; font-weight: 900; }
 .fac-head { display: flex; align-items: center; gap: 22px; margin-bottom: 18px; }
 .fac-head .seal { width: 120px; height: 120px; border-radius: 26px; background: var(--c); color: #fff; font-size: 84px; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 0 rgba(0,0,0,.2); }
@@ -85,19 +98,21 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .race3 { display: flex; gap: 14px; margin-top: 16px; } .race3 div { flex: 1; border-radius: 18px; padding: 16px 10px; text-align: center; color: #fff; font-size: 38px; font-weight: 900; line-height: 1.35; } .race3 small { display: block; font-size: 30px; font-weight: 700; opacity: .95; }
 .tracks10 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 18px; } .tc { background: #fff; border-radius: 16px; padding: 8px 4px 6px; text-align: center; min-width: 0; } .tc svg { width: 100%; height: auto; display: block; } .tc span { display: block; font-size: 23px; font-weight: 700; line-height: 1.2; }
 .gates { display: flex; gap: 10px; margin-top: 18px; } .gt { flex: 1; background: #fff; border-radius: 16px; padding: 10px 4px 8px; text-align: center; min-width: 0; } .gt i { display: block; font-style: normal; font-size: 64px; line-height: 1.1; } .gt b { display: block; font-size: 30px; } .gt span { display: block; font-size: 30px; font-weight: 900; color: #D9563E; }
+.tight .body { gap: 20px; } .tight .card { padding: 26px 30px 26px 130px; } .tight .card .no { top: 26px; width: 80px; height: 80px; font-size: 46px; } .tight .card h2 { font-size: 54px; margin-bottom: 8px; } .tight .card p { font-size: 40px; line-height: 1.5; }
 .brand { display: flex; align-items: center; justify-content: center; gap: 22px; position: absolute; left: 60px; right: 110px; bottom: 305px; }
 .brand img { width: 800px; border-radius: 34px; display: block; }
 .brand span { font-size: 44px; font-weight: 900; color: #fff; letter-spacing: 3px; } .brand small { display: block; font-size: 28px; font-weight: 700; color: #e8dcc0; letter-spacing: 1px; margin-top: 4px; }
-.swipe { margin-top: 20px; font-size: 36px; color: #ffd35c; font-weight: 900; }
+.swipe { margin-top: 14px; font-size: 36px; color: #ffd35c; font-weight: 900; }
 `;
 const top = n => `<div class="top"><div class="t">萌戰三國・<b>直播亂鬥</b></div><div class="pg">${n}/${TOTAL}</div></div>`;
 
+const G = window.GAME_CONFIG;
 const slides = [
 `<div class="slide cover">
   <h1>萌戰三國<b>直播亂鬥</b></h1>
   <div class="sub">留言選武將、送禮打架　30 秒看懂玩法</div>
   <div class="row"><img src="${img('lvbu.png')}"><img src="${img('guanyu.png')}"><img src="${img('diaochan.png')}"><img src="${img('michelin.png')}"></div>
-  <div class="steps"><div><i>1</i>留言武將名字　上場！</div><div><i>2</i>送禮物　你的武將出手</div><div><i>3</i>一起打倒大 BOSS</div><div class="new"><i>4</i>全新陣營模式<em>紅藍大對決</em></div><div class="new"><i>5</i>全新創意賽跑及障礙賽模式<em>一起來跑步</em></div></div>
+  <div class="steps"><div><i>1</i>留言武將名字　上場！</div><div><i>2</i>送禮物　你的武將出手</div><div><i>3</i>一起打倒大 BOSS</div><div class="new"><i>4</i>全新陣營模式<em>紅藍大對決</em></div><div class="new"><i>5</i>全新創意賽跑及障礙賽模式<em>一起來跑步</em></div><div class="new"><i>6</i>全新單挑賽<em>一對一決鬥</em></div><div class="new"><i>7</i>全新轉輪模式<em>送禮轉大獎</em></div></div>
   <div class="swipe">往左滑　看玩法＋全部武將 ➜</div>
   <div class="brand"><img src="${brand}"></div></div>`,
 
@@ -180,6 +195,27 @@ const slides = [
   <div class="card"><div class="no">18</div><h2>送 199 鑽開障礙賽</h2>
     <p>送<b>剛好 199 鑽</b>的禮物（亂鬥時），會<b>隨機開放賽跑或障礙賽</b>！報名開始後留言 <span class="say">我要參賽</span>。</p></div>
 </div></div>`,
+
+`<div class="slide tight">${top(9)}<div class="body">
+  <div class="card" style="background:#FDEBE8;border-color:#f3c4bd"><div class="no" style="background:#c8432f;box-shadow:0 4px 0 #8f2f20">19</div><h2>單挑賽　一對一決鬥</h2>
+    <p>想跟誰單挑？留言 <span class="say">@對方名字 單挑</span>！對方<b>${G.duel.inviteSeconds} 秒內</b>送 <span class="say">玫瑰</span> 就是<b>接受</b>，送 <span class="say">GG</span> 或不理就是拒絕。也可以直接留言 <span class="say">接受</span> <span class="say">拒絕</span>。</p></div>
+  <div class="card"><div class="no">20</div><h2>怎麼打</h2>
+    <p>兩人<b>血量一樣（${G.duel.hp}）</b>，面對面開打！<b>送禮就是攻擊，禮物越貴越痛</b>。怒氣滿了會<b>自動放大招</b>。單挑中<b>不能回血</b>，最長 ${Math.round(G.duel.maxSeconds / 60)} 分鐘。</p></div>
+  <div class="card"><div class="no">21</div><h2>圍觀的人也能幫忙</h2>
+    <p>先留言 <span class="say">@甲</span> 或 <span class="say">@乙</span> 選邊站，再送禮就是<b>幫他助攻</b>，畫面有<b>助攻榜</b>！</p></div>
+  <div class="card"><div class="no">22</div><h2>輸贏怎麼算</h2>
+    <p>贏的人拿經驗，<b>連勝越多越多</b>，打倒連勝高手有<b>大獎勵</b>；輸的人<b>扣經驗，可能掉等級</b>！</p></div>
+</div></div>`,
+
+`<div class="slide tight">${top(10)}<div class="body">
+  <div class="card" style="background:#FFF6D6;border-color:#f0dc8a"><div class="no" style="background:#e0a21e;box-shadow:0 4px 0 #a8730f">23</div><h2>轉輪模式　送禮轉大獎</h2>
+    <p>每累積送禮 <b>${G.wheel.threshold} 鑽</b>就<b>轉一次</b>！亂鬥時滿 ${G.wheel.threshold} 鑽<b>自動開轉輪</b>，主播也能手動開。</p>
+    ${wheelSvg()}<div class="note" style="text-align:center">※ 轉輪上的獎項由主播自己設定，這裡是範例</div></div>
+  <div class="card"><div class="no">24</div><h2>怎麼轉</h2>
+    <p>輪到你時，武將<b>站到轉輪旁</b>，轉 ${G.wheel.spinSeconds} 秒，<b>指針停哪格就是你的結果</b>！右上角列出<b>最近結果</b>。</p></div>
+  <div class="card"><div class="no">25</div><h2>小提醒</h2>
+    <p>累積<b>只算這場直播</b>，下次開播歸零；<b>最多排 ${G.wheel.maxPending} 次</b>。留言 <span class="say">轉輪模式</span> 可查自己累積多少鑽。</p></div>
+</div></div>`,
 ];
 
 // 陣營武將頁：每個武將一格（圖＋名字＋技能名）。每格大小依這個陣營的人數算，11 人也塞得進安全區
@@ -201,7 +237,7 @@ for (const key of FACTION_ORDER) {
   for (const f of fs.readdirSync(path.join(root, 'roster'))) if (/^玩法說明.*\.jpg$/.test(f)) fs.unlinkSync(path.join(root, 'roster', f));   // 清掉舊版
   for (let i = 0; i < slides.length; i++) {
     await p.setContent(`<!doctype html><meta charset="utf-8"><style>${css}</style>${slides[i]}`); await p.waitForTimeout(400);
-    const overflow = await p.evaluate(() => { const s = document.querySelector('.slide'), body = document.querySelector('.body'); return body ? body.scrollHeight - body.clientHeight : 0; });
+    const overflow = await p.evaluate(() => { const body = document.querySelector('.body'), lim = document.querySelector('.tight') ? 1920 - 300 : 1850; /* 新版單挑／轉輪頁要收在 TikTok 底部安全區內；較早的頁面原本就會略超出，只擋會被切到的 */ let low = 0; const els = document.querySelectorAll('.slide > .body > *, .steps, .swipe'); els.forEach(e => { low = Math.max(low, e.getBoundingClientRect().bottom); }); const top0 = document.querySelector('.slide h1'); const clipTop = top0 ? Math.max(0, 80 - top0.getBoundingClientRect().top) : 0; return Math.max(body ? body.scrollHeight - body.clientHeight : 0, Math.round(low - lim), Math.round(clipTop)); });
     const out = path.join(root, 'roster', `玩法說明_${i + 1}.jpg`);
     await p.screenshot({ path: out, type: 'jpeg', quality: 92 });
     console.log('已輸出', out, fs.statSync(out).size + ' bytes', overflow > 0 ? `⚠ 內容超出 ${overflow}px（會被擠到安全區外）` : '');
