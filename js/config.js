@@ -58,6 +58,37 @@ window.GAME_CONFIG = {
     giftNames: { boost: ['玫瑰', 'Rose'], hinder: ['GG'] },   // TikTok 禮物名稱（賽跑時專用，跟亂鬥的禮物對照分開）
   },
 
+  // ---------- 單挑賽（觀眾留言「@對方名字 單挑」發起；平常是亂鬥模式）----------
+  // 流程：甲留言「@乙 單挑」→ 畫面中間跳出申請，乙在 inviteSeconds 秒內送玫瑰＝接受（或留言「接受」），送 GG／留言「拒絕」／沒反應＝拒絕
+  //   → 接受後 3、2、1 開打：兩人面對面、其他人在四周圍觀；雙方血量一樣（hp），攻擊力看禮物的價值（鑽石數）。
+  //   → 兩人都會每隔幾秒自動小攻擊（沒送禮的人也有動作）；送禮累積怒氣，滿了自動放技能；單挑中不能回血。
+  //   → 圍觀的人先留言「@甲」或「@乙」再送禮，就是幫那一邊助攻（打對面）；傷害與怒氣打折（audienceFactor）。
+  //   → 贏的人加經驗（連勝越多加成越多）；輸的人扣經驗（可能掉等級）；打倒連勝者拿大量經驗。結束後自動回亂鬥模式。
+  // ⚠️ 這些數字是 Claude 先抓的，沒經過真人試玩。
+  duel: {
+    enabled: true,
+    inviteSeconds: 60,                  // 乙幾秒內要回應，沒反應就當拒絕
+    inviteCooldown: 300,                // 甲發出申請後，幾秒內不能再發（防刷屏）
+    refuseBlock: 600,                   // 被拒絕（含沒反應）後，甲幾秒內不能再挑戰同一個人
+    countdown: 3, maxSeconds: 180, resultSeconds: 15,   // 開打倒數、一場最長幾秒（時間到比剩餘血量，一樣多＝和局）、結果顯示幾秒
+    hp: 4000,                           // 雙方血量（一樣，不吃等級加成）
+    autoAtkEvery: 4, autoAtkDmg: 30, autoRage: 1.5,   // 自動小攻擊：每幾秒一下、每下傷害、每下增加的怒氣
+    giftBase: 40, giftExp: 0.5,         // 每個禮物的傷害 = giftBase × 鑽石數^giftExp（0.5＝開根號：大禮比小禮強，但不會強幾百倍）
+    giftCapPercent: 0.35,               // 單一份禮物最多打掉血量的幾成（防止一份大禮秒殺）
+    maxGiftCombo: 20,                   // 一次連送最多算幾個
+    audienceFactor: 0.5,                // 圍觀者助攻的傷害與怒氣打幾折
+    rageMax: 100, rageGift: 6, rageHit: 80, skillDmg: 700, skillCooldown: 3,   // 怒氣：每份禮物加 rageGift × 鑽石數^giftExp；被打也加（傷害佔血量的比例 × rageHit）；滿了自動放技能（傷害 skillDmg），技能之間至少隔 skillCooldown 秒
+    supportNoticeMin: 20,               // 圍觀者的助攻禮物至少幾鑽才在訊息區寫出來（免得洗版）
+    fakeDiamonds: { attack: 1, aoe: 20, skill: 200 },   // 沒有鑽石數的禮物（面板測試、主播按鈕）怎麼算：動作 → 鑽石數；回血動作在單挑中無效
+    giftNames: { accept: ['玫瑰', 'Rose'], refuse: ['GG'] },   // 乙回應用的 TikTok 禮物名稱（玫瑰＝接受、GG＝拒絕）
+    // 經驗值：贏的人 =（winBase + winPerLevel × 對手等級）× 連勝加成；連勝加成 = 1 + streakStep ×（連勝數 − 1），最多 streakMaxMult 倍
+    //   打倒連勝 breakMinStreak 場以上的人：再加 breakPerStreak × 對方連勝數（最多 breakMax）；
+    //   以上全部再乘「等級差折扣」（跟擊倒一樣：比對方高很多級就打折）和「同一對人反覆單挑折扣」（pairWindow 秒內每多打一次少 pairPenalty，最少剩 pairMinFactor）
+    //   輸的人 = （loseBase + losePerLevel × 自己等級）×（1 + loserStreakExtra × 自己的連勝數，最多多 loserStreakExtraMax）；扣到不夠會掉等級（1 級最低扣到 0 經驗）
+    xp: { winBase: 100, winPerLevel: 20, streakStep: 0.25, streakMaxMult: 3, breakMinStreak: 2, breakPerStreak: 150, breakMax: 2000,
+          loseBase: 40, losePerLevel: 8, loserStreakExtra: 0.1, loserStreakExtraMax: 1, pairWindow: 600, pairPenalty: 0.25, pairMinFactor: 0.1 },
+  },
+
   // ---------- 陣營模式（主播按「切換陣營模式」才會用到；平常是亂鬥模式）----------
   // 場地由左到右：紅方主堡｜紅隊武將｜紅方防禦塔｜藍方防禦塔｜藍隊武將｜藍方主堡
   // 規則：只能打敵方（武將、防禦塔、主堡），不能打同隊；敵塔倒了、而且敵方場上武將全部倒地，才能打主堡；主堡倒了那隊輸。
@@ -394,6 +425,9 @@ window.GAME_CONFIG = {
     setLevel: ['等級', '設定等級'],   // 主播本人留言「等級 名字 30」→ 把那位觀眾調成 Lv.30（要先在面板「主播文字指令」設定主播）
     raceJoin: ['我要參賽'],             // 賽跑模式：報名參賽（整句剛好才算）
     hurdleOpen: ['開放障礙賽'],         // 障礙賽：主播留言這句＝開放障礙賽報名（只有主播有效）
+    duel: ['單挑'],                     // 單挑賽：留言「@對方名字 單挑」（或「單挑 @對方名字」）發起申請
+    duelAccept: ['接受', '接受挑戰'],   // 被挑戰的人留言這些字（整句剛好）＝接受（不用送玫瑰）
+    duelRefuse: ['拒絕'],               // 被挑戰的人留言這些字＝拒絕
     raceOpen: ['開放報名'],             // 賽跑模式：主播留言這句＝開放報名（只有主播有效）
     joinRed: ['加入紅隊', '紅隊'],      // 陣營模式：留言這些字（整句剛好）加入紅隊
     joinBlue: ['加入藍隊', '藍隊'],     // 陣營模式：加入藍隊
