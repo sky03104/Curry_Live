@@ -460,7 +460,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       // 單挑賽：兩位選手在中間面對面（大），其他人在四周圍觀（小）：上排、下排，人多再排左右兩側
       const D = game.getDuel(), specs = list.filter(p => p.id !== D.a.id && p.id !== D.b.id), ns = specs.length;
       const ss = ns ? clamp(Math.min(arena.h * 0.2, arena.w * 0.055), 28, 64) : 0;
-      const topEdge = arena.y + 112 * duelZoom(), botEdge = arena.y + arena.h - 6;
+      const topEdge = arena.y + 118 * duelZoom(), botEdge = arena.y + arena.h - 6;
       const rowTop = topEdge + ss * 0.8 + 22, rowBot = botEdge - ss * 0.5 - 34;
       const midY = ns ? (rowTop + rowBot) / 2 : (topEdge + botEdge) / 2;
       const sd = clamp(Math.min((botEdge - topEdge) * (ns ? 0.7 : 0.85), arena.w * 0.34), 50, 380);
@@ -705,7 +705,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       ctx.restore();
       text(`${Math.ceil(S.hp)}`, bx + half / 2, by + bh / 2 + 1, 22 * z, '#fff');
       // 怒氣條：左邊（或右邊）一個火焰＋「怒氣」大字；滿了整條變彩色閃爍，放完技能歸零
-      const ry = by + bh + 8, rh = 24 * z, rr = clamp(S.rage / S.rageMax, 0, 1), full = rr >= 0.999;
+      const ry = by + bh + 14 * z, rh = 12 * z, rr = clamp(S.rage / S.rageMax, 0, 1), full = rr >= 0.999;
       ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(bx - 2, ry - 2, half + 4, rh + 4, rh / 2 + 2); ctx.fill();
       ctx.beginPath(); ctx.roundRect(bx, ry, half, rh, rh / 2); ctx.clip();
       ctx.fillStyle = '#3a2a2e'; ctx.fillRect(bx, ry, half, rh);
@@ -721,9 +721,10 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(gx0, ry + rh * 0.12, gw, rh * 0.28);
       }
       ctx.restore();
-      const fs2 = 20 * z, flame = full ? 1 + 0.12 * Math.sin(time * 18) : 1;   // 滿了火焰一跳一跳
-      text('🔥', left ? bx + 16 * z : bx + half - 16 * z, ry + rh / 2 + 1, 24 * z * flame, '#fff');
-      text(full ? '怒氣滿了！' : '怒氣', left ? bx + 34 * z : bx + half - 34 * z, ry + rh / 2 + 1, fs2, full ? '#ffffff' : '#fff3d0', left ? 'left' : 'right');
+      // 字和火焰比細細的怒氣條大，可以超出條的上下（不用關在框框裡）
+      const fs2 = 26 * z, flame = full ? 1 + 0.12 * Math.sin(time * 18) : 1;   // 滿了火焰一跳一跳
+      text('🔥', left ? bx + 18 * z : bx + half - 18 * z, ry + rh / 2, 34 * z * flame, '#fff');
+      text(full ? '怒氣滿了！' : '怒氣', left ? bx + 42 * z : bx + half - 42 * z, ry + rh / 2 + 1, fs2, full ? '#ffffff' : '#fff3d0', left ? 'left' : 'right');
       // 名字、等級、連勝
       const nm = `${short(S.name, 8)}`, streak = S.streak >= 2 ? `  🔥${S.streak}連勝` : '';
       text(`Lv.${S.level} ${nm}${streak}`, left ? bx : bx + half, y0 + 17 * z, 26 * z, '#fff', left ? 'left' : 'right');
