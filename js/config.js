@@ -193,6 +193,8 @@ window.GAME_CONFIG = {
       projectId: 'mengzhan-sanguo',
       apiKey: 'AIzaSyBzJytVzlJv2E6_6bSgs42WHG-2YFmhSuY',   // Firebase 網頁用金鑰，本來就是公開的，不是密碼
       baseUrl: 'https://firestore.googleapis.com',
+      realtime: true,           // 主播按鈕用 Supabase Realtime 即時推送（約 0.1 秒內到）；false = 只靠下面的詢問
+      cmdPollLiveSeconds: 5,    // 即時推送連著的時候，直播畫面改成每隔幾秒才看一次資料庫（只是保險，萬一推送漏了）；連線斷了自動回到下面每秒詢問
       cmdPollSeconds: 1,        // 主播按鈕：直播畫面平常每隔幾秒看一次有沒有新的按鈕指令（每次算 1 次讀取，直播 4 小時約 14,400 次；免費額度每天 5 萬次是所有實況主共用，大約夠 3 位同時直播；想省就調大）
       cmdBurstSeconds: 0.5,     // 剛收到按鈕指令後，改成每隔幾秒看一次（連按幾下反應更快）
       cmdBurstHold: 60,         // 這種「密集模式」維持幾秒
