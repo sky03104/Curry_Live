@@ -406,6 +406,13 @@ window.GAME_CONFIG = {
       walk: { src: 'hamster_walk.png', frames: 7, cw: 271, ch: 324, ground: 320, fps: 9 },   // 走路循環（原圖 16 格有的有羽扇有的沒有，只挑有羽扇的 7 格）
     },
     // 蕃薯：待機＝吃薯條（8 格，每秒 3 格連播 2 輪）；攻擊／技能＝撲出去咬（8 格，第 5 格咬下去；普攻 13 格/秒、技能 11 格/秒）
+    nekomeow: {
+      idle: { src: 'nekomeow_idle.png', frames: 7, cw: 420, ch: 293, ground: 290, fps: 3, repeat: 2 },   // 待機：洗臉理毛（站姿→抬爪→舔肉球→擦臉頰→放下爪），連播 2 輪（Gemini 生圖 8 格，第 8 格是正面站姿跟其他格不連，只用前 7 格）
+      eat: { src: 'nekomeow_idle.png', frames: 7, cw: 420, ch: 293, ground: 290, fps: 3 },                // 回血：同一組，播一輪
+      walk: { src: 'nekomeow_walk.png', frames: 8, cw: 475, ch: 314, ground: 310, fps: 9 },              // 走路循環（四足側面，8 格）
+      attack: { src: 'nekomeow_attack.png', frames: 5, cw: 439, ch: 312, ground: 289, fps: 10, hitFrame: 4 },   // 普攻：蓄力→前撲→空中舉爪→爪擊劃出藍紫爪痕（第 4 格打中）→落地。原圖只有 4 個能用的格（另一張是特寫、大小不一），最後一格回到第 1 格的蓄力姿勢當落地
+      skill: { src: 'nekomeow_skill.png', frames: 9, cw: 865, ch: 409, ground: 405, fps: 9, hitFrame: 7 },   // 技能「雲爪妙計」：站起→雙爪高舉→肉球符印浮現→推出（第 7 格施放）→符印飛遠→收勢（9 格）
+    },
     pudding: {
       walk: { src: 'pudding_walk.png', frames: 8, cw: 526, ch: 372, ground: 368, fps: 9 },   // 走路循環（黃金獵犬優雅小跑，8 格）
       idle: { src: 'pudding_idle.png', frames: 8, cw: 497, ch: 491, ground: 487, fps: 2.5, repeat: 2 },   // 待機：吃布丁（舀一口→吃→再舀→吃光→舔嘴），連播 2 輪
