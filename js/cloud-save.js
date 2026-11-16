@@ -237,14 +237,30 @@ ML.createCloudSave = function (config, params, slot, opts) {
   }
   const sameContent = (a, b) => a.length === b.length && (() => { const m = new Map(b.map(p => [p.id, p])); return a.every(p => { const o = m.get(p.id); return o && o.level === p.level && o.xp === p.xp && o.kills === p.kills && o.adj === p.adj && o.streak === p.streak; }); })();
 
-  // 存進 Supabase 之後，順便在 Firebase 留一份備份（不等它、失敗也不影響主要存檔）
-  function mirror(merged, settings, o) {
-    if (cfg.backup === false || !cfg.apiKey) return;
-    write(slot, encode(merged, settings), null, o && o.keepalive ? { keepalive: true } : null).then(r => {
+  // 存進 Supabase 之後，順便在 Firebase 留一份備份（不等它、失敗也不影響主要存檔）。
+  // 為了省 Firebase 的免費寫入額度（每天約 2 萬次，所有主播共用），備份最多每 backupSeconds 秒（預設 60）寫一次：
+  // 這段時間內又存了幾次，只會在時間到時把「最新的那份」寫一次；關網頁前會立刻補寫（flushBackup）。主要存檔（Supabase）不受影響，照樣每次都存。
+  let mirrorLast = 0, mirrorTimer = null, mirrorPending = null;
+  function mirrorNow(merged, settings, keepalive) {
+    mirrorLast = Date.now();
+    write(slot, encode(merged, settings), null, keepalive ? { keepalive: true } : null).then(r => {
       const had = status.text.endsWith(BK_WARN);
       if (!r.ok && !had) setStatus(status.state, status.text + BK_WARN);
       else if (r.ok && had) setStatus(status.state, status.text.slice(0, -BK_WARN.length));
     }).catch(() => { /* 備份失敗不影響遊戲 */ });
+  }
+  function mirror(merged, settings, o) {
+    if (cfg.backup === false || !cfg.apiKey) return;
+    const gap = (cfg.backupSeconds == null ? 60 : Number(cfg.backupSeconds)) * 1000, wait = mirrorLast + gap - Date.now();
+    if ((o && o.keepalive) || wait <= 0) { clearTimeout(mirrorTimer); mirrorTimer = null; mirrorPending = null; mirrorNow(merged, settings, !!(o && o.keepalive)); return; }
+    mirrorPending = { merged, settings };   // 還沒到時間：只記下最新的，時間到再寫一次
+    if (!mirrorTimer) mirrorTimer = setTimeout(() => { mirrorTimer = null; const m = mirrorPending; mirrorPending = null; if (m) mirrorNow(m.merged, m.settings); }, wait);
+  }
+  // 關網頁前呼叫：還在等時間的備份立刻寫出去，不要丟掉最後一次
+  function flushBackup() {
+    if (!mirrorPending) return;
+    clearTimeout(mirrorTimer); mirrorTimer = null;
+    const m = mirrorPending; mirrorPending = null; mirrorNow(m.merged, m.settings, true);
   }
 
   // ================= 寫入（會先跟雲端上的合併，衝突時重試）=================
@@ -455,7 +471,7 @@ ML.createCloudSave = function (config, params, slot, opts) {
     get enabled() { return !!token; }, get token() { return token; }, canWrite,
     get settings() { return remote.settings; },   // 雲端上目前的主播設定（讀過之後才有）
     get status() { return status; }, onStatus(fn) { listeners.push(fn); },
-    load, store, test, newToken, setToken, sendCommand, fetchCommand,
+    load, store, test, newToken, setToken, sendCommand, fetchCommand, flushBackup,
     listenCommands, connectRealtime, stopRealtime: rtStop, get realtimeState() { return rt.state; }, get realtimeLive() { return rt.state === 'live'; },
   };
 };
