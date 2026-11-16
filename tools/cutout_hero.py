@@ -1,6 +1,6 @@
 """把一張角色圖去背，轉成遊戲用的全身圖（312x396 透明背景），放進 assets/heroes/。
 
-用法：python3 tools/cutout_hero.py <原圖路徑> <heroId> [--no-ai]
+用法：python3 tools/cutout_hero.py <原圖路徑> <heroId> [--no-ai] [--model birefnet-general]
 範例：python3 tools/cutout_hero.py 米其林.webp michelin
 
 需要：pip install rembg scipy pillow（rembg 第一次執行會自動下載約 180MB 的 AI 模型）
@@ -26,6 +26,9 @@ SIZE = (312, 396)   # 跟 tools/sync_from_curry_games.py 縮出來的尺寸一�
 
 def cut_ai(img):
     from rembg import new_session, remove
+    for i, x in enumerate(sys.argv):   # --model NAME：換別的去背模型。背景是深色漸層／光暈、而角色有裸露的皮膚（腿、手）時，預設模型會把腿當背景去掉，改用 birefnet-general（第一次執行會下載約 1GB 模型）
+        if x == '--model' and i + 1 < len(sys.argv):
+            return remove(img, session=new_session(sys.argv[i + 1])).convert('RGBA')
     return remove(img, session=new_session('isnet-general-use'), alpha_matting=True,
                   alpha_matting_foreground_threshold=235, alpha_matting_background_threshold=15,
                   alpha_matting_erode_size=8).convert('RGBA')
@@ -41,7 +44,8 @@ def cut_flood(img):
 
 
 def main():
-    args = [x for x in sys.argv[1:] if not x.startswith('--')]
+    argv = sys.argv[1:]
+    args = [x for i, x in enumerate(argv) if not x.startswith('--') and not (i > 0 and argv[i - 1] == '--model')]
     if len(args) != 2:
         sys.exit(__doc__)
     src, hero_id = args

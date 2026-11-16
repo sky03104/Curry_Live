@@ -16,6 +16,7 @@ window.GAME_CONFIG = {
     hamster:  { attack: { style: 'projectile', emoji: '🧀', color: '#ffd35c' }, skill: { style: 'emojiStorm', emoji: '🧀', n: 18, color: '#ffd35c' } },   // 西當普利鼠：丟起司、起司旋風
     yam:      { attack: { style: 'claw', color: '#b06cff' }, skill: { style: 'tigerPounce', color: '#b06cff' } },                      // 蕃薯：紫色爪痕、猛虎撲殺
     joy:      { attack: { style: 'claw', color: '#ff5a4d' }, skill: { style: 'emojiRain', emoji: '🍗', n: 10, big: 0.6, color: '#ffb36b' } },   // Joy：紅色爪痕、大雞腿雨
+    xuejie:   { attack: { style: 'projectile', emoji: '🧋', color: '#d9b27a' }, skill: { style: 'heartWave', emoji: '🍵', color: '#7bd46b' } },   // 學姊：丟冰飲、抹茶光波
     nekomeow: { attack: { style: 'claw', color: '#8f9bff' }, skill: { style: 'emojiStorm', emoji: '🐾', n: 16, color: '#8f9bff' } },   // 那隻喵：藍紫爪痕、肉球旋風
     xiaoni:   { attack: { style: 'shockSmash', color: '#ffd35c' }, skill: { style: 'stampSmash', text: '100T', color: '#ffd35c' } },   // 小妮：重擊震波、100T 大字砸下來
   },
@@ -406,6 +407,13 @@ window.GAME_CONFIG = {
       walk: { src: 'hamster_walk.png', frames: 7, cw: 271, ch: 324, ground: 320, fps: 9 },   // 走路循環（原圖 16 格有的有羽扇有的沒有，只挑有羽扇的 7 格）
     },
     // 蕃薯：待機＝吃薯條（8 格，每秒 3 格連播 2 輪）；攻擊／技能＝撲出去咬（8 格，第 5 格咬下去；普攻 13 格/秒、技能 11 格/秒）
+    xuejie: {
+      idle: { src: 'xuejie_idle.png', frames: 7, cw: 252, ch: 415, ground: 412, fps: 3, repeat: 2 },   // 待機：拿麥克風唱歌（用 AI 原圖只有上半身的格子接上腿拼成，共 7 格；原圖第 7 格沒拿杯子沒用）
+      eat: { src: 'xuejie_idle.png', frames: 7, cw: 252, ch: 415, ground: 412, fps: 3, repeat: 2 },   // 回血時也播同一組
+      walk: { src: 'xuejie_walk.png', frames: 12, cw: 193, ch: 407, ground: 404, fps: 12 },   // 走路循環（悠閒走路，12 格；原圖 3 排各 4 格，第 3 排杯子上的星巴克商標已塗成素色貼紙）
+      attack: { src: 'xuejie_attack.png', frames: 8, cw: 295, ch: 399, ground: 395, fps: 10, hitFrame: 6 },   // 普攻：吸飲料→皺眉→彈指→伸手向前（第 6 格打中）→收回（最後一格的星巴克商標已塗掉）
+      skill: { src: 'xuejie_skill.png', frames: 8, cw: 223, ch: 410, ground: 407, fps: 9, hitFrame: 7 },   // 技能「學姊罩你」：舉杯→叉腰→頭髮飛揚→比讚笑→手指向前（第 7 格施放）→回站姿。原圖第 8 格只畫到腰（被格子切掉）沒用，共 8 格
+    },
     nekomeow: {
       idle: { src: 'nekomeow_idle.png', frames: 7, cw: 420, ch: 293, ground: 290, fps: 3, repeat: 2 },   // 待機：洗臉理毛（站姿→抬爪→舔肉球→擦臉頰→放下爪），連播 2 輪（Gemini 生圖 8 格，第 8 格是正面站姿跟其他格不連，只用前 7 格）
       eat: { src: 'nekomeow_idle.png', frames: 7, cw: 420, ch: 293, ground: 290, fps: 3 },                // 回血：同一組，播一輪
@@ -454,7 +462,7 @@ window.GAME_CONFIG = {
   // 程式假設每張全身圖原本都是「面向左邊」，往右走時會把圖左右翻面。
   // 如果發現某隻武將走路時是倒退著走（背對前進方向），代表牠的原圖其實面向右，
   // 把牠的英文 ID 加進下面這個清單就會修正。例如： ['taishici', 'sunquan']
-  artFacesRight: ['taishici'],
+  artFacesRight: ['taishici', 'xuejie'],
 
   // ---------- 留言指令 ----------
   commands: {
