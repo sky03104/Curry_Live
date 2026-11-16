@@ -101,7 +101,8 @@ function startDuel(t, a, b) {
   const pa = game.getPlayer('tt:甲'), pb = game.getPlayer('tt:乙');
   t.run(20); ok(pa.hp < config.duel.hp && pb.hp < config.duel.hp, `沒人送禮也會互相自動小攻擊（甲 ${Math.round(pa.hp)}／乙 ${Math.round(pb.hp)}）`);
   t.fxs.length = 0; t.tgift('甲', 'Rose', 300, 3);   // 怒氣塞滿
-  t.run(1); ok(t.fxs.some(e => e.type === 'attack' && e.action === 'skill' && e.id === 'tt:甲'), '怒氣滿了自動放技能');
+  t.run(0.5); ok(game.getDuel().a.rage >= 100 && !t.fxs.some(e => e.action === 'skill'), '怒氣滿了先閃爍等一下，還沒放技能');
+  t.run(2.5); ok(t.fxs.some(e => e.type === 'attack' && e.action === 'skill' && e.id === 'tt:甲'), '閃爍完自動放技能');
   ok(game.getDuel().a.rage < 100, '放技能後怒氣歸零');
 }
 { // 時間到：比血量；一樣多＝和局

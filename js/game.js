@@ -862,7 +862,7 @@ ML.createGame = function (config, heroes) {
     mode = 'duel'; duelLock.clear(); raceLock.clear();
     for (const p of players.values()) p.lockId = null;
     for (const p of [pa, pb]) { p.maxHp = p.hp = dc.hp; p.down = false; }
-    duel = { phase: 'countdown', a: pa.id, b: pb.id, cd: dc.countdown || 3, t: 0, rage: { a: 0, b: 0 }, nextAuto: { a: 0, b: 0 }, skillAt: { a: 0, b: 0 }, resLeft: 0, result: null };
+    duel = { phase: 'countdown', a: pa.id, b: pb.id, cd: dc.countdown || 3, t: 0, rage: { a: 0, b: 0 }, nextAuto: { a: 0, b: 0 }, skillAt: { a: 0, b: 0 }, skillCharge: { a: 0, b: 0 }, resLeft: 0, result: null };
     notice(`⚔ ${pb.name} 接受了挑戰！${pa.name} VS ${pb.name} 單挑開始`);
     fx({ type: 'modeChange', mode });
   }
@@ -986,9 +986,12 @@ ML.createGame = function (config, heroes) {
         duel.nextAuto[side] = time + (dc.autoAtkEvery || 4);
         duelStrike(side, (dc.autoAtkDmg || 30) * (1 + (Math.random() * 2 - 1) * config.damageVariance), 'attack', dc.autoRage || 0);
       }
-      if (duel && duel.phase === 'fight' && duel.rage[side] >= dc.rageMax && time >= duel.skillAt[side]) {
-        duel.rage[side] = 0; duel.skillAt[side] = time + (dc.skillCooldown || 3);
-        duelStrike(side, dc.skillDmg, 'skill', 0);
+      if (duel && duel.phase === 'fight' && duel.rage[side] >= dc.rageMax) {   // 怒氣滿了：先閃爍一下（skillDelay 秒，畫面上整條怒氣變彩色閃爍），再放技能，放完怒氣歸零
+        if (!duel.skillCharge[side]) duel.skillCharge[side] = Math.max(time + (dc.skillDelay === undefined ? 1.5 : dc.skillDelay), duel.skillAt[side]);
+        if (time >= duel.skillCharge[side]) {
+          duel.skillCharge[side] = 0; duel.rage[side] = 0; duel.skillAt[side] = time + (dc.skillCooldown || 3);
+          duelStrike(side, dc.skillDmg, 'skill', 0);
+        }
       }
     }
     if (duel && duel.phase === 'fight' && duel.t >= (dc.maxSeconds || 180)) {   // 時間到：比剩餘血量，一樣多＝和局

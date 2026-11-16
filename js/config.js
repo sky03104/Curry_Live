@@ -77,7 +77,7 @@ window.GAME_CONFIG = {
     giftCapPercent: 0.35,               // 單一份禮物最多打掉血量的幾成（防止一份大禮秒殺）
     maxGiftCombo: 20,                   // 一次連送最多算幾個
     audienceFactor: 0.5,                // 圍觀者助攻的傷害與怒氣打幾折
-    rageMax: 100, rageGift: 6, rageHit: 80, skillDmg: 700, skillCooldown: 3,   // 怒氣：每份禮物加 rageGift × 鑽石數^giftExp；被打也加（傷害佔血量的比例 × rageHit）；滿了自動放技能（傷害 skillDmg），技能之間至少隔 skillCooldown 秒
+    rageMax: 100, rageGift: 6, rageHit: 80, skillDmg: 700, skillCooldown: 3, skillDelay: 1.5,   // 怒氣：每份禮物加 rageGift × 鑽石數^giftExp；被打也加（傷害佔血量的比例 × rageHit）；滿了整條怒氣彩色閃爍 skillDelay 秒後自動放技能（傷害 skillDmg），放完歸零，技能之間至少隔 skillCooldown 秒
     supportNoticeMin: 20,               // 圍觀者的助攻禮物至少幾鑽才在訊息區寫出來（免得洗版）
     fakeDiamonds: { attack: 1, aoe: 20, skill: 200 },   // 沒有鑽石數的禮物（面板測試、主播按鈕）怎麼算：動作 → 鑽石數；回血動作在單挑中無效
     giftNames: { accept: ['玫瑰', 'Rose'], refuse: ['GG'] },   // 乙回應用的 TikTok 禮物名稱（玫瑰＝接受、GG＝拒絕）
