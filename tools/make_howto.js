@@ -1,7 +1,7 @@
 // 產生「玩法說明」圖片（發給觀眾看怎麼玩；版面是給 TikTok 圖文貼文用的）。
 // 用法：node tools/make_howto.js [--attack 玫瑰] [--aoe 煙火] [--skill 皇冠] [--heal 愛心] [--boss1 …] [--boss2 …] [--boss3 …]
 //   後面的禮物名稱是「主播自己指定的禮物」，沒給就寫「主播公布」（招換 BOSS 沒給就寫預設鑽石數）。想換說明文字就改下面各張的內容。
-// 需要 Playwright。輸出：roster/玩法說明_1.jpg … _12.jpg（前 7 張是玩法（第 5 張陣營模式、第 6 張賽跑模式、第 7 張障礙賽），後面蜀魏吳群萌各一張陣營武將圖，附武將名稱和技能名），每張 1080x1920（9:16），照順序當 TikTok 圖文貼文的輪播圖（滑著看）。
+// 需要 Playwright。輸出：roster/玩法說明_1.jpg … _13.jpg（前 8 張是玩法（第 5 張陣營模式、第 6 張賽跑模式、第 7 張障礙賽、第 8 張障礙賽 10 種賽道），後面蜀魏吳群萌各一張陣營武將圖，附武將名稱和技能名），每張 1080x1920（9:16），照順序當 TikTok 圖文貼文的輪播圖（滑著看）。
 // 版面為 TikTok 留的安全區：上面 130px、下面 300px（標題文字和按鈕會蓋住）、右邊 110px（愛心、留言按鈕）不放重要內容。
 // 數字（60 秒復活、99 級、BOSS 鑽石數）請對照 js/config.js；改了設定要回頭改這裡。風格跟武將名冊一致（米白宣紙底）。
 const fs = require('fs');
@@ -23,10 +23,10 @@ const gift = k => args[k] || '主播公布';
 const bossGift = (k, def) => args[k] || def;
 const img = f => 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/heroes', f)).toString('base64');
 const hero = (f, name, c) => `<div class="h"><img src="${img(f)}"><span style="background:${c}">${name}</span></div>`;
-const TOTAL = 7 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 7 張玩法（含陣營模式、賽跑模式、障礙賽）+ 每個陣營一張
+const TOTAL = 8 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 8 張玩法（含陣營模式、賽跑模式、障礙賽、障礙賽賽道）+ 每個陣營一張
 
 // 10 種賽道的小圖：直接用遊戲裡的形狀與路面顏色畫成 SVG，賽道改了重跑就會跟著更新
-const trackChips = () => (window.GAME_CONFIG.race.tracks || []).map(t => {
+const trackChips = (list) => (list || window.GAME_CONFIG.race.tracks || []).map(t => {
   const T = ML.buildRaceTrack(t.id, 0, 0, 1, 1, 0.2, 0.02, 4), P = T.pts, d = P.map((q, i) => (i ? 'L' : 'M') + (50 + q.x * 42).toFixed(1) + ' ' + (32 + q.y * 24).toFixed(1)).join('') + 'Z';
   const col = T.theme.surface.replace(/rgba\((\d+),(\d+),(\d+),[^)]+\)/, 'rgb($1,$2,$3)'), inf = T.theme.infield.replace(/rgba\((\d+),(\d+),(\d+),[^)]+\)/, 'rgb($1,$2,$3)');
   return `<div class="tc"><svg viewBox="0 0 100 64"><path d="${d}" fill="${inf}" stroke="#fff" stroke-width="13" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${col}" stroke-width="9" stroke-linejoin="round"/></svg><span>${t.name}</span></div>`;
@@ -163,6 +163,16 @@ const slides = [
     <p>在關卡前<b>摔倒停 2～3 秒</b>再繼續跑，<b>不會淘汰</b>、也不會退回，大家都能跑完。看<b>誰摔得最少、跑得最快</b>！</p></div>
   <div class="card"><div class="no">15</div><h2>送禮幫忙或搗蛋</h2>
     <p>送 <span class="say">玫瑰</span> 讓人<b>更容易過關</b>，送 <span class="say">GG</span> 讓人<b>更容易摔倒</b>。前三名拿經驗值，賽道有 <b>10 種專屬障礙賽道</b>，每場隨機！</p></div>
+</div></div>`,
+
+`<div class="slide">${top(8)}<div class="body">
+  <div class="card" style="background:#FFF1DC;border-color:#f0cf9a"><div class="no" style="background:#e08a1e;box-shadow:0 4px 0 #a8620f">16</div><h2>障礙賽　10 種專屬賽道</h2>
+    <p>障礙賽有<b>自己的 10 種賽道</b>，<b>每場隨機一種</b>，不會連續兩場一樣！</p>
+    <div class="tracks10">${trackChips(window.GAME_CONFIG.race.hurdleTracks)}</div></div>
+  <div class="card"><div class="no">17</div><h2>每條賽道都有 5 道關卡</h2>
+    <p>跑道上的 <b>🚧 🪨 🌊 🔥 🧱</b> 就是關卡，每道都標著<b>過關率</b>。叢林、峽谷、雪山、古堡、糖果、太空、火山、水道、梯田、馬戲團，<b>看你抽到哪條</b>！</p></div>
+  <div class="card"><div class="no">18</div><h2>送 199 鑽開障礙賽</h2>
+    <p>送<b>剛好 199 鑽</b>的禮物（亂鬥時），會<b>隨機開放賽跑或障礙賽</b>！報名開始後留言 <span class="say">我要參賽</span>。</p></div>
 </div></div>`,
 ];
 

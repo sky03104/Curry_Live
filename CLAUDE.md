@@ -322,8 +322,8 @@
 | `bridge/server.js` | TikTok 橋接程式（在主播電腦上跑，不是網頁的一部分） |
 | `bridge/啟動.bat` | Windows 一鍵啟動橋接程式 |
 | `tools/make_roster.js` | 產生武將名冊圖片（發給觀眾看有哪些武將可選），輸出到 `roster/` |
-| `roster/` | 武將名冊圖片：全武將長圖一張＋魏蜀吳群各一張。武將資料或圖有變就重跑 `node tools/make_roster.js`；另有 `玩法說明_1～12.jpg`（`node tools/make_howto.js`） |
-| `tools/make_howto.js` | 產生「玩法說明」圖片（TikTok 圖文貼文用）：`roster/玩法說明_1.jpg`～`_12.jpg`，每張 1080x1920（9:16），照順序上傳當輪播圖：**1 封面、2～4 玩法、5 陣營模式、6 賽跑模式（附 10 種賽道小圖，形狀與顏色直接讀 `js/race-tracks.js`）、7 障礙賽（5 道關卡與過關率直接讀 `config.race.hurdle`）、8～12 蜀／魏／吳／群／萌 五個陣營的武將圖**（每個武將附名稱和技能名，資料讀 `data/heroes.js`＋`data/extra-heroes.js`，新增武將或改技能名後重跑就會更新；張數＝7＋有武將的陣營數）。**版面留了 TikTok 的安全區**（上 130、下 300、右 110px 不放重點，標題文字和愛心按鈕會蓋住）。可用 `--attack 玫瑰 --aoe 煙火 --skill 皇冠 --heal 愛心` 填上主播指定的禮物名（沒給就寫「主播公布」）；數字（60 秒復活、99 級、BOSS 鑽石數）寫在腳本裡，改了 `js/config.js` 要回頭改 |
+| `roster/` | 武將名冊圖片：全武將總覽圖一張（橫式）＋魏蜀吳群萌各一張。武將資料或圖有變就重跑 `node tools/make_roster.js`（全武將名冊是**一張橫式總覽圖**，一個陣營一排，不是長圖，2026-11-16 咖哩要求）；另有 `玩法說明_1～13.jpg`（`node tools/make_howto.js`） |
+| `tools/make_howto.js` | 產生「玩法說明」圖片（TikTok 圖文貼文用）：`roster/玩法說明_1.jpg`～`_13.jpg`，每張 1080x1920（9:16），照順序上傳當輪播圖：**1 封面、2～4 玩法、5 陣營模式、6 賽跑模式（附 10 種賽道小圖，形狀與顏色直接讀 `js/race-tracks.js`）、7 障礙賽（5 道關卡與過關率直接讀 `config.race.hurdle`）、8 障礙賽 10 種專屬賽道小圖（讀 `config.race.hurdleTracks`）、9～13 蜀／魏／吳／群／萌 五個陣營的武將圖**（每個武將附名稱和技能名，資料讀 `data/heroes.js`＋`data/extra-heroes.js`，新增武將或改技能名後重跑就會更新；張數＝8＋有武將的陣營數）。**版面留了 TikTok 的安全區**（上 130、下 300、右 110px 不放重點，標題文字和愛心按鈕會蓋住）。可用 `--attack 玫瑰 --aoe 煙火 --skill 皇冠 --heal 愛心` 填上主播指定的禮物名（沒給就寫「主播公布」）；數字（60 秒復活、99 級、BOSS 鑽石數）寫在腳本裡，改了 `js/config.js` 要回頭改 |
 | `tools/sync_from_curry_games.py` | 從 Curry_Games 同步資料與全身圖 |
 
 ## 工作方式
