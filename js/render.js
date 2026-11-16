@@ -460,7 +460,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       // 單挑賽：兩位選手在中間面對面（大），其他人在四周圍觀（小）：上排、下排，人多再排左右兩側
       const D = game.getDuel(), specs = list.filter(p => p.id !== D.a.id && p.id !== D.b.id), ns = specs.length;
       const ss = ns ? clamp(Math.min(arena.h * 0.2, arena.w * 0.055), 28, 64) : 0;
-      const topEdge = arena.y + 96, botEdge = arena.y + arena.h - 6;
+      const topEdge = arena.y + 134 * duelZoom(), botEdge = arena.y + arena.h - 6;
       const rowTop = topEdge + ss * 0.8 + 22, rowBot = botEdge - ss * 0.5 - 34;
       const midY = ns ? (rowTop + rowBot) / 2 : (topEdge + botEdge) / 2;
       const sd = clamp(Math.min((botEdge - topEdge) * (ns ? 0.46 : 0.62), arena.w * 0.21), 50, 210);
@@ -686,13 +686,15 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
 
 
   // ---------- 單挑賽：上方大血條、怒氣條、倒數、結果；申請階段的中間彈窗 ----------
+  // 畫面被等比例縮小（直播橫幅）時，單挑的上方資訊要放大補回來，不然字太小
+  const duelZoom = () => clamp(0.6 / viewK, 1, 1.5);
   function drawDuelHud(arena) {
     const D = game.getDuel();
     if (!D) return;
-    const cx = arena.x + arena.w / 2, x0 = arena.x + 8, x1 = arena.x + arena.w - 8, y0 = arena.y;
-    const half = Math.max(80, (x1 - x0) / 2 - 62), mmss = n => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
+    const z = duelZoom(), cx = arena.x + arena.w / 2, x0 = arena.x + 8, x1 = arena.x + arena.w - 8, y0 = arena.y;
+    const half = Math.max(80, (x1 - x0) / 2 - 76 * z), mmss = n => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
     const side = (S, left) => {
-      const bx = left ? x0 : x1 - half, by = y0 + 30, bh = 22, ratio = clamp(S.hp / S.maxHp, 0, 1);
+      const bx = left ? x0 : x1 - half, by = y0 + 38 * z, bh = 30 * z, ratio = clamp(S.hp / S.maxHp, 0, 1);
       ctx.save();
       ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(bx - 3, by - 3, half + 6, bh + 6, 12); ctx.fill();
       ctx.beginPath(); ctx.roundRect(bx, by, half, bh, 9); ctx.clip();
@@ -701,23 +703,23 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       ctx.fillStyle = ratio > 0.5 ? '#6fdc8c' : ratio > 0.25 ? '#ffd24d' : '#ff6b81'; ctx.fillRect(fx0, by, fw, bh);
       ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(fx0, by + 2, fw, 5);
       ctx.restore();
-      text(`${Math.ceil(S.hp)}`, bx + half / 2, by + bh / 2 + 1, 15, '#fff');
+      text(`${Math.ceil(S.hp)}`, bx + half / 2, by + bh / 2 + 1, 22 * z, '#fff');
       // 怒氣條（細一條，滿了閃「技能！」）
-      const ry = by + bh + 8, rr = clamp(S.rage / S.rageMax, 0, 1), full = rr >= 0.999;
-      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.beginPath(); ctx.roundRect(bx, ry, half, 9, 5); ctx.fill();
-      ctx.beginPath(); ctx.roundRect(bx, ry, half, 9, 5); ctx.clip();
-      ctx.fillStyle = full && Math.sin(time * 14) > 0 ? '#fff3c0' : '#ff9a3c'; ctx.fillRect(left ? bx : bx + half - half * rr, ry, half * rr, 9);
+      const ry = by + bh + 8, rh = 16 * z, rr = clamp(S.rage / S.rageMax, 0, 1), full = rr >= 0.999;
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.beginPath(); ctx.roundRect(bx, ry, half, rh, 8); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(bx, ry, half, rh, 8); ctx.clip();
+      ctx.fillStyle = full && Math.sin(time * 14) > 0 ? '#fff3c0' : '#ff9a3c'; ctx.fillRect(left ? bx : bx + half - half * rr, ry, half * rr, rh);
       ctx.restore();
-      text(full ? '怒氣滿！技能發動' : '怒氣', left ? bx + 4 : bx + half - 4, ry + 4.5, 11, full ? '#ffe27a' : '#ffd9a8', left ? 'left' : 'right');
+      text(full ? '怒氣滿！技能發動' : '怒氣', left ? bx + 8 : bx + half - 8, ry + rh / 2 + 1, 14 * z, full ? '#ffe27a' : '#ffd9a8', left ? 'left' : 'right');
       // 名字、等級、連勝
       const nm = `${short(S.name, 8)}`, streak = S.streak >= 2 ? `  🔥${S.streak}連勝` : '';
-      text(`Lv.${S.level} ${nm}${streak}`, left ? bx : bx + half, y0 + 14, 17, '#fff', left ? 'left' : 'right');
+      text(`Lv.${S.level} ${nm}${streak}`, left ? bx : bx + half, y0 + 17 * z, 26 * z, '#fff', left ? 'left' : 'right');
     };
     side(D.a, true); side(D.b, false);
     ctx.font = `bold 26px ${FONT}`;
-    text('VS', cx, y0 + 22, 24, '#ffd35c');
-    if (D.phase === 'fight') text(mmss(D.timeLeft), cx, y0 + 50, 20, '#fff');
-    if (D.phase !== 'result') text(`圍觀的人：留言「@${short(D.a.name, 6)}」或「@${short(D.b.name, 6)}」，再送禮幫他助攻`, cx, y0 + 80, 14, '#e8dcc0', 'center', false);
+    text('VS', cx, y0 + 30 * z, 36 * z, '#ffd35c');
+    if (D.phase === 'fight') text(mmss(D.timeLeft), cx, y0 + 68 * z, 30 * z, '#fff');
+    if (D.phase !== 'result') text(`圍觀的人：留言「@${short(D.a.name, 6)}」或「@${short(D.b.name, 6)}」，再送禮幫他助攻`, cx, y0 + 112 * z, 20 * z, '#fff3d0');
     const mid = arena.y + arena.h * 0.5;
     if (D.phase === 'countdown') {
       ctx.save(); ctx.globalAlpha = 0.9; text(String(Math.ceil(D.cd)), cx, mid, 130 - (D.cd % 1) * 30, '#ffd35c'); ctx.restore();
