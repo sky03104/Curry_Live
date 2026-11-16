@@ -151,7 +151,7 @@ ML.createHeroSprite = function (heroes, config, basePath) {
       // 以下以「腳底中央」為原點往上畫
       if (anim) {
         // 動畫圖的像素比例跟單張圖（312x396）一樣，所以用同一個縮放；腳底那一列對在原點
-        const k = h / 396, m = anim.m;
+        const m = anim.m, k = h / 396 * (m.res || 1);   // res：連續圖是用幾分之一的大小畫的（3D 拍的圖用 res:2，檔案比較小）
         ctx.drawImage(anim.sh, anim.frame * m.cw, 0, m.cw, m.ch, -m.cw * k / 2, -m.ground * k, m.cw * k, m.ch * k);
       } else if (img) {
         ctx.drawImage(img, -w / 2, -h, w, h);
