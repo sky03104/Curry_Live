@@ -382,6 +382,12 @@ window.GAME_CONFIG = {
   //   eat：回血時播一次　idle：每次走到定點停下來時播一次（還沒有圖就先不寫）；有 idle2、idle3… 就每次停下來隨機挑一組播
   //   frames 幾格／cw ch 每格寬高（像素）／ground 腳底在第幾列／fps 每秒播幾格／repeat 連續播幾輪（預設 1）
   heroAnims: {
+    guanyu: {   // 3D 拍的連續圖（tools/render_hero_sprites.py），res:2＝圖是一半大小
+      idle: { src: 'guanyu_idle.png', frames: 8, cw: 230, ch: 209, ground: 205, fps: 3, repeat: 2, res: 2 },
+      walk: { src: 'guanyu_walk.png', frames: 8, cw: 190, ch: 202, ground: 186, fps: 8, res: 2 },
+      attack: { src: 'guanyu_attack.png', frames: 8, cw: 184, ch: 226, ground: 218, fps: 12, hitFrame: 4, res: 2 },
+      skill: { src: 'guanyu_skill.png', frames: 8, cw: 216, ch: 258, ground: 243, fps: 9, hitFrame: 5, res: 2 },
+    },
     michelin: {
       walk: { src: 'michelin_walk.png', frames: 8, cw: 512, ch: 397, ground: 394, fps: 9 },   // 走路循環（鬥牛犬搖擺步，8 格）
       eat: { src: 'michelin_eat.png', frames: 8, cw: 461, ch: 390, ground: 346, fps: 3 },
