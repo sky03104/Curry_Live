@@ -13,6 +13,28 @@
 // ============================================================
 window.ML = window.ML || {};
 
+// 匯入「整份禮物清單」：貼上橋接工具（bridge/gifts.js）存的 gifts.json 內容。
+// 回傳 null＝這不是 JSON（照一行一個名稱的舊方式處理）；{ error } ＝看起來是 JSON 但讀不了；{ list:[{ name, diamonds, icon }] } ＝成功。
+// 圖片網址只收 https:// 開頭的（避免貼進奇怪的東西），名稱最長 60 字，最多 1000 筆。
+ML.parseGiftCatalog = function (text) {
+  const s = String(text || '').trim();
+  if (!/^[\[{]/.test(s)) return null;
+  let data; try { data = JSON.parse(s); } catch (e) { return { error: '看起來是 JSON，但格式不對（可能複製不完整）。請把 gifts.json 的內容全選複製再貼一次。' }; }
+  const arr = Array.isArray(data) ? data : (data && Array.isArray(data.gifts) ? data.gifts : null);
+  if (!arr) return { error: '讀不到禮物清單：JSON 裡要有 gifts 這個陣列。' };
+  const seen = new Set(), list = [];
+  for (const g of arr) {
+    if (!g || typeof g !== 'object') continue;
+    const name = String(g.name || '').trim();
+    if (!name || name.length > 60 || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    const d = Number(g.diamonds), icon = typeof g.icon === 'string' && /^https:\/\//.test(g.icon) && g.icon.length <= 600 ? g.icon : '';
+    list.push({ name, diamonds: Number.isFinite(d) && d > 0 ? Math.floor(d) : 0, icon });
+    if (list.length >= 1000) break;
+  }
+  return list.length ? { list } : { error: '清單裡沒有任何有效的禮物名稱。' };
+};
+
 ML.createGiftSettings = function (config, params) {
   const KEY = 'curryLive.giftSettings.v1';
   const t = config.tiktok;
