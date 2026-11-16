@@ -1,6 +1,6 @@
 """把「綠底、多格排在一張圖上」的連續動作圖，轉成遊戲用的逐格動畫條（透明背景、一排橫放）。
 
-用法：python3 tools/make_anim_sheet.py <原圖> <輸出檔名> [--grid 4x2] [--faces right|left] [--match-height 328] [--equalize area] [--erase-grid 6] [--row-counts 3,3,4] [--flip 3,4,5] [--pick 1,2,3,4,6,8,9] [--cut 768:512-1024 或 h298:0-1200] [--cx x1,x2,.. --feet y1,y2,.. --lift l1,l2,.. --scale 0.885]
+用法：python3 tools/make_anim_sheet.py <原圖> <輸出檔名> [--grid 4x2] [--faces right|left] [--match-height 328] [--equalize area] [--erase-grid 6] [--row-counts 3,3,4] [--flip 3,4,5] [--drop-thin 6] [--pick 1,2,3,4,6,8,9] [--cut 768:512-1024 或 h298:0-1200] [--cx x1,x2,.. --feet y1,y2,.. --lift l1,l2,.. --scale 0.885]
 範例：python3 tools/make_anim_sheet.py 米其林吃骨頭.jpg assets/heroes/michelin_eat.png --grid 4x2 --faces right
 
 做的事：
@@ -21,7 +21,7 @@ from PIL import Image
 def parse():
     a = sys.argv[1:]
     if len(a) < 2: print(__doc__); sys.exit(1)
-    opt = {'grid': '4x2', 'faces': 'right', 'match-height': '328', 'equalize': '', 'erase-grid': '0', 'row-counts': '', 'cx': '', 'feet': '', 'lift': '', 'scale': '', 'cut': '', 'flip': '', 'pick': ''}
+    opt = {'grid': '4x2', 'faces': 'right', 'match-height': '328', 'equalize': '', 'erase-grid': '0', 'row-counts': '', 'cx': '', 'feet': '', 'lift': '', 'scale': '', 'cut': '', 'flip': '', 'drop-thin': '0', 'pick': ''}
     pos = []
     i = 0
     while i < len(a):
@@ -94,6 +94,8 @@ def main():
             if opt['pick'] and (k + 1) not in [int(x) for x in opt['pick'].split(',')]: parts.append(None); continue
             sys.exit(f'第 {k + 1} 格找不到角色')
         dog = max(cs, key=lambda c: c['size'])
+        dt = int(opt['drop-thin'])   # --drop-thin N：把「又扁又細」（高或寬 ≤ N 像素）的小碎片丟掉（原圖格線沒擦乾淨留下的細線）；主體不會被丟
+        if dt > 0: cs = [c for c in cs if c is dog or (min(c['y1'] - c['y0'], c['x1'] - c['x0']) + 1 > dt)]
         x0 = min(c['x0'] for c in cs); x1 = max(c['x1'] for c in cs); y0 = min(c['y0'] for c in cs); y1 = max(c['y1'] for c in cs)
         keep = np.isin(lab[y0:y1 + 1, x0:x1 + 1], [c['id'] for c in cs])
         crop = rgba[y0:y1 + 1, x0:x1 + 1].copy(); crop[..., 3] = np.where(keep, crop[..., 3], 0)

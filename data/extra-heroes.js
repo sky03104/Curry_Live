@@ -23,4 +23,6 @@ window.HEROES_DATA = window.HEROES_DATA.concat([
   { heroId: 'xiaoni', displayName: '小妮', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '百噸重錘', extra: true },
   // 九億（原名 Joy，2026-11-15 咖哩改名；heroId 仍是 joy）：萌國的約克夏小狗遊俠（紅纓頭盔、金紅鎧甲、背著劍鞘）。能力值取遊俠平均（同大寶），技能「紅纓突襲」。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
   { heroId: 'joy', displayName: '九億', faction: 'Meng', troop: 'Ranger', baseHp: 540, baseAtk: 72, baseArmor: 25, skillName: '紅纓突襲', extra: true },
+  // 那隻喵（2026-11-16 咖哩第九隻）：萌國的布偶貓謀士（藍紫金披風、肉球徽章、小金冠；設定稿標「貓將・智謀・輔佐・謀略」）。能力值取謀士水準（同西當普利鼠：血少、攻中、防低），技能「雲爪妙計」，演出＝法陣落雷。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
+  { heroId: 'nekomeow', displayName: '那隻喵', faction: 'Meng', troop: 'Strategist', baseHp: 600, baseAtk: 68, baseArmor: 28, skillName: '雲爪妙計', extra: true },
 ]);
