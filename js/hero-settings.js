@@ -17,17 +17,22 @@ ML.createHeroSettings = function (heroes, params) {
   const FALLBACK_DEF = all[0] || '';
   let def = FALLBACK_DEF;
 
+  // 新增的角色要自動開放：設定裡記下「存的當時有哪些武將」(known)，之後多出來的武將預設開放。
+  // 舊的設定沒有 known（那隻喵、學姊加進來之前存的），就當成不認識這兩隻，讓他們自動開放。
+  const LEGACY_NEW = ['nekomeow', 'xuejie'];
+  const legacyKnown = () => all.filter(id => !LEGACY_NEW.includes(id));
+  const withNew = (set, known) => { const k = new Set(known); all.forEach(id => { if (!k.has(id)) set.add(id); }); return set; };
   const clean = list => (list || []).map(s => s.trim()).filter(id => valid.has(id));
   function fromUrl() {
     if (params.has('def')) { const v = params.get('def'); def = valid.has(v) ? v : ''; }
-    if (params.has('heroes')) { enabled = new Set(clean(params.get('heroes').split(','))); return true; }
+    if (params.has('heroes')) { enabled = withNew(new Set(clean(params.get('heroes').split(','))), legacyKnown()); return true; }
     if (params.has('skip')) { const s = new Set(clean(params.get('skip').split(','))); enabled = new Set(all.filter(id => !s.has(id))); return true; }
     return params.has('def');
   }
   function fromStorage() {
     try {
       const saved = JSON.parse(localStorage.getItem(KEY));
-      if (saved && Array.isArray(saved.enabled)) enabled = new Set(clean(saved.enabled));
+      if (saved && Array.isArray(saved.enabled)) enabled = withNew(new Set(clean(saved.enabled)), Array.isArray(saved.known) ? saved.known : legacyKnown());
       if (saved && typeof saved.def === 'string') def = valid.has(saved.def) ? saved.def : '';
     } catch (e) { /* 讀不到就全開 */ }
   }
@@ -35,7 +40,7 @@ ML.createHeroSettings = function (heroes, params) {
   if (!enabled.size) enabled = new Set(all);   // 一隻都沒開的設定視為無效，退回全開
 
   let appliedAt = 0;
-  function persist() { try { localStorage.setItem(KEY, JSON.stringify({ enabled: [...enabled], def })); } catch (e) { /* 存不了不影響這次使用 */ } }
+  function persist() { try { localStorage.setItem(KEY, JSON.stringify({ enabled: [...enabled], known: all, def })); } catch (e) { /* 存不了不影響這次使用 */ } }
   return {
     all,
     get enabled() { return [...enabled]; },
@@ -55,11 +60,11 @@ ML.createHeroSettings = function (heroes, params) {
     },
     setMany(ids) { const s = new Set(clean(ids)); if (!s.size) return false; if (def) s.add(def); enabled = s; persist(); return true; },   // 預設武將一定留著
     // 雲端同步：面板改了會存到雲端，直播畫面定時讀回來套用（不用重貼網址）
-    exportRemote() { return { enabled: [...enabled], def: this.defaultId, at: Date.now() }; },
+    exportRemote() { return { enabled: [...enabled], known: all, def: this.defaultId, at: Date.now() }; },
     applyRemote(h) {
       if (!h || typeof h !== 'object' || !(Number(h.at) > appliedAt) || !Array.isArray(h.enabled)) return false;
       appliedAt = Number(h.at);
-      const s = new Set(clean(h.enabled)); if (!s.size) return false;
+      const s = withNew(new Set(clean(h.enabled)), Array.isArray(h.known) ? h.known : legacyKnown()); if (!s.size) return false;
       def = typeof h.def === 'string' && valid.has(h.def) ? h.def : '';
       if (def) s.add(def);
       enabled = s; persist(); return true;
@@ -69,7 +74,7 @@ ML.createHeroSettings = function (heroes, params) {
       const out = {};
       if (enabled.size !== all.length) {
         const off = all.filter(id => !enabled.has(id));
-        if (off.length < enabled.size) out.skip = off.join(','); else out.heroes = [...enabled].join(',');
+        out.skip = off.join(",");   // 一律用排除寫法，之後新增的武將才會自動開放
       }
       const d = this.defaultId;
       if (d !== FALLBACK_DEF) out.def = d || 'none';   // 跟預設值一樣就不寫進網址
