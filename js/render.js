@@ -106,7 +106,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     }
     if (e.type === 'wheelResult') {   // 轉出結果：轉輪中央噴金光、轉的人跳起來
       const g = wheelGeo, sv = views.get(e.id);
-      if (g) { effects.sparks(g.cx, g.cy, '#ffd35c', 60, 640, 7, 1); effects.pillar(g.cx, g.cy + g.R * 0.9, g.R * 0.7, g.R * 2.2, '#ffd35c'); }
+      if (g) { effects.sprite('ui_level-up', g.cx, g.cy + g.R * 0.9, { scale: Math.max(2, g.R * 2.4 / 96), life: 1.4 }); effects.sparks(g.cx, g.cy, '#ffd35c', 60, 640, 7, 1); effects.pillar(g.cx, g.cy + g.R * 0.9, g.R * 0.7, g.R * 2.2, '#ffd35c'); }
       if (sv) { sv.hop = 1; sv.hopH = 1.4; sv.flash = 0.6; }
       quake = Math.max(quake, 0.6);
       return;
@@ -129,6 +129,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       v.shake = 1.2; quake = 1.4;
       effects.sparks(v.x, v.y, '#ffb347', 50, 640, 7, 1);
       effects.crack(v.x, feet(v), v.size * 1.6, '#ffb347');
+      effects.explode(v.x, feet(v), v.size * 1.6);   // 圖片特效：大爆炸
       rings.push({ v, age: 0, life: 0.8, color: '#ffb347', max: 2.4, width: 10 });
       floats.push({ v, text: '摧毀！', color: '#ffb347', scale: 1.5, age: 0, life: 2 });
       return;
@@ -170,6 +171,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     if (e.type === 'bossDefeated') {      // 打倒 BOSS：大爆發、金色字樣
       v.shake = 1; quake = 1.8;
       effects.sparks(v.x, v.y, '#ffd35c', 70, 700, 7, 1.1);
+      effects.explode(v.x, feet(v), v.size * 1.8);
       effects.pillar(v.x, feet(v), v.size * 1.2, v.size * 3, '#ffd35c');
       rings.push({ v, age: 0, life: 1, color: '#ffd35c', max: 3, width: 12 });
       floats.push({ v, text: 'BOSS 被打倒！', color: '#ffd35c', scale: 1.6, age: 0, life: 2.6 });
@@ -188,7 +190,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       const p = game.getPlayer(e.id);
       v.hop = 1; v.hopH = 0.9;
       if (v.pending === 0) { v.hp = p.hp; v.shownHp = p.hp; }
-      effects.pillar(v.x, feet(v), v.size * 0.9, v.size * 2.2, '#ffd35c');
+      effects.sprite('ui_level-up', v.x, feet(v), { scale: Math.max(1.5, v.size * 2.2 / 96), life: 1.4 });   // 圖片特效：升級光環
       effects.rise(v.x, v.y, '#ffd35c', 26, v.size * 0.45);
       floats.push({ v, text: `升級！Lv.${e.level}`, color: '#ffd35c', scale: 1.2, age: 0, life: 1.6 });
     } else if (e.type === 'switch') {            // 換武將：一陣光點、跳一下，血條直接對到新數值
@@ -201,7 +203,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       v.hop = 1; v.hopH = 0.6;
     } else if (e.type === 'revive') {
       v.hop = 1; v.hopH = 1.4; v.flash = 1;
-      effects.pillar(v.x, feet(v), v.size * 0.9, v.size * 2.2, '#ffe27a');
+      effects.sprite('holy_resurrect', v.x, feet(v), { scale: Math.max(1.5, v.size * 2.2 / 80), life: 1.4 });   // 圖片特效：復活光柱
       effects.rise(v.x, v.y, '#ffe27a', 22, v.size * 0.4);
       floats.push({ v, text: '復活！', color: '#ffe27a', scale: 1.3, age: 0 });
     } else if (e.type === 'buffGain') {      // 獲得 BUFF：藍／紅色光柱＋字樣
@@ -254,6 +256,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         after(land, () => {
           rings.push({ v, age: 0, life: 0.9, color: '#ffd35c', max: 0, width: 18 });
           effects.crack(v.x, feet(v), v.size * 1.4, '#ffd35c');
+          effects.explode(v.x, feet(v), v.size * 1.0);   // 圖片特效：落地大爆炸
           effects.sparks(v.x, feet(v), '#ffd35c', 40, 560, 6, 0.8);
           quake = 1.2;
         });
@@ -263,6 +266,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
         onHit = tv => {
           effects.pillar(tv.x, feet(tv), tv.size * 0.9, tv.size * 2.2, '#ffd35c');
           effects.crack(tv.x, feet(tv), tv.size * 0.7, '#ffd35c');
+          effects.hit(tv.x, tv.y, tv.size);
           effects.sparks(tv.x, tv.y, '#ffd35c', 22, 460, 5, 0.7);
           rings.push({ v: tv, age: 0, life: 0.45, color: '#ff6b5c', max: 1.5 });
         };

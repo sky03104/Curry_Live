@@ -70,6 +70,7 @@ window.ML = window.ML || {};
     shockSmash: {
       onHit(tv, h, p) {
         const c = pick(p, 'color', '#ffd35c');
+        h.fx.sprite('melee_hammer-smash', tv.x, tv.y + tv.size * 0.5, { w: tv.size * 3, life: 0.9 });   // 圖片特效：錘擊震地
         h.fx.shock(tv.x, tv.y + tv.size * 0.5, tv.size * 1.6, c, 0.6);
         h.fx.crack(tv.x, tv.y + tv.size * 0.5, tv.size * 1.1, c);
         h.fx.sparks(tv.x, tv.y, c, 24, 500, 6, 0.7);
@@ -106,7 +107,7 @@ window.ML = window.ML || {};
         const c = pick(p, 'color', '#8fffd0');
         for (let i = 0; i < 6; i++) h.after(0.05 + i * 0.07, () => {
           const a = i * Math.PI / 3 + rnd(-0.3, 0.3);
-          h.fx.slash(tv.x, tv.y, a, tv.size * rnd(0.8, 1.2), c);
+          h.fx.sprite('wind_wind-blade', tv.x - Math.cos(a) * tv.size * 0.6, tv.y - Math.sin(a) * tv.size * 0.6, { w: tv.size * 2.4, rot: a, life: 0.6 });   // 圖片特效：風刃
           h.fx.emoji(tv.x + Math.cos(a) * tv.size, tv.y + Math.sin(a) * tv.size, pick(p, 'emoji', '🍃'), tv.size * 0.3, -Math.cos(a) * 260, -Math.sin(a) * 260, 0, 0.5, 10);
         });
       },
