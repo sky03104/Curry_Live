@@ -10,6 +10,30 @@ ML.createEffects = function () {
   const rnd = (a, b) => a + Math.random() * (b - a);
   const add = (o) => { o.age = 0; items.push(o); return o; };
 
+  // ---------- 圖片特效（assets/fx，資料在 js/fx-sprites.js）----------
+  // 第一次用到才下載那張圖；還沒載好的時候就略過那一次（下次就有了）。圖片特效不夠時，原本程式畫的特效仍保留。
+  const SPR = ML.FX_SPRITES || {};
+  const sprImgs = {};
+  function sprImg(name) {
+    const d = SPR[name]; if (!d) return null;
+    let e = sprImgs[name];
+    if (!e) {
+      e = sprImgs[name] = { img: new Image(), ok: false };
+      e.img.onload = () => { e.ok = true; };
+      e.img.src = 'assets/fx/' + d.src + (window.APP_VERSION ? '?v=' + window.APP_VERSION : '');
+    }
+    return e.ok ? e.img : null;
+  }
+  // 目前時間對應第幾格（每格有自己的時間，整段拉長／縮短成 life 秒）
+  function sprFrame(d, k, loop) {
+    const fr = d.frames, a = loop ? loop[0] : 0, b = loop ? loop[1] : fr.length - 1;
+    if (loop) { const n = b - a + 1; return a + Math.floor(k * n * (loop[2] || 1)) % n; }
+    let tot = 0; for (let i = a; i <= b; i++) tot += fr[i][6];
+    let t = Math.min(0.9999, k) * tot;
+    for (let i = a; i <= b; i++) { if (t < fr[i][6]) return i; t -= fr[i][6]; }
+    return b;
+  }
+
   // 一條有粗細變化的折線（落雷、地裂共用）
   function jagged(x0, y0, x1, y1, parts, wobble) {
     const pts = [[x0, y0]];
@@ -27,6 +51,19 @@ ML.createEffects = function () {
   }
 
   const draw = {
+    // 圖片特效：i.scale＝原圖一個像素放大成幾個畫面像素；i.rot 旋轉；i.flip 左右翻；i.cx 水平置中；i.loop 只循環某幾格
+    sprite(ctx, i, k) {
+      const d = SPR[i.name], img = sprImg(i.name); if (!d || !img) return;
+      const f = d.frames[sprFrame(d, k, i.loop)];
+      const px = i.cx ? d.w / 2 : d.pivot[0], py = d.pivot[1];
+      const s = i.scale;
+      ctx.imageSmoothingEnabled = !d.pixel;
+      ctx.translate(i.x, i.y); if (i.rot) ctx.rotate(i.rot); if (i.flip) ctx.scale(-1, 1);
+      if (i.alpha !== undefined) ctx.globalAlpha = i.alpha;
+      // f = [圖上 x, y, 寬, 高, 去掉透明邊後的基準點 x, y, 毫秒]；基準點在原圖裡的位置 px,py 要換算成去邊後的位置
+      const ox = f[4] - (d.pivot[0] - px), oy = f[5];
+      ctx.drawImage(img, f[0], f[1], f[2], f[3], -ox * s, -oy * s, f[2] * s, f[3] * s);
+    },
     // 火花／光點：帶一小段尾巴，看起來像在飛
     p(ctx, i, k) {
       ctx.globalAlpha = 1 - k;
@@ -203,6 +240,9 @@ ML.createEffects = function () {
         } else if (i.type === 'p') {
           i.x += i.vx * dt; i.y += i.vy * dt; i.vy += i.g * dt;
           i.vx *= 1 - Math.min(1, dt * i.drag); i.vy *= 1 - Math.min(1, dt * i.drag);
+        } else if (i.type === 'sprite' && i.vx !== undefined) {   // 會飛的圖片特效
+          const kk = Math.min(1, i.age / i.life);
+          i.x = i.x0 + (i.x1 - i.x0) * kk; i.y = i.y0 + (i.y1 - i.y0) * kk;
         } else if (i.type === 'orb') {
           const k = Math.min(1, i.age / i.life);
           i.x = i.x0 + (i.x1 - i.x0) * k; i.y = i.y0 + (i.y1 - i.y0) * k - Math.sin(Math.PI * k) * i.arc;
@@ -217,7 +257,7 @@ ML.createEffects = function () {
       for (const i of items) {
         if (!!i.ground !== ground) continue;
         ctx.save();
-        if (!i.ground || i.type === 'circle') ctx.globalCompositeOperation = 'lighter';   // 發光感：顏色疊加變亮
+        if (i.type !== 'sprite' && (!i.ground || i.type === 'circle')) ctx.globalCompositeOperation = 'lighter';   // 發光感：顏色疊加變亮
         draw[i.type](ctx, i, i.age / i.life);
         ctx.restore();
       }
@@ -232,6 +272,7 @@ ML.createEffects = function () {
     },
     // 集氣：一圈光點往身上收
     converge(x, y, color, radius, life) {
+      if (SPR['status_power-up-aura']) fx.sprite('status_power-up-aura', x, y + radius * 0.55, { w: radius * 1.9, life: Math.max(0.5, life) });
       for (let c = 0; c < 26; c++) {
         const a = rnd(0, Math.PI * 2), d = rnd(0.7, 1.2) * radius, t = rnd(0.6, 1) * life;
         add({ type: 'p', x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, vx: -Math.cos(a) * d / t, vy: -Math.sin(a) * d / t,
@@ -241,20 +282,44 @@ ML.createEffects = function () {
     },
     // 往上飄的光點（回血、復活）
     rise(x, y, color, n, spread) {
+      if (SPR['holy_holy-heal']) fx.sprite('holy_holy-heal', x, y + spread * 1.2, { w: spread * 5, life: 1.2 });
       for (let c = 0; c < n; c++) {
         add({ type: 'p', x: x + rnd(-spread, spread), y: y + rnd(-spread, spread) * 0.6, vx: rnd(-15, 15), vy: rnd(-160, -70),
           g: 0, drag: 0.5, size: rnd(3, 6), color: Math.random() < 0.3 ? '#fff' : color, life: rnd(0.5, 0.9) });
       }
     },
-    slash(x, y, angle, r, color) { add({ type: 'slash', x, y, angle, r, color, life: 0.45 }); },
-    circle(x, y, r, color, life) { add({ type: 'circle', ground: true, x, y, r, color, life }); },
+    // 通用：放一個圖片特效。opts：w 畫面上要多寬（像素）或 scale；rot；flip；ground（貼地、被武將蓋住）；life（秒）；cx；loop
+    sprite(name, x, y, o) {
+      o = o || {}; const d = SPR[name]; if (!d) return null;
+      const scale = o.scale || (o.w ? o.w / d.w : 3);
+      const total = d.frames.reduce((a, f) => a + f[6], 0) / 1000;
+      return add({ type: 'sprite', name, x, y, scale, rot: o.rot || 0, flip: !!o.flip, cx: !!o.cx, loop: o.loop, alpha: o.alpha,
+        ground: !!o.ground, life: o.life || total });
+    },
+    // 命中火花（打中的瞬間）
+    hit(x, y, size) { return fx.sprite('hit_spark', x, y, { w: size * 1.6, life: 0.5 }); },
+    // 大爆炸（全場攻擊、塔堡被打爆）
+    explode(x, y, size, ground) { return fx.sprite('explosions_big-explosion', x, y, { w: size * 2.4, life: 1.0 }); },
+    slash(x, y, angle, r, color) {
+      if (SPR['melee_axe-smear']) { fx.sprite('melee_axe-smear', x, y, { w: r * 2.6, rot: angle, life: 0.5 }); fx.hit(x, y, r * 0.8); return; }
+      add({ type: 'slash', x, y, angle, r, color, life: 0.45 });
+    },
+    circle(x, y, r, color, life) {
+      if (SPR['arcane_magic-circle']) { fx.sprite('arcane_magic-circle', x, y, { w: r * 2.6, ground: true, life: life || 1.4 }); return; }
+      add({ type: 'circle', ground: true, x, y, r, color, life });
+    },
     bolt(x, y, h, color, w) {
+      if (SPR['lightning_lightning-strike']) { fx.sprite('lightning_lightning-strike', x, y, { scale: Math.max(1.5, h / 110), life: 0.6 }); return; }
       const pts = jagged(x + rnd(-h * 0.15, h * 0.15), y - h, x, y, 9, h * 0.06);
       const mid = pts[5];
       add({ type: 'bolt', pts, branch: jagged(mid[0], mid[1], mid[0] + rnd(-1, 1) * h * 0.25, mid[1] + h * 0.25, 4, h * 0.04), color, w, life: 0.5 });
     },
-    pillar(x, y, w, h, color) { add({ type: 'pillar', x, y, w, h, color, life: 0.7 }); },
+    pillar(x, y, w, h, color) {
+      if (SPR['holy_divine-beam']) { fx.sprite('holy_divine-beam', x, y, { scale: Math.max(1.5, h / 90), life: 0.9 }); return; }
+      add({ type: 'pillar', x, y, w, h, color, life: 0.7 });
+    },
     crack(x, y, r, color) {
+      if (SPR['nature_fissure']) { fx.sprite('nature_fissure', x, y, { w: r * 2.4, cx: true, ground: true, life: 1.0 }); return; }
       const lines = [];
       for (let c = 0; c < 7; c++) { const a = c / 7 * Math.PI * 2 + rnd(-0.3, 0.3), d = rnd(0.6, 1) * r; lines.push(jagged(0, 0, Math.cos(a) * d, Math.sin(a) * d, 4, r * 0.1)); }
       add({ type: 'crack', ground: true, x, y, lines, color, life: 0.9 });
@@ -270,11 +335,28 @@ ML.createEffects = function () {
           light: shade(color, 0.45), mid: shade(color, 0), dark: shade(color, -0.45), life: rnd(0.9, 1.3) });
       }
     },
-    claw(x, y, angle, r, color) { add({ type: 'claw', x, y, angle, r, color, life: 0.5 }); },
-    fang(x, y, r, color) { add({ type: 'fang', x, y, r, color, life: 0.5 }); },
+    claw(x, y, angle, r, color) {
+      if (SPR['melee_shadow-claw']) { fx.sprite('melee_shadow-claw', x, y, { w: r * 2.2, rot: angle + Math.PI * 0.5, life: 0.5 }); fx.hit(x, y, r * 0.7); return; }
+      add({ type: 'claw', x, y, angle, r, color, life: 0.5 });
+    },
+    fang(x, y, r, color) { add({ type: 'fang', x, y, r, color, life: 0.5 }); fx.hit(x, y, r * 0.7); },
     stamp(x, y, text, size, color, life) { add({ type: 'stamp', x, y, text, size, color, life: life || 0.9 }); },
-    shock(x, y, r, color, life) { add({ type: 'shock', ground: true, x, y, r, color, life: life || 0.7 }); },
-    orb(x0, y0, x1, y1, r, color, life) { add({ type: 'orb', x: x0, y: y0, x0, y0, x1, y1, r, color, life, arc: Math.abs(x1 - x0) * 0.12 }); },
+    shock(x, y, r, color, life) {
+      if (SPR['explosions_fire-nova']) {
+        const white = String(color).toLowerCase() === '#ffffff';
+        fx.sprite(white ? 'explosions_arcane-burst' : 'explosions_fire-nova', x, y, { w: r * (white ? 2.2 : 2.6), ground: true, life: Math.max(0.8, (life || 0.7) * 1.4) }); return;
+      }
+      add({ type: 'shock', ground: true, x, y, r, color, life: life || 0.7 });
+    },
+    orb(x0, y0, x1, y1, r, color, life) {
+      if (SPR['arcane_arcane-orb-projectile']) {   // 飛行中循環播前幾格，到了再炸開
+        const ang = Math.atan2(y1 - y0, x1 - x0);
+        const o = fx.sprite('arcane_arcane-orb-projectile', x0, y0, { w: r * 7, rot: ang, loop: [0, 7, 2], life: life });
+        o.vx = 1; o.x0 = x0; o.y0 = y0; o.x1 = x1; o.y1 = y1;
+        setTimeout(() => fx.sprite('explosions_arcane-burst', x1, y1, { w: r * 6, life: 0.7 }), Math.max(0, life * 1000 - 40));
+        return;
+      }
+      add({ type: 'orb', x: x0, y: y0, x0, y0, x1, y1, r, color, life, arc: Math.abs(x1 - x0) * 0.12 }); },
   };
   return fx;
 };
