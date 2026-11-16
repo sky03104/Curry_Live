@@ -162,4 +162,5 @@ for i in range(0, len(queue), 2):
     for h in queue[i:i + 2]:
         lines.append(f"| 第{i // 2 + 1}天 | {h['displayName']} | [{h['heroId']}.md]({h['heroId']}.md) | [ ] |")
 open(os.path.join(OUT, '隊列.md'), 'w', encoding='utf-8').write('\n'.join(lines) + '\n')
+open(os.path.join(OUT, '隊列.txt'), 'w', encoding='utf-8').write('\n'.join(h['heroId'] for h in queue) + '\n')   # 給 Gemini／排程讀的純名單（一行一個 heroId，照順序）
 print('產生', len(order), '份提示詞')
