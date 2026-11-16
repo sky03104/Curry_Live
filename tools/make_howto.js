@@ -21,7 +21,7 @@ const args = {};
 for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, '')] = process.argv[i + 1];
 const gift = k => args[k] || '主播公布';
 const bossGift = (k, def) => args[k] || def;
-const brand = 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/brand/curry_ai_studio.png')).toString('base64');
+const brand = 'data:image/jpeg;base64,' + fs.readFileSync(path.join(root, 'assets/brand/curry_ai_studio_banner.jpg')).toString('base64');
 const img = f => 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'assets/heroes', f)).toString('base64');
 const hero = (f, name, c) => `<div class="h"><img src="${img(f)}"><span style="background:${c}">${name}</span></div>`;
 const TOTAL = 8 + FACTION_ORDER.filter(k => heroData.some(h => h.faction === k)).length;   // 8 張玩法（含陣營模式、賽跑模式、障礙賽、障礙賽賽道）+ 每個陣營一張
@@ -61,7 +61,7 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .boss .b strong { display: block; font-size: 40px; margin-top: 6px; } .boss .b em { font-style: normal; color: #ffd35c; font-size: 40px; font-weight: 900; }
 .buffs { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
 .buff { border-radius: 22px; padding: 22px 30px; font-size: 42px; color: #fff; line-height: 1.45; } .buff b { font-size: 48px; }
-.cover { background: linear-gradient(170deg,#2b3a42,#3E4A46 60%,#2b3a42); color: #fff; padding: 130px 110px 520px 60px; text-align: center; justify-content: center; }
+.cover { background: linear-gradient(170deg,#2b3a42,#3E4A46 60%,#2b3a42); color: #fff; padding: 110px 110px 660px 60px; text-align: center; justify-content: center; }
 .cover h1 { font-size: 100px; font-weight: 900; letter-spacing: 6px; line-height: 1.2; } .cover h1 b { color: #ffd35c; display: block; }
 .cover .sub { font-size: 44px; color: #e8dcc0; margin-top: 18px; }
 .cover .row { display: flex; justify-content: center; margin: 46px 0 30px; } .cover .row img { height: 330px; margin: 0 -26px; filter: drop-shadow(0 8px 10px rgba(0,0,0,.4)); }
@@ -85,7 +85,7 @@ body { background: #888; font-family: "Noto Sans TC","Microsoft JhengHei","PingF
 .tracks10 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 18px; } .tc { background: #fff; border-radius: 16px; padding: 8px 4px 6px; text-align: center; min-width: 0; } .tc svg { width: 100%; height: auto; display: block; } .tc span { display: block; font-size: 23px; font-weight: 700; line-height: 1.2; }
 .gates { display: flex; gap: 10px; margin-top: 18px; } .gt { flex: 1; background: #fff; border-radius: 16px; padding: 10px 4px 8px; text-align: center; min-width: 0; } .gt i { display: block; font-style: normal; font-size: 64px; line-height: 1.1; } .gt b { display: block; font-size: 30px; } .gt span { display: block; font-size: 30px; font-weight: 900; color: #D9563E; }
 .brand { display: flex; align-items: center; justify-content: center; gap: 22px; position: absolute; left: 60px; right: 110px; bottom: 310px; }
-.brand img { width: 190px; height: 190px; border-radius: 50%; border: 5px solid #ffd35c; background: #F7F1E3; }
+.brand img { width: 860px; border-radius: 34px; display: block; }
 .brand span { font-size: 44px; font-weight: 900; color: #fff; letter-spacing: 3px; } .brand small { display: block; font-size: 28px; font-weight: 700; color: #e8dcc0; letter-spacing: 1px; margin-top: 4px; }
 .swipe { margin-top: 30px; font-size: 38px; color: #ffd35c; font-weight: 900; }
 `;
