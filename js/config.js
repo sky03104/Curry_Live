@@ -72,7 +72,7 @@ window.GAME_CONFIG = {
     autoOpen: true,                     // 有人累積滿鑽時自動開轉輪（false＝只有主播手動開才會轉）
     items: ['再來一次', '唱一首歌', '謝謝參與', '加碼獎勵', '大笑三聲', '挑戰一次', '抽一張卡', '猜拳決勝'],   // 轉輪上的結果（面板「轉輪設定」可以改；2～12 項）
     maxItems: 12, itemMaxChars: 10,
-    voiceEnabled: true, voice: 'assets/audio/wheel_voice.mp3', voiceText: '我要轉輪', voiceSeconds: 1.6, voiceVolume: 1,   // 開啟轉輪前先播這段語音（只有「開啟」時播，每次轉不播）；放不出來時照樣開啟
+    voiceEnabled: true, voice: 'assets/audio/wheel_voice.mp3', voiceText: '我要轉輪', voiceSeconds: 1.9, voiceVolume: 1,   // 開啟轉輪前先播這段語音（只有「開啟」時播，每次轉不播）；放不出來時照樣開啟
     openSeconds: 0.8, readySeconds: 2.6, spinSeconds: 6, resultSeconds: 8,   // 轉輪跳出動畫、轉之前待機動畫、旋轉、結果顯示各幾秒
     idleHours: 6, historyMax: 30,
     fakeDiamonds: { attack: 1, aoe: 20, skill: 200, heal: 5 },   // 面板測試用的禮物（沒有鑽石數）怎麼算
