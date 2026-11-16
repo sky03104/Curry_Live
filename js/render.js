@@ -8,6 +8,7 @@ window.ML = window.ML || {};
 ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, arenas) {
   const ctx = canvas.getContext('2d');
   const FONT = '"Noto Sans TC","Microsoft JhengHei","PingFang TC","WenQuanYi Zen Hei",sans-serif';
+  let wheelGeo = null;         // 轉輪：位置與大小（每格排位置時重算）{ cx, cy, R, sd }
   let raceGeo = null;          // 賽跑：橢圓跑道的位置與大小（每格排位置時重算）
   let lastModeName = 'brawl';  // 上一次排位置時的模式（亂鬥／陣營／賽跑），一換就重排所有武將
   let lastTeamMode = false;   // 上一次排位置時是不是陣營模式（模式一換就重排）
@@ -92,6 +93,22 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     }
     if (e.type === 'duelInvite') {   // 單挑申請：兩位的腳下各一圈金光
       for (const id of [e.from, e.to]) { const iv = views.get(id); if (iv) { rings.push({ v: iv, age: 0, life: 0.7, color: '#ffd35c', max: 2, width: 7 }); iv.hop = 1; iv.hopH = 0.7; } }
+      return;
+    }
+    if (e.type === 'wheelReady') {   // 輪到某位轉輪：先播 1～2 次待機動畫（沒有待機動畫的武將就跳兩下），再開始轉
+      const sv = views.get(e.id);
+      if (sv) {
+        const go = () => { if (!views.has(e.id)) return; startAnim(sv, 'idle'); sv.hop = 1; sv.hopH = 0.9; rings.push({ v: sv, age: 0, life: 0.6, color: '#ffd35c', max: 1.8, width: 6 }); effects.sparks(sv.x, sv.y, '#ffd35c', 12, 280, 4, 0.6, 0); };
+        go(); after(1.3, go);
+        floats.push({ v: sv, text: '輪到我轉！', color: '#ffd35c', scale: 1.1, age: 0, life: 2 });
+      }
+      return;
+    }
+    if (e.type === 'wheelResult') {   // 轉出結果：轉輪中央噴金光、轉的人跳起來
+      const g = wheelGeo, sv = views.get(e.id);
+      if (g) { effects.sparks(g.cx, g.cy, '#ffd35c', 60, 640, 7, 1); effects.pillar(g.cx, g.cy + g.R * 0.9, g.R * 0.7, g.R * 2.2, '#ffd35c'); }
+      if (sv) { sv.hop = 1; sv.hopH = 1.4; sv.flash = 0.6; }
+      quake = Math.max(quake, 0.6);
       return;
     }
     if (e.type === 'duelGo') { quake = Math.max(quake, 1.2); return; }
@@ -361,13 +378,15 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
 
   // ---------- 排位置 ----------
   function layout() {
+    const WH = game.getWheel(), wheelOn = !!(WH && WH.phase !== 'voice');   // 轉輪開著（語音階段還不顯示）
+    for (const v of views.values()) if (v.wheelSp) { v.duel = false; v.wheelSp = false; v.tx = undefined; }   // 上一格被固定在轉輪旁的人先放開，下面再重新排
     const list = game.getPlayers().filter(p => !p.isBoss);   // BOSS 不參與一般武將的排位
     list.forEach(makeView);   // 保險：場上有人沒有顯示狀態就補建
     const bp = game.getPlayer('boss'); if (bp && bp.isBoss) makeView(bp);
     const n = list.length;
     const wide = W >= H;
     const lbW = wide ? clamp(W * 0.26, 260, 340) : W - 32;
-    const lbRows = game.getMode() === 'race' ? 5 : game.getMode() === 'duel' ? Math.max(1, (game.getDuelAssists() || []).length) : Math.max(1, game.getLeaderboard().length);   // 賽跑時右上角改顯示前 5 名
+    const lbRows = game.getMode() === 'race' ? 5 : game.getMode() === 'duel' ? Math.max(1, (game.getDuelAssists() || []).length) : wheelOn ? Math.max(1, Math.min(config.wheel.boardRows || 10, game.getWheelHistory().length)) : Math.max(1, game.getLeaderboard().length);   // 賽跑時右上角改顯示前 5 名
     const lbH = 50 + lbRows * 32;
     const lb = { x: W - lbW - 16, y: 16, w: lbW, h: lbH };
     // 對 BOSS 的傷害排行榜：放在傷害排行榜正下方，場上有 BOSS 才出現（2026-11-14 咖哩要求）
@@ -380,9 +399,23 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     // 禮物提示列：告訴觀眾「送哪個禮物會觸發哪個動作」。
     // （2026-11-13 咖哩要求移到畫面右下角；2026-11-14 再要求改成「一排直的」：一個動作一列，從右下角往上疊。
     //   空間不夠（排行榜佔了很多、或畫面很扁）就整排縮小，最小縮到一半。）
+    // 轉輪：在排行榜（轉輪結果榜）的左邊放一個大轉輪，轉的人站在轉輪左邊，其他人在更左邊的空地走動
+    wheelGeo = null;
+    if (wheelOn) {
+      if (wide) {
+        const D = clamp(Math.min(H - 40, W * 0.34), 120, 560), R = D / 2, cx = lb.x - 22 - R, cy = H / 2;
+        const sd = clamp(Math.min(H * 0.36, Math.max(60, cx - R - arena.x) * 0.3), 60, 200);
+        wheelGeo = { cx, cy, R, sd };
+        arena.w = Math.max(160, cx - R - sd * 1.3 - 30 - arena.x);
+      } else {
+        const D = clamp(Math.min(W * 0.7, H * 0.4), 120, 560), R = D / 2, cy = H - 100 - R;
+        wheelGeo = { cx: W / 2 + R * 0.25, cy, R, sd: clamp(R * 0.5, 50, 150) };
+        arena.h = Math.max(100, cy - R - 24 - arena.y);
+      }
+    }
     toastBox = null;
     const arenaFullW = arena.w;   // 還沒被禮物提示列擠窄的場地寬度（武將走動範圍用：提示列上方的空地也可以走）
-    const items = getLegend ? getLegend(game.getMode() === 'race' ? 'race' : game.getMode() === 'duel' ? 'duel' : '') : [];   // 賽跑模式：右下角改顯示助力（玫瑰）、干擾（GG）的禮物指令
+    const items = getLegend ? getLegend(game.getMode() === 'race' ? 'race' : game.getMode() === 'duel' ? 'duel' : wheelOn ? 'wheel' : '') : [];   // 賽跑模式：右下角改顯示助力（玫瑰）、干擾（GG）的禮物指令
     let legend = null;
     if (items.length) {
       // 2026-11-14 咖哩用手機看說「還是霧霧的」：直播影片壓縮會把彩色的字糊掉（顏色資訊被壓得很粗，只有明暗保得住），
@@ -549,6 +582,14 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       // 畫面很小時上下可能擠到沒有空間（下限比上限還高）：這時就讓大家排在同一條水平線上、只左右走
       if (bounds.y0 > bounds.y1) bounds.y0 = bounds.y1 = (bounds.y0 + bounds.y1) / 2;
       if (bounds.x0 > bounds.x1) bounds.x0 = bounds.x1 = (bounds.x0 + bounds.x1) / 2;
+    }
+    if (wheelOn && wheelGeo && WH.spinner && (WH.phase === 'ready' || WH.phase === 'spin' || WH.phase === 'result')) {   // 轉的人固定站在轉輪左邊、面向轉輪
+      const sv = views.get(WH.spinner.id);
+      if (sv) {
+        const g = wheelGeo, tx = g.cx - g.R - g.sd * 0.55 - 34;
+        sv.wheelSp = true; sv.duel = true; sv.tx = tx; sv.ty = g.cy; sv.tsize = g.sd; sv.face = 1; sv.goal = null; sv.zx0 = sv.zx1 = sv.zy0 = sv.zy1 = undefined;
+        if (sv.x === null) { sv.x = tx; sv.y = g.cy; sv.size = g.sd; }
+      }
     }
     return { lb, lb2, arena, legend };
   }
@@ -774,6 +815,90 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       if (R.why) text(R.why, cx, by + 62, 15, '#e8dcc0', 'center', false);
     }
   }
+  // ---------- 轉輪：大轉輪、結果榜、提示 ----------
+  function drawWheel() {
+    const WH = game.getWheel(), g = wheelGeo;
+    if (!WH || WH.phase === 'voice' || !g) return;
+    const n = WH.items.length, slice = Math.PI * 2 / n, R = g.R, colors = config.wheel.colors || ['#e74c3c'];
+    let sc = 1;
+    if (WH.phase === 'open') { const p = clamp(WH.t / WH.openSeconds, 0, 1), c1 = 1.70158, c3 = c1 + 1; sc = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); }   // 彈出來（過頭一點再回彈）
+    else if (WH.phase === 'closing') sc = Math.max(0, 1 - WH.t / 0.5);
+    ctx.save(); ctx.translate(g.cx, g.cy); ctx.scale(Math.max(0.001, sc), Math.max(0.001, sc));
+    ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = R * 0.12;
+    ctx.beginPath(); ctx.arc(0, 0, R * 1.07, 0, Math.PI * 2); ctx.fillStyle = '#23262f'; ctx.fill(); ctx.shadowBlur = 0;
+    ctx.lineWidth = Math.max(4, R * 0.03); ctx.strokeStyle = '#ffd35c'; ctx.stroke();
+    ctx.save(); ctx.rotate(WH.angle);
+    for (let i = 0; i < n; i++) {
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, i * slice, (i + 1) * slice); ctx.closePath();
+      ctx.fillStyle = colors[i % colors.length]; ctx.fill(); ctx.lineWidth = Math.max(2, R * 0.015); ctx.strokeStyle = 'rgba(255,255,255,0.92)'; ctx.stroke();
+      if ((WH.phase === 'result') && i === WH.result) { ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.25 * Math.sin(time * 10)})`; ctx.fill(); }   // 抽中的那一格閃
+    }
+    // 格內文字：大、粗、白字黑邊，從外圈往圓心排；比格子大的字允許超出格子
+    for (let i = 0; i < n; i++) {
+      const txt = WH.items[i];
+      ctx.save(); ctx.rotate((i + 0.5) * slice); ctx.translate(R * 0.9, 0); ctx.rotate(Math.PI);
+      let fs = Math.max(18, R * (n <= 6 ? 0.25 : n <= 9 ? 0.21 : 0.18));
+      ctx.font = `900 ${fs}px ${FONT}`;
+      const w = ctx.measureText(txt).width, maxW = R * 0.66;
+      if (w > maxW) { fs *= maxW / w; ctx.font = `900 ${fs}px ${FONT}`; }
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+      ctx.lineWidth = Math.max(4, fs * 0.22); ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.strokeText(txt, 0, 0);
+      ctx.fillStyle = (WH.phase === 'result' && i === WH.result) ? '#fff3a0' : '#fff'; ctx.fillText(txt, 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.13, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = Math.max(3, R * 0.025); ctx.strokeStyle = '#ffd35c'; ctx.stroke();
+    ctx.font = `${R * 0.15}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎡', 0, R * 0.01);
+    // 指針（在轉輪左邊，指向圓心）
+    ctx.beginPath(); ctx.moveTo(-R * 0.84, 0); ctx.lineTo(-R * 1.24, -R * 0.11); ctx.lineTo(-R * 1.24, R * 0.11); ctx.closePath();
+    ctx.fillStyle = '#ff4d4d'; ctx.fill(); ctx.lineWidth = Math.max(3, R * 0.03); ctx.strokeStyle = '#fff'; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.restore();
+  }
+  function drawWheelBoard(lb) {
+    const rows = game.getWheelHistory().slice(0, config.wheel.boardRows || 10);
+    ctx.fillStyle = 'rgba(22,26,30,0.78)'; ctx.beginPath(); ctx.roundRect(lb.x, lb.y, lb.w, lb.h, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+    text('🎡 轉輪結果', lb.x + lb.w / 2, lb.y + 24, 20, '#ffd35c');
+    if (!rows.length) { text('還沒有人轉輪', lb.x + lb.w / 2, lb.y + 62, 14, '#aaa', 'center', false); return; }
+    rows.forEach((r, i) => {
+      const y = lb.y + 62 + i * 32;
+      text(short(r.name, 5), lb.x + 14, y, 16, '#fff', 'left');
+      text(short(r.text, 7), lb.x + lb.w - 12, y, 20, i === 0 ? '#ffe27a' : '#ffd35c', 'right');
+    });
+  }
+  // 轉輪的提示：語音階段的大字、準備／等待／結果的橫幅、排隊人數、還沒開轉輪但有人排隊的小標籤
+  function drawWheelHud(arena) {
+    const WH = game.getWheel(), cx = arena.x + arena.w / 2;
+    if (!WH) {
+      const wp = game.getWheelPending();
+      if (wp > 0) { const t = `🎡 待轉 ${wp} 次`; ctx.font = `bold 20px ${FONT}`; const w = ctx.measureText(t).width + 28; ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.beginPath(); ctx.roundRect(arena.x + 4, arena.y + 4, w, 34, 17); ctx.fill(); ctx.restore(); text(t, arena.x + 18, arena.y + 21, 20, '#ffd35c', 'left'); }
+      return;
+    }
+    if (WH.phase === 'voice') {   // 先播語音：畫面中間一句大字
+      const k = 1 + 0.08 * Math.sin(WH.t * 12), fs = clamp(H * 0.22, 60, 150) * k;
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 0, W, H); ctx.restore();
+      text('🎡 我要轉輪！', W / 2, H / 2, fs, '#ffd35c'); return;
+    }
+    const sp = WH.spinner;
+    let l1 = '', l2 = WH.pending ? `排隊中還有 ${WH.pending} 次` : '';
+    if (WH.phase === 'ready' && sp) l1 = `🎡 輪到 ${short(sp.name, 8)} 轉輪！`;
+    else if (WH.phase === 'spin' && sp) l1 = `${short(sp.name, 8)} 轉輪中…`;
+    else if (WH.phase === 'wait') l1 = `🎡 每累積 ${WH.threshold} 鑽就能轉一次`;
+    if (l1) {   // 字太長就縮小，一定要放得進左邊的空地
+      let fz = 28; ctx.font = `bold ${fz}px ${FONT}`; const tw = ctx.measureText(l1).width; if (tw > arena.w - 40) fz = Math.max(14, fz * (arena.w - 40) / tw);
+      ctx.font = `bold ${fz}px ${FONT}`; const w = Math.min(arena.w - 8, ctx.measureText(l1).width + 40);
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(cx - w / 2, arena.y + 8, w, l2 ? 74 : 46, 22); ctx.fill(); ctx.restore();
+      text(l1, cx, arena.y + 31, fz, '#fff'); if (l2) text(l2, cx, arena.y + 62, 18, '#ffd35c');
+    }
+    if (WH.phase === 'result' && sp) {   // 結果：大大一行，名字＋抽中什麼
+      const by = arena.y + arena.h * 0.28, t1 = `🎉 ${short(sp.name, 8)} 抽中`, t2 = WH.resultText;
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.74)'; ctx.fillRect(arena.x, by - 62, arena.w, 150); ctx.restore();
+      text(t1, cx, by - 28, 30, '#fff');
+      let fs = 60; ctx.font = `900 ${fs}px ${FONT}`; const w = ctx.measureText(t2).width; if (w > arena.w - 20) fs *= (arena.w - 20) / w;
+      text(t2, cx, by + 28, fs, '#ffe27a');
+    }
+  }
+
   // 單挑時右上角的「助攻榜」：圍觀者幫忙打了多少傷害（取代亂鬥的傷害排行榜）
   function drawAssistBoard(lb) {
     const rows = game.getDuelAssists() || [];
@@ -1087,6 +1212,12 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     }
     text(`${fac.label}・${p.hero.displayName}`, x, y + r + fs * 0.85, fs * 0.8, facColor);
 
+    // 轉輪開著時：每個人名字下面顯示累積的鑽石數（滿了排隊的次數也寫出來）
+    const WHs = game.getWheel();
+    if (WHs && WHs.phase !== 'voice' && !v.down && !p.isBoss) {
+      const pg = game.getWheelProgress(p.id);
+      if (pg.dia > 0 || pg.pending) text(`💎${pg.dia}/${pg.threshold}${pg.pending ? `  🎡×${pg.pending}` : ''}`, x, y + r + fs * 2.85, fs * 0.8, '#9ad8ff');
+    }
     // 最下面一行：倒地倒數 或 鎖定對象
     const ly = y + r + fs * 1.85;
     if (v.down && game.getMode() === 'duel') {
@@ -1274,6 +1405,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     if (arenas) arenas.draw(ctx, { x: 4, y: 4, w: W - 8, h: H - 8 }, dpr * k);   // 場地地面：鋪滿整個畫面（排行榜、禮物提示列畫在它上面）；預設全場透明＝什麼都不畫
 
     drawTrack();   // 賽跑：橢圓跑道（畫在武將下面）
+    drawWheel();   // 轉輪（畫在武將下面）
     if (dim) {   // 技能發動：畫面短暫變暗，讓特效更顯眼
       ctx.fillStyle = `rgba(0,0,0,${config.skillDim * Math.sin(Math.PI * dim.age / dim.life)})`;
       ctx.fillRect(0, 0, W, H);
@@ -1311,7 +1443,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     drawTeamHud(arena);
     drawRaceHud(arena);
     drawDuelHud(arena, lb);
-    if (game.getRace()) drawRaceBoard(lb, game.getRace()); else if (game.getMode() === 'duel' && game.getDuel()) drawAssistBoard(lb); else drawLeaderboard(lb);
+    drawWheelHud(arena);
+    if (game.getRace()) drawRaceBoard(lb, game.getRace()); else if (game.getMode() === 'duel' && game.getDuel()) drawAssistBoard(lb); else if (wheelGeo) drawWheelBoard(lb); else drawLeaderboard(lb);
     if (lb2) drawBossLeaderboard(lb2);
     if (legend) drawLegend(legend);
     drawBossQueue(arena, lb2 && W >= H ? lb2 : lb);

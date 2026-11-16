@@ -28,6 +28,12 @@
   #panel h1 small { font-size: 11px; font-weight: normal; color: #8C9490; margin-left: 4px; }
   #panel .topbtns { display: flex; gap: 6px; }
   #panel .topbtns button { padding: 4px 8px; font-size: 12px; border-radius: 14px; background: #fff; }
+  #panel .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 0 0 6px; }
+  #panel button.tab { flex: none; padding: 7px 2px; font-size: 13px; font-weight: bold; border-radius: 10px; background: #fff; color: #8C9490; white-space: nowrap; }
+  #panel button.tab.on { background: #D9563E; border-color: #B23F2B; color: #fff; }
+  #panel .tab-pane { display: none; }
+  #panel .tab-pane.on { display: block; }
+  #panel .tabhint { font-size: 12px; color: #8C9490; margin: 2px 2px 8px; line-height: 1.5; }
   #panel .group { margin: 14px 2px 6px; font-size: 12px; font-weight: bold; letter-spacing: 2px; color: #8C9490;
     display: flex; align-items: center; gap: 8px; }
   #panel .group::after { content: ''; flex: 1; height: 1.5px; background: #E3D9BE; }
@@ -96,7 +102,7 @@
     // 逼瀏覽器抓最新的（GitHub Pages 的檔案會被瀏覽器快取約 10 分鐘，不加的話更新後可能還在用舊檔）。
     (function () {
       var v = new URLSearchParams(location.search).get('_v') || '', q = v ? '?v=' + encodeURIComponent(v) : '';
-      ['js/version.js', 'js/config.js', 'data/heroes.js', 'data/extra-heroes.js', 'js/events.js', 'js/gift-settings.js', 'js/hero-settings.js', 'js/host-commands.js', 'js/save.js', 'js/cloud-save.js', 'js/game.js', 'js/hero-sprite.js', 'js/effects.js', 'js/hero-fx.js', 'js/arenas.js', 'js/race-tracks.js', 'js/render.js', 'js/panel.js', 'js/updater.js', 'js/main.js'].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
+      ['js/version.js', 'js/config.js', 'data/heroes.js', 'data/extra-heroes.js', 'js/events.js', 'js/gift-settings.js', 'js/hero-settings.js', 'js/wheel-settings.js', 'js/sound.js', 'js/host-commands.js', 'js/save.js', 'js/cloud-save.js', 'js/game.js', 'js/hero-sprite.js', 'js/effects.js', 'js/hero-fx.js', 'js/arenas.js', 'js/race-tracks.js', 'js/render.js', 'js/panel.js', 'js/updater.js', 'js/main.js'].forEach(function (f) { document.write('<script src="' + f + q + '"><\/script>'); });
     })();
   </script>
 </body>

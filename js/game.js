@@ -35,6 +35,16 @@ ML.createGame = function (config, heroes) {
   const noticeAt = new Map();  // 提醒訊息的節流：key → 上次提醒的時間，免得洗版
   let duelSkipGift = null;     // 剛當成「回應單挑」的那份 TikTok 禮物：接著那份對應的遊戲禮物（普攻）要跳過，不然同一份玫瑰又會打人
 
+  // ---------- 轉輪模式的狀態 ----------
+  const wc = config.wheel || {};
+  let ws = { items: (wc.items || []).slice(), threshold: wc.threshold || 1000, autoOpen: wc.autoOpen !== false, voiceEnabled: wc.voiceEnabled !== false };   // 主播在面板改的設定（見 setWheelSettings）
+  const wheelAcc = new Map();  // 觀眾代號 → { dia: 累積的鑽石（不含已經換成轉輪次數的）, name }
+  const wheelQueue = [];       // 排隊等著轉的次數：{ id, name }
+  const wheelHistory = [];     // 轉輪結果紀錄（新的在前）：{ id, name, text, at }
+  let wheel = null;            // 轉輪開著時的狀態：{ phase: 'voice'|'open'|'ready'|'spin'|'result'|'wait'|'closing', t, locked, spinner, items, angle, a0, a1, dur, result }
+  let wheelWant = false;       // 主播要求「常駐」：被 BOSS／比賽擋住時記著，能開的時候自動開
+  let wheelDirty = false;      // 累積資料有變動（main.js 用來決定要不要存到瀏覽器）
+
   // 留言比對用：武將中文名與別名 → 武將資料（名字長的先比，避免短名搶先）
   const heroById = new Map(heroes.map(h => [h.heroId, h]));
   const nameTable = heroes.map(h => [h.displayName, h]);
@@ -179,6 +189,7 @@ ML.createGame = function (config, heroes) {
 
     if (isLeaveCommand(text)) { if (me) leave(me); return; }
 
+    if (handleWheelCommand(user, text)) return;   // 轉輪模式
     // 單挑賽：「@乙 單挑」發起申請；被挑戰的人留言「接受／拒絕」回應；單挑中圍觀者「@甲／@乙」選邊助攻
     const inviteName = parseDuelInvite(text);
     if (inviteName !== null) { sendDuelInvite(user, me, inviteName); return; }
@@ -267,6 +278,7 @@ ML.createGame = function (config, heroes) {
   function runHostGift(user, hostGift) {
     if (hostGift.setMode) { gameApi.setMode(hostGift.setMode); return; }
     if (hostGift.race) { if (hostGift.race === 'open') openRace(); else if (hostGift.race === 'openHurdle') openRace('hurdle'); else if (hostGift.race === 'start') raceStartNow(); else if (hostGift.race === 'cancel') cancelRace('主播取消了比賽'); return; }
+    if (hostGift.wheel) { wheelHost(hostGift.wheel); return; }
     if (hostGift.duel === 'cancel') { cancelDuel('主播取消了單挑'); return; }
     if (hostGift.restartMatch) { if (mode === 'team') restartMatch(true); else notice('現在是亂鬥模式，沒有陣營賽可以重開'); return; }
     if (hostGift.revive !== undefined) { hostRevive(user, hostGift.revive); return; }
@@ -673,6 +685,7 @@ ML.createGame = function (config, heroes) {
   }
   // 主播開放報名（按鈕或留言）：進入賽跑模式，報名倒數開始
   function openRace(kind) {
+    if (wheel) wheelAbort('主播開放了賽跑，轉輪暫停');
     if (mode === 'duel') { notice('單挑賽進行中，結束後才能開放報名'); return; }
     if (duelInvite) { duelInvite = null; fx({ type: 'duelInviteEnd' }); notice('主播開放了賽跑，單挑申請取消'); }
     if (mode === 'race') { notice(race && race.phase === 'signup' ? '已經在報名中了' : '比賽進行中，結束後才能再開放報名'); return; }
@@ -824,6 +837,7 @@ ML.createGame = function (config, heroes) {
   function sendDuelInvite(user, me, rest) {
     const nm = user.name;
     if (!dc.enabled) { if (throttle('duelOff', 20)) notice('單挑功能目前沒有開放'); return; }
+    if (wheel) { if (throttle('duelWheel', 8)) notice(`${nm} 轉輪進行中，轉完才能發起單挑`); return; }
     if (mode !== 'brawl') { if (throttle('duelMode:' + user.id, 8)) notice(`${nm} 現在不能發起單挑（${mode === 'duel' ? '單挑賽進行中' : mode === 'race' ? '比賽進行中' : '陣營賽進行中'}，只有亂鬥模式可以）`); return; }
     if (!me) { if (throttle('duelJoin:' + user.id, 8)) notice(`${nm} 請先留言武將名字上場，才能發起單挑`); return; }
     if (me.down) { notice(`${nm} 倒地中，不能發起單挑`); return; }
@@ -1003,6 +1017,139 @@ ML.createGame = function (config, heroes) {
     }
   }
 
+  // ---------- 轉輪模式 ----------
+  // 規則見 config.wheel 上面的說明。重點：鑽石數照實累積（不影響 BOSS／賽跑／單挑的原本規則）；轉輪只在亂鬥模式、場上沒有 BOSS 時才開，
+  // 其他時候轉的次數先排隊；每人排隊有上限；零頭留著；累積資料存瀏覽器（見 main.js），閒置太久算新的一場。
+  function wheelItems() {
+    const max = wc.maxItems || 12, mc = wc.itemMaxChars || 10;
+    let list = (ws.items || []).map(t => String(t).trim().slice(0, mc)).filter(Boolean).slice(0, max);
+    if (list.length < 2) list = (wc.items || []).map(t => String(t).trim().slice(0, mc)).filter(Boolean).slice(0, max);
+    return list;
+  }
+  function canWheel() {
+    return wc.enabled !== false && mode === 'brawl' && !duelInvite && !duel && !players.has(BOSS_ID) && !bossQueue.length;
+  }
+  const wheelHave = id => wheelQueue.filter(q => q.id === id).length + (wheel && wheel.spinner && wheel.spinner.id === id && (wheel.phase === 'ready' || wheel.phase === 'spin') ? 1 : 0);
+  // 累積鑽石：每滿 threshold 鑽排一次（每人排隊有上限，零頭留著）
+  function wheelAdd(user, dia) {
+    if (wc.enabled === false || !user || !user.id || !(dia > 0)) return;
+    const th = ws.threshold, rec = wheelAcc.get(user.id) || { dia: 0, name: user.name };
+    rec.name = user.name || rec.name; rec.dia += dia;
+    const spins = Math.floor(rec.dia / th);
+    rec.dia -= spins * th;
+    wheelAcc.set(user.id, rec);
+    wheelDirty = true;
+    if (!spins) return;
+    const add = Math.max(0, Math.min(spins, (wc.maxPending || 3) - wheelHave(user.id)));
+    for (let i = 0; i < add; i++) wheelQueue.push({ id: user.id, name: rec.name });
+    notice(`🎡 ${rec.name} 累積滿 ${th} 鑽，獲得 ${add} 次轉輪${spins > add ? `（排隊上限 ${wc.maxPending || 3} 次，多的不算）` : ''}`);
+    fx({ type: 'wheelQueue' });
+  }
+  function startWheel() {
+    if (wheel || !canWheel()) return;
+    const voice = ws.voiceEnabled !== false && !!wc.voice;
+    wheel = { phase: voice ? 'voice' : 'open', t: 0, locked: wheelWant, spinner: null, items: wheelItems(), angle: Math.random() * Math.PI * 2, a0: 0, a1: 0, dur: 0, result: -1 };
+    if (voice) fx({ type: 'wheelVoice' });
+    fx({ type: 'wheelOpen' });
+    notice('🎡 轉輪模式開啟！');
+  }
+  function closeWheel(msg) {
+    if (!wheel) return;
+    wheel = null; fx({ type: 'wheelClose' });
+    notice(msg || '🎡 轉輪結束，回到亂鬥模式');
+  }
+  // 被別的事打斷（切模式、開賽跑…）：正在準備或旋轉的那一次還給那位玩家，立刻收起
+  function wheelAbort(why) {
+    if (!wheel) return;
+    if (wheel.spinner && (wheel.phase === 'ready' || wheel.phase === 'spin')) wheelQueue.unshift(wheel.spinner);
+    wheelWant = false;
+    closeWheel(why);
+  }
+  // 輪到下一位（或沒人了：常駐就等著、否則收起）
+  function wheelNext() {
+    if (!canWheel()) { if (wheel.locked) wheelWant = true; wheel.phase = 'closing'; wheel.t = 0; return; }
+    const q = wheelQueue.shift();
+    if (!q) { if (wheel.locked) { wheel.phase = 'wait'; wheel.t = 0; wheel.spinner = null; } else { wheel.phase = 'closing'; wheel.t = 0; } return; }
+    wheel.spinner = q; wheel.phase = 'ready'; wheel.t = 0; wheel.result = -1;
+    if (!players.has(q.id)) { const dh = heroById.get(defaultHeroId) || heroes[0]; if (dh) joinHero({ id: q.id, name: q.name }, dh, true); }   // 轉的人不在場上：帶預設武將上場
+    fx({ type: 'wheelReady', id: q.id });
+    notice(`🎡 輪到 ${q.name} 轉輪！`);
+  }
+  function wheelStartSpin() {
+    const n = wheel.items.length, slice = Math.PI * 2 / n, idx = Math.floor(Math.random() * n), jitter = (Math.random() - 0.5) * 0.7 * slice;
+    const target = Math.PI - (idx + 0.5) * slice + jitter;   // 指針在轉輪左邊（角度 π）：要讓第 idx 格的中心停在那裡
+    const k = Math.ceil((wheel.angle + Math.PI * 10 - target) / (Math.PI * 2));   // 至少多轉 5 圈
+    wheel.a0 = wheel.angle; wheel.a1 = target + k * Math.PI * 2; wheel.dur = wc.spinSeconds || 6; wheel.result = idx; wheel.phase = 'spin'; wheel.t = 0;
+    fx({ type: 'wheelSpin', id: wheel.spinner.id });
+  }
+  function wheelEndSpin() {
+    wheel.angle = wheel.a1; wheel.phase = 'result'; wheel.t = 0;
+    const text = wheel.items[wheel.result], q = wheel.spinner;
+    wheelHistory.unshift({ id: q.id, name: q.name, text, at: Date.now() });
+    if (wheelHistory.length > (wc.historyMax || 30)) wheelHistory.length = wc.historyMax || 30;
+    wheelDirty = true;
+    fx({ type: 'wheelResult', id: q.id, text });
+    notice(`🎡 ${q.name} 轉到：${text}`);
+  }
+  function wheelTick(dt) {
+    if (!wheel) { if (canWheel() && ((ws.autoOpen && wheelQueue.length) || wheelWant)) startWheel(); return; }
+    // 轉輪開著時 BOSS 出現、單挑開始…：還沒開始轉的就先收起來，轉到一半的轉完再收
+    if (!canWheel() && (wheel.phase === 'ready' || wheel.phase === 'wait' || wheel.phase === 'voice' || wheel.phase === 'open')) {
+      if (wheel.locked) wheelWant = true;
+      if (wheel.phase === 'ready' && wheel.spinner) { wheelQueue.unshift(wheel.spinner); }
+      closeWheel('🎡 轉輪暫停（BOSS／比賽進行中），結束後繼續'); return;
+    }
+    wheel.t += dt;
+    switch (wheel.phase) {
+      case 'voice': if (wheel.t >= (wc.voiceSeconds || 1.6)) { wheel.phase = 'open'; wheel.t = 0; } break;
+      case 'open': if (wheel.t >= (wc.openSeconds || 0.8)) wheelNext(); break;
+      case 'wait': if (wheelQueue.length) wheelNext(); else if (!wheel.locked) { wheel.phase = 'closing'; wheel.t = 0; } break;
+      case 'ready': if (wheel.t >= (wc.readySeconds || 2.6)) wheelStartSpin(); break;
+      case 'spin': {
+        const p = Math.min(1, wheel.t / wheel.dur), e = 1 - Math.pow(1 - p, 4);
+        wheel.angle = wheel.a0 + (wheel.a1 - wheel.a0) * e;
+        if (p >= 1) wheelEndSpin();
+        break;
+      }
+      case 'result': if (wheel.t >= (wc.resultSeconds || 8)) wheelNext(); break;
+      case 'closing': if (wheel.t >= 0.5) closeWheel(); break;
+    }
+  }
+  // 留言「轉輪模式」：主播＝開啟（常駐）；玩家＝看自己累積了多少、排到沒有。「關閉轉輪」只有主播有效。回傳有處理
+  function handleWheelCommand(user, text) {
+    const t = plain(text), isHost = !!(hostCheck && hostCheck(user));
+    if ((config.commands.wheelOpen || []).some(c => plain(c) === t)) {
+      if (wc.enabled === false) { notice('轉輪功能目前沒有開放'); return true; }
+      if (isHost) { wheelHost('open'); return true; }
+      const have = wheelHave(user.id), rec = wheelAcc.get(user.id), dia = rec ? Math.floor(rec.dia) : 0;
+      if (have) notice(`${user.name} 有 ${have} 次轉輪排隊中${canWheel() ? '，馬上輪到' : '，等 BOSS／比賽結束就轉'}`);
+      else if (throttle('wheelAsk:' + user.id, 10)) notice(`${user.name} 累積 ${dia}/${ws.threshold} 鑽，還差 ${ws.threshold - dia} 鑽就能轉輪`);
+      return true;
+    }
+    if (isHost && (config.commands.wheelClose || []).some(c => plain(c) === t)) { wheelHost('close'); return true; }
+    return false;
+  }
+  // 主播的轉輪操作（按鈕和留言共用）：open 開啟（常駐）／close 關閉／reset 新的一場（累積歸零）
+  function wheelHost(act) {
+    if (act === 'open') {
+      if (wc.enabled === false) { notice('轉輪功能目前沒有開放'); return; }
+      wheelWant = true;
+      if (wheel) { wheel.locked = true; notice('🎡 轉輪已經開著了'); return; }
+      if (!canWheel()) { notice('🎡 現在不能開轉輪（BOSS 在場／單挑／比賽進行中），可以開的時候會自動開'); return; }
+      startWheel();
+    } else if (act === 'close') {
+      wheelWant = false;
+      if (!wheel) { notice('現在沒有開轉輪'); return; }
+      wheel.locked = false;
+      if (wheel.phase === 'wait' || wheel.phase === 'open' || wheel.phase === 'voice') { wheel.phase = 'closing'; wheel.t = 0; }
+      notice('🎡 轉輪會在目前這一輪結束後收起');
+    } else if (act === 'reset') {
+      wheelAcc.clear(); wheelQueue.length = 0; wheelHistory.length = 0; wheelDirty = true;
+      if (wheel && (wheel.phase === 'ready' || wheel.phase === 'spin')) { wheel.spinner = null; wheelAbort('🎡 新的一場開始，轉輪收起'); }
+      notice('🎡 新的一場：所有人的鑽石累積與轉輪排隊都歸零了');
+    }
+  }
+
   const gameApi = {
     setHeroPool,
     setHostMatcher(fn, isHost) { hostMatch = fn; hostCheck = isHost || null; },
@@ -1014,6 +1161,9 @@ ML.createGame = function (config, heroes) {
       // 任何留言或送禮都算「有動作」，用來判斷這位觀眾還在不在
       const me = ev.user && players.get(ev.user.id);
       if (me) me.lastActive = time;
+      // 轉輪：每份禮物的鑽石數都累積（真的 TikTok 禮物用鑽石數；面板測試的禮物照 wheel.fakeDiamonds）。TikTok 禮物會先後來 tiktokGift 和對應過的 gift 兩個事件，只在 tiktokGift 算一次
+      if (ev.type === 'tiktokGift') wheelAdd(ev.user, (Number(ev.gift && ev.gift.diamonds) || 0) * Math.max(1, Math.floor(ev.count) || 1));
+      else if (ev.type === 'gift' && !ev.tiktokGift) { const g = config.gifts.find(x => x.id === ev.giftId), d = (wc.fakeDiamonds || {})[g && g.action]; if (d) wheelAdd(ev.user, d * Math.max(1, Math.floor(ev.count) || 1)); }
       if (ev.type === 'chat') {
         // 主播的文字指令：主播本人留言設定好的字 = 送那個動作的禮物（不走一般留言處理）
         const hostGift = hostMatch && hostMatch(ev.user, ev.text);
@@ -1046,6 +1196,7 @@ ML.createGame = function (config, heroes) {
       if (mode === 'team') teamTick(dt);
       if (mode === 'race') raceTick(dt);
       if (mode === 'duel') duelTick(dt); else duelInviteTick(dt);
+      wheelTick(dt);
       for (const p of [...players.values()]) {
         if (p.isBoss) { bossUpdate(p); continue; }
         tickBuffs(p, dt);
@@ -1061,6 +1212,7 @@ ML.createGame = function (config, heroes) {
     // 清空場上。keepProgress = true 時保留每位觀眾的等級、經驗值、擊倒數（只把場上武將和傷害排行榜清掉）
     reset(keepProgress) {
       players.clear(); left.clear(); killLog.clear(); bossQueue.length = 0; time = 0;
+      wheel = null; wheelWant = false; wheelAcc.clear(); wheelQueue.length = 0; wheelHistory.length = 0; wheelDirty = true;
       duelInvite = null; duelLock.clear(); duelCool.clear(); duelBlock.clear(); duelPairLog.clear(); noticeAt.clear(); if (duel) { duel = null; mode = 'brawl'; }
       teamOf.clear(); swaps.clear(); match = { winner: null, restartAt: 0, time: 0 }; if (mode === 'team') initStructs();
       scores.forEach(s => { s.buffs = null; });   // 遊戲時間歸零，BUFF 也一併清掉
@@ -1188,11 +1340,40 @@ ML.createGame = function (config, heroes) {
       const rows = [...duel.assist.entries()].map(([id, r]) => ({ id, name: duelNames.get(id) || '觀眾', damage: r.dmg, side: r.side, sideName: nameOfId(duel[r.side]) })).sort((x, y) => y.damage - x.damage).slice(0, config.leaderboardSize);
       return rows;
     },
+    // 轉輪：畫面和面板用
+    setWheelSettings(o) {
+      if (!o || typeof o !== 'object') return;
+      if (Array.isArray(o.items)) ws.items = o.items.slice();
+      if (Number(o.threshold) >= 1) ws.threshold = Math.floor(Number(o.threshold));
+      if (typeof o.autoOpen === 'boolean') ws.autoOpen = o.autoOpen;
+      if (typeof o.voiceEnabled === 'boolean') ws.voiceEnabled = o.voiceEnabled;
+    },
+    getWheelSettings() { return { items: wheelItems(), threshold: ws.threshold, autoOpen: ws.autoOpen, voiceEnabled: ws.voiceEnabled }; },
+    getWheel() {
+      if (!wheel) return null;
+      return { phase: wheel.phase, t: wheel.t, items: wheel.items, angle: wheel.angle, spinner: wheel.spinner, result: wheel.result, resultText: wheel.result >= 0 ? wheel.items[wheel.result] : '', locked: wheel.locked, dur: wheel.dur, pending: wheelQueue.length, threshold: ws.threshold,
+        openSeconds: wc.openSeconds || 0.8, readySeconds: wc.readySeconds || 2.6, resultSeconds: wc.resultSeconds || 8 };
+    },
+    getWheelHistory() { return wheelHistory.slice(); },
+    getWheelPending() { return wheelQueue.length; },
+    getWheelProgress(id) { const r = wheelAcc.get(id); return { dia: r ? Math.floor(r.dia) : 0, threshold: ws.threshold, pending: wheelHave(id) }; },
+    getWheelAccList() { return [...wheelAcc.entries()].map(([id, r]) => ({ id, name: r.name, dia: Math.floor(r.dia) })).filter(r => r.dia > 0).sort((a, b) => b.dia - a.dia); },
+    wheelBusy() { return !!wheel; },
+    // 累積資料的存取（main.js 存在瀏覽器；自動更新重新載入後讀回來）
+    takeWheelDirty() { const d = wheelDirty; wheelDirty = false; return d; },
+    exportWheel() { return { acc: [...wheelAcc.entries()].map(([id, r]) => [id, r.name, r.dia]), queue: wheelQueue.map(q => [q.id, q.name]), history: wheelHistory.slice(0, 30) }; },
+    importWheel(o) {
+      if (!o || typeof o !== 'object') return;
+      for (const [id, name, dia] of o.acc || []) if (id && Number(dia) > 0) wheelAcc.set(String(id), { name: String(name || ''), dia: Number(dia) });
+      for (const [id, name] of o.queue || []) if (id && wheelQueue.length < 200) wheelQueue.push({ id: String(id), name: String(name || '') });
+      for (const h of o.history || []) if (h && h.text) wheelHistory.push({ id: String(h.id || ''), name: String(h.name || ''), text: String(h.text), at: Number(h.at) || 0 });
+    },
     duelBusy() { return !!duelInvite || mode === 'duel'; },
     raceBusy() { return mode === 'race' && !!race && (race.phase === 'countdown' || race.phase === 'run'); },
     raceGift(user, kind, count) { raceGift(user, kind, count); },
     setMode(m) {
       if (m === 'race') { openRace(); return; }
+      if (wheel) wheelAbort('切換模式，轉輪暫停');
       if (duelInvite) { duelInvite = null; fx({ type: 'duelInviteEnd' }); notice('切換模式，單挑申請取消'); }
       if (mode === 'duel') { cancelDuel('主播切換了模式'); if (m === 'brawl') return; }
       if (m === 'hurdle') { openRace('hurdle'); return; }

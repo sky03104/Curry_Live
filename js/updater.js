@@ -31,7 +31,7 @@ ML.createUpdater = function (config, params, game, hooks) {
   let lastAttack = -1e9;
   game.onFx(e => { if (e.type === 'attack') lastAttack = Date.now(); });
   // 「安靜」＝場上沒有 BOSS、也沒有 BOSS 在排隊、最近 10 秒沒人出招（避免在打到一半時重新整理）
-  const quiet = () => !(game.raceBusy && game.raceBusy()) && !(game.duelBusy && game.duelBusy()) && !game.getPlayers().some(p => p.isBoss) && !(game.getBossQueue && game.getBossQueue().length) && Date.now() - lastAttack > (cfg.quietSeconds || 10) * 1000;
+  const quiet = () => !(game.raceBusy && game.raceBusy()) && !(game.duelBusy && game.duelBusy()) && !(game.wheelBusy && game.wheelBusy()) && !game.getPlayers().some(p => p.isBoss) && !(game.getBossQueue && game.getBossQueue().length) && Date.now() - lastAttack > (cfg.quietSeconds || 10) * 1000;
 
   async function check() {
     if (location.protocol === 'file:' || !current) return;

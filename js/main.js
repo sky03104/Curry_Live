@@ -16,12 +16,24 @@
   // 主播文字指令：主播本人留言設定好的字，效果等於送那個動作的禮物
   const hostCmd = ML.createHostCommands(config, params);
   game.setHostMatcher((user, text) => hostCmd.match(user, text), user => hostCmd.isHost(user));
+  // 轉輪設定（結果項目、門檻…）與語音；累積的鑽石數存在這個瀏覽器，閒置太久算新的一場
+  const wheelSettings = ML.createWheelSettings(config, params);
+  game.setWheelSettings(wheelSettings.value);
+  const sound = ML.createSound(config);
+  game.onFx(e => { if (e.type === 'wheelVoice') sound.playWheelVoice(); });
+  const WKEY = 'curryLive.wheel.v1';
+  try {
+    const w = JSON.parse(localStorage.getItem(WKEY));
+    if (w && w.data && Date.now() - Number(w.savedAt) < (config.wheel.idleHours || 6) * 3600 * 1000) game.importWheel(w.data);   // 閒置超過幾小時算新的一場：不讀回來＝歸零
+  } catch (e) { /* 讀不到就從零開始 */ }
+  function saveWheel() { try { if (game.takeWheelDirty()) localStorage.setItem(WKEY, JSON.stringify({ savedAt: Date.now(), data: game.exportWheel() })); } catch (e) { /* 存不了不影響 */ } }
+  setInterval(saveWheel, 3000); window.addEventListener('pagehide', saveWheel);
   const sprite = ML.createHeroSprite(heroes.concat(game.bossHeroes()), config, 'assets/heroes');   // BOSS 的圖也要載入
   // 場地：直播畫面讀網址的 &arena=；面板視窗讀這個瀏覽器記住的選擇（方便預覽）
   const arenas = ML.createArenas();
   let savedArena = ''; try { savedArena = localStorage.getItem('curryLive.arena') || ''; } catch (e) { /* 讀不到就用預設 */ }
   arenas.set(params.get('arena') || (params.get('obs') === '1' ? 'none' : savedArena));
-  const renderer = ML.createRenderer(document.getElementById('stage'), game, config, sprite, ML.createEffects(), m => (m === 'race' ? giftSettings.raceLegend() : m === 'duel' ? [] : giftSettings.legend()), arenas);
+  const renderer = ML.createRenderer(document.getElementById('stage'), game, config, sprite, ML.createEffects(), m => (m === 'race' ? giftSettings.raceLegend() : m === 'duel' || m === 'wheel' ? [] : giftSettings.legend()), arenas);
 
   // ---------- 存檔：觀眾的等級、經驗值、擊倒數 ----------
   const save = ML.createSave(config, params);
@@ -59,6 +71,7 @@
     if (s && s.host && hostCmd.applyRemote(s.host)) game.announce('已套用主播在面板改的指令設定');
     if (s && s.gifts && giftSettings.applyRemote(s.gifts)) game.announce('已套用主播在面板改的禮物設定');
     if (s && s.arena && Number(s.arena.at) > arenaAt && typeof s.arena.key === 'string') { arenaAt = Number(s.arena.at); arenas.set(s.arena.key); game.announce('已套用主播在面板改的場地'); }
+    if (s && s.wheel && wheelSettings.applyRemote(s.wheel)) { game.setWheelSettings(wheelSettings.value); game.announce('已套用主播在面板改的轉輪設定'); }
     if (s && s.heroes && heroSettings.applyRemote(s.heroes)) { game.setHeroPool(heroSettings.enabled); game.setDefaultHero(heroSettings.defaultId); game.announce('已套用主播在面板改的可選武將設定'); }
   }
   async function saveSettings(settings) {   // 面板呼叫：把主播設定存到雲端
@@ -147,7 +160,7 @@
   if (params.get('obs') === '1') {
     document.body.classList.add('obs');
   } else {
-    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { updater, heroSettings, hostCmd, saveSettings, save, flushSave, count: saved.length, cloud, syncCloud, saveNow });
+    ML.createPanel(document.getElementById('panel'), hub, game, renderer, config, heroes, giftSettings, { updater, heroSettings, wheelSettings, sound, hostCmd, saveSettings, save, flushSave, count: saved.length, cloud, syncCloud, saveNow });
   }
   // 接真的 TikTok，兩種方式擇一：
   //   A. TikFinity 電腦版（建議）：網址加 ?tikfinity=1

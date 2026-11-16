@@ -81,6 +81,9 @@ ML.createHostCommands = function (config) {
       if (action === 'hurdleOpen') return { race: 'openHurdle', label: '開放障礙賽' };
       if (action === 'raceStart') return { race: 'start', label: '提早開跑' };
       if (action === 'raceCancel') return { race: 'cancel', label: '取消比賽' };
+      if (action === 'wheelOpen') return { wheel: 'open', label: '開啟轉輪' };
+      if (action === 'wheelClose') return { wheel: 'close', label: '關閉轉輪' };
+      if (action === 'wheelReset') return { wheel: 'reset', label: '新的一場（轉輪累積歸零）' };
       if (action === 'duelCancel') return { duel: 'cancel', label: '取消單挑' };
       if (action === 'modeTeam') return { setMode: 'team', label: '陣營模式' };         // 只有按鈕有：切換玩法模式
       if (action === 'modeBrawl') return { setMode: 'brawl', label: '亂鬥模式' };
