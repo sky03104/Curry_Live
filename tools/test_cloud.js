@@ -44,14 +44,32 @@ function makeWorld() {
     }
     throw new Error('意外的網址 ' + url);
   };
+  // 假的 Supabase Realtime（Phoenix 通訊協定的最簡版：join、broadcast 轉發給同頻道其他人）
+  w.sockets = []; w.rtMode = 'ok'; w.broadcasts = 0;
+  w.WebSocket = class {
+    constructor(url) {
+      this.url = url; this.readyState = 0; w.sockets.push(this);
+      setTimeout(() => {
+        if (w.rtMode === 'down') { this.readyState = 3; this.onerror && this.onerror(); this.onclose && this.onclose(); return; }
+        this.readyState = 1; this.onopen && this.onopen();
+      }, 1);
+    }
+    _rx(m) { this.onmessage && this.onmessage({ data: JSON.stringify(m) }); }
+    send(s) {
+      const m = JSON.parse(s);
+      if (m.event === 'phx_join') { this.topic = m.topic; this.joined = true; setTimeout(() => this._rx({ topic: m.topic, event: 'phx_reply', payload: { status: 'ok', response: {} }, ref: m.ref }), 1); }
+      else if (m.event === 'broadcast') { w.broadcasts++; for (const o of w.sockets) if (o !== this && o.joined && o.topic === m.topic && o.readyState === 1) setTimeout(() => o._rx({ topic: m.topic, event: 'broadcast', payload: m.payload }), 1); }
+    }
+    close() { if (this.readyState === 3) return; this.readyState = 3; this.joined = false; setTimeout(() => this.onclose && this.onclose(), 0); }
+  };
   return w;
 }
 function loadCloud(world, overrides) {
   const store = {};
   const RealDate = Date;
   class FakeDate extends RealDate { constructor(...a) { if (a.length) super(...a); else super(RealDate.now() + world.offset); } static now() { return RealDate.now() + world.offset; } }
-  const sb = { console, Math, Date: FakeDate, URLSearchParams, AbortController, setTimeout, clearTimeout, btoa, JSON, Promise, Uint8Array, String, Number, Array, Map, Object, Error,
-    fetch: world.fetch, localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } } };
+  const sb = { console, Math, Date: FakeDate, URLSearchParams, AbortController, setTimeout, clearTimeout, setInterval, clearInterval, btoa, JSON, Promise, Uint8Array, String, Number, Array, Map, Object, Error,
+    fetch: world.fetch, WebSocket: world.WebSocket, localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } } };
   sb.window = sb; sb.crypto = require('crypto').webcrypto; vm.createContext(sb);
   vm.runInContext(fs.readFileSync(path.join(root, 'js/config.js'), 'utf8'), sb);
   vm.runInContext(fs.readFileSync(path.join(root, 'js/cloud-save.js'), 'utf8'), sb);
@@ -62,6 +80,7 @@ const TOKEN = 'abcdefghijklmnopqrstuvwxyz012345';
 const mk = (env, slot, canWrite) => env.ML.createCloudSave(env.config, new URLSearchParams('cloud=' + TOKEN), slot || 'main', { canWrite: canWrite !== false });
 const P = (id, level, xp, extra) => Object.assign({ id: 'tt:' + id, name: id, level, xp: xp || 0, kills: 0, seen: 1 }, extra || {});
 const settle = () => new Promise(r => setTimeout(r, 20));
+const waitFor = async (fn, ms) => { const end = Date.now() + (ms || 1500); while (Date.now() < end) { if (fn()) return true; await new Promise(r => setTimeout(r, 5)); } return fn(); };
 
 (async () => {
   // 1. 第一次：兩邊都空 → 存進 Supabase，Firebase 留備份
@@ -147,7 +166,7 @@ const settle = () => new Promise(r => setTimeout(r, 20));
     w.sbMode = 'down'; const f2 = await live.fetchCommand(); ok(f2 && f2.action === 'attack', 'Supabase 掛了：改從 Firebase 備份收到同一個指令');
     const s2 = await pad.sendCommand({ action: 'skill' }); await settle(); ok(s2.ok, 'Supabase 掛了：送指令靠 Firebase 備份仍成功');
     const f3 = await live.fetchCommand(); ok(f3 && f3.action === 'skill', '…直播畫面收得到');
-    w.fbMode = 'down'; const s3 = await pad.sendCommand({ action: 'heal' }); ok(!s3.ok && s3.text, '兩邊都掛：回報失敗與原因'); }
+    pad.stopRealtime(); w.fbMode = 'down'; const s3 = await pad.sendCommand({ action: 'heal' }); ok(!s3.ok && s3.text, '兩邊都掛：回報失敗與原因'); }
 
   // 11. 連線測試
   { const w = makeWorld(), env = loadCloud(w), c = mk(env);
@@ -162,6 +181,48 @@ const settle = () => new Promise(r => setTimeout(r, 20));
 
   // 13. 面板（canWrite:false）不寫入
   { const w = makeWorld(), env = loadCloud(w), c = mk(env, 'main', false); await c.load(); const r = await c.store([P('甲', 2)]); ok(r === null && w.sb.size === 0, '面板視窗只讀取、不寫入'); }
+
+  // 14. Realtime 即時推送
+  { const w = makeWorld(), env = loadCloud(w, { realtimeRetryMs: 20 }), live = mk(env, 'main', true), pad = mk(env, 'pad', false);
+    const got = [], states = []; live.listenCommands(c => got.push(c), s => states.push(s)); pad.connectRealtime();
+    ok(await waitFor(() => live.realtimeLive && pad.realtimeLive), '直播畫面和主播按鈕都連上即時頻道');
+    ok(states.includes('connecting') && states.includes('live'), '連線狀態有通知（connecting → live）');
+    const s = await pad.sendCommand({ action: 'attack', count: 2 });
+    ok(s.ok && s.pushed === true, '按下按鈕：即時推送已送出');
+    ok(await waitFor(() => got.length === 1) && got[0].action === 'attack' && got[0].count === 2 && got[0].seq > 0, '直播畫面立刻收到推送（不用等詢問）');
+    ok(w.sb.get(TOKEN + '|__cmd') && w.sb.get(TOKEN + '|__cmd').data.action === 'attack', '同時也寫進資料庫（斷線補收、重新整理基準用）');
+    const f = await live.fetchCommand(); ok(f && f.seq === got[0].seq, '詢問讀到的序號跟推送一樣（程式靠序號去重，不會執行兩次）');
+    ok(w.sockets.filter(x => x.readyState === 1).length === 2, '只開了兩條連線（各一）'); }
+  { const w = makeWorld(), env = loadCloud(w, { realtimeRetryMs: 20 }), live = mk(env, 'main', true), pad = mk(env, 'pad', false); const got = [];
+    live.listenCommands(c => got.push(c)); pad.connectRealtime(); await waitFor(() => live.realtimeLive && pad.realtimeLive);
+    // 換成另一個代號的人推送，不會收到
+    const other = env.ML.createCloudSave(env.config, new URLSearchParams('cloud=zzzzzzzzzzzzzzzzzzzzzzzzzzzz9999'), 'pad', { canWrite: false }); other.connectRealtime(); await waitFor(() => other.realtimeLive);
+    await other.sendCommand({ action: 'skill' }); await settle(); await settle(); ok(got.length === 0, '別的雲端代號推的指令，這個直播畫面收不到');
+    // 連線被切斷 → 自動重連，並通知（主程式靠這個補看一次資料庫）
+    const states = []; live.listenCommands(c => got.push(c), s => states.push(s));
+    w.sockets.find(x => x.topic === 'realtime:cmd-' + TOKEN && x.readyState === 1).close();   // 先開的是直播畫面那條
+    await waitFor(() => !live.realtimeLive && !pad.realtimeLive, 300);
+    ok(await waitFor(() => live.realtimeLive && pad.realtimeLive, 2000), '連線被切斷後自動重連'); }
+  { const w = makeWorld(), env = loadCloud(w, { realtimeRetryMs: 20 }), live = mk(env, 'main', true), pad = mk(env, 'pad', false); const got = [];
+    // 推送連不上：照樣用資料庫（原本的詢問方式）收得到
+    w.rtMode = 'down'; live.listenCommands(c => got.push(c)); pad.connectRealtime(); await settle();
+    ok(!live.realtimeLive && !pad.realtimeLive, '即時連線連不上時狀態不是 live（主程式會維持每秒詢問）');
+    const s = await pad.sendCommand({ action: 'heal' }); ok(s.ok && !s.pushed, '沒有即時連線：送指令仍成功（靠資料庫）');
+    const f = await live.fetchCommand(); ok(f && f.action === 'heal', '直播畫面用詢問照樣收得到');
+    w.rtMode = 'ok'; ok(await waitFor(() => live.realtimeLive && pad.realtimeLive, 3000), '網路恢復後自動連上'); }
+  { const w = makeWorld(), env = loadCloud(w, { realtime: false }), live = mk(env, 'main', true), pad = mk(env, 'pad', false);
+    live.listenCommands(() => {}); pad.connectRealtime(); await pad.sendCommand({ action: 'attack' }); await settle();
+    ok(w.sockets.length === 0 && !live.realtimeLive, 'realtime:false 時完全不開連線'); }
+  { const w = makeWorld(), env = loadCloud(w, { primary: 'firebase' }), live = mk(env, 'main', true);
+    live.listenCommands(() => {}); await settle(); ok(w.sockets.length === 0, "primary:'firebase' 時不開即時連線（沒有 Supabase）"); }
+  { const w = makeWorld(), env = loadCloud(w, { realtimeRetryMs: 20 }), pad = mk(env, 'pad', false);
+    const s = await pad.sendCommand({ action: 'attack' }); ok(s.ok && !s.pushed, '連線還沒開好就按：這次靠資料庫送出，不會卡住');
+    ok(await waitFor(() => pad.realtimeLive), '同時把連線開起來給下一次用'); }
+  { const w = makeWorld(), env = loadCloud(w, { realtimeRetryMs: 20 }), live = mk(env, 'main', true), got = [];
+    live.listenCommands(c => got.push(c)); await waitFor(() => live.realtimeLive);
+    const NEW = 'newtoken0123456789abcdefghijkl'; live.setToken(NEW);
+    ok(await waitFor(() => live.realtimeLive && w.sockets.some(x => x.topic === 'realtime:cmd-' + NEW && x.readyState === 1)), '換雲端代號後改連新頻道');
+    ok(!w.sockets.some(x => x.topic === 'realtime:cmd-' + TOKEN && x.readyState === 1), '舊頻道已斷開'); }
 
   console.log(`${pass} 項通過、${fail} 項失敗`); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

@@ -1,6 +1,6 @@
 // ============================================================
 // 主播按鈕小視窗（pad.html）：從控制面板「🎮 開啟主播按鈕」開出來的獨立小視窗，只有大顆按鈕，給主播直播時快速點。
-// 做法跟面板一樣：點一下 → 透過雲端存檔的 __cmd 文件傳給直播畫面（約 2～3 秒內執行）。
+// 做法跟面板一樣：點一下 → 透過雲端存檔的 __cmd 文件傳給直播畫面（有即時推送時約 0.1～0.5 秒內執行，沒有則約 1～3 秒）。
 // 這個視窗跟面板在同一個瀏覽器，所以主播是誰、次數是多少、雲端代號，都直接讀面板存在這個瀏覽器裡的設定。
 // ============================================================
 (function () {
@@ -50,7 +50,9 @@
     say(r.ok ? `✔ 已送出「${btn.dataset.text}」（${new Date().toLocaleTimeString()}）` : '⚠ 送出失敗：' + (r.text || '連不上'), !r.ok);
   });
 
-  $('#ver').textContent = '版本 ' + (window.APP_VERSION || '');
+  const showVer = () => { $('#ver').textContent = '版本 ' + (window.APP_VERSION || '') + (cloud.realtimeLive ? '　⚡ 即時推送已連線' : cloud.enabled ? '　（即時推送連線中…，先用一般模式）' : ''); };
+  showVer();
+  if (cloud.enabled) cloud.connectRealtime(showVer);
   render();
   setInterval(render, 2000);
   window.addEventListener('storage', render);

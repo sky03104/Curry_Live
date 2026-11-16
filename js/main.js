@@ -136,11 +136,18 @@
     if (!h.id) { game.announce('主播按鈕：還沒設定主播（面板「主播文字指令」選「我就是主播」）'); return; }
     game.hostPress({ id: String(h.id).slice(0, 80), name: String(h.name || '主播').slice(0, 40) }, hg);
   }
+  // 即時推送（Supabase Realtime）：面板按下去，指令直接推到這裡；序號一樣會跟資料庫詢問去重，所以兩條路同時收到也只執行一次
+  function onPushedCommand(c) {
+    if (!cloud.enabled) return;
+    if (cmdSeq === null || c.seq > cmdSeq) { cmdSeq = c.seq; runButton(c); }
+  }
+  if (cloud.canWrite) cloud.listenCommands(onPushedCommand, st => { if (st === 'live') pollCommand().catch(() => { /* 連上時補看一次，斷線期間的指令才不會漏 */ }); });
   // 平常每 cmdPollSeconds 秒看一次；剛收到按鈕指令後的一段時間（cmdBurstHold 秒）改成更密（cmdBurstSeconds 秒），連按幾下的反應更快、又不會整場都密集讀取
   let fastUntil = 0;
   function schedulePoll() {
     const cc = config.save.cloud, fast = Date.now() < fastUntil;
-    setTimeout(async () => { try { await pollCommand(); } catch (e) { /* 這次失敗下次再試 */ } schedulePoll(); }, (fast ? (cc.cmdBurstSeconds || 0.5) : (cc.cmdPollSeconds || 1)) * 1000);
+    const sec = cloud.realtimeLive ? (cc.cmdPollLiveSeconds || 5) : (fast ? (cc.cmdBurstSeconds || 0.5) : (cc.cmdPollSeconds || 1));   // 即時推送連著：只是保險、慢慢看；沒連著：照舊每秒（密集時 0.5 秒）
+    setTimeout(async () => { try { await pollCommand(); } catch (e) { /* 這次失敗下次再試 */ } schedulePoll(); }, sec * 1000);
   }
   if (cloud.canWrite) schedulePoll();
   setInterval(() => flushCloud(), config.save.cloud.intervalSeconds * 1000);

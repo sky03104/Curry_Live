@@ -16,7 +16,7 @@
 // 只存真實觀眾（代號開頭是 tt:）；面板測試用的假觀眾不會進雲端。
 //
 // 設定在 js/config.js 的 save.cloud：supabase（網址＋公開金鑰）、backup（false = 不寫 Firebase 備份）、
-//   primary（'firebase' = 暫時只用 Firebase，不用 Supabase）。
+//   primary（'firebase' = 暫時只用 Firebase，不用 Supabase）、realtime（false = 不用即時推送，只靠詢問）。
 // ============================================================
 window.ML = window.ML || {};
 
@@ -330,6 +330,57 @@ ML.createCloudSave = function (config, params, slot, opts) {
     return { ok: false, text: `Supabase（主要）${sbText}。${fbOk ? 'Firebase 備份是正常的，遊戲會自動改用它，不會中斷。' : 'Firebase 備份也有問題：' + fbText}` };
   }
 
+  // ---------- Realtime 即時推送（Supabase Broadcast）----------
+  // 主播按鈕送出時，除了寫進資料庫（留紀錄、斷線補收），同時從一條一直開著的連線直接「推」給直播畫面，
+  // 不用等直播畫面下一次詢問。直播畫面平常改成每幾秒才看一次資料庫（只是保險）；連線斷了就自動回到每秒詢問。
+  // 做法：不用程式庫，直接用瀏覽器的 WebSocket 講 Supabase Realtime 的通訊協定（Phoenix）。頻道名稱由雲端代號組成，不知道代號的人進不來。
+  const rtOn = () => sbOn && cfg.realtime !== false && typeof WebSocket !== 'undefined';
+  const rt = { ws: null, state: 'off', joined: false, ref: 0, hb: null, retry: 0, timer: null, want: false, lastRx: 0, onCmd: null, onState: null };
+  const rtTopic = () => 'realtime:cmd-' + token;
+  const rtRaw = obj => { try { rt.ws.send(JSON.stringify(obj)); return true; } catch (e) { return false; } };
+  function rtSet(state) { if (rt.state === state) return; rt.state = state; if (rt.onState) { try { rt.onState(state); } catch (e) { /* 不讓畫面的錯誤影響連線 */ } } }
+  function rtRetry() {
+    clearTimeout(rt.timer);
+    if (!rt.want || !token) return;
+    const base = cfg.realtimeRetryMs || 1000;
+    rt.timer = setTimeout(rtConnect, Math.min(15000, base * Math.pow(2, Math.min(rt.retry++, 4))));
+  }
+  function rtConnect() {
+    if (!token || !rtOn()) return;
+    rt.want = true;
+    if (rt.ws && rt.ws.readyState <= 1) return;   // 已經連著或正在連
+    rtSet('connecting'); rt.joined = false;
+    let ws;
+    try { ws = new WebSocket(`${sbCfg.url.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${encodeURIComponent(sbCfg.key)}&vsn=1.0.0`); } catch (e) { rtSet('off'); rtRetry(); return; }
+    rt.ws = ws; const topic = rtTopic();
+    ws.onopen = () => {
+      rt.lastRx = Date.now();
+      rtRaw({ topic, event: 'phx_join', payload: { config: { broadcast: { self: false, ack: false }, presence: { key: '' }, postgres_changes: [], private: false } }, ref: String(++rt.ref) });
+      clearInterval(rt.hb);
+      rt.hb = setInterval(() => {   // 每 25 秒打一次招呼；超過 70 秒沒收到任何東西就當斷線，重連
+        if (Date.now() - rt.lastRx > 70000) { try { ws.close(); } catch (e) { /* 已經關了 */ } return; }
+        rtRaw({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++rt.ref) });
+      }, 25000);
+    };
+    ws.onmessage = ev => {
+      rt.lastRx = Date.now();
+      let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m.topic !== topic) return;
+      if (m.event === 'phx_reply' && !rt.joined) { if (m.payload && m.payload.status === 'ok') { rt.joined = true; rt.retry = 0; rtSet('live'); } else { try { ws.close(); } catch (e) { /* 已經關了 */ } } return; }
+      if (m.event === 'broadcast' && m.payload && m.payload.event === 'cmd') {
+        const c = m.payload.payload;
+        if (c && typeof c === 'object' && Number(c.seq) > 0 && rt.onCmd) { try { rt.onCmd(c); } catch (e) { /* 一個指令的錯誤不要弄斷連線 */ } }
+      }
+    };
+    ws.onclose = () => { if (rt.ws !== ws) return; clearInterval(rt.hb); rt.joined = false; rt.ws = null; rtSet('off'); rtRetry(); };
+    ws.onerror = () => { try { ws.close(); } catch (e) { /* 已經關了 */ } };
+  }
+  function rtStop() { rt.want = false; clearTimeout(rt.timer); clearInterval(rt.hb); const ws = rt.ws; rt.ws = null; rt.joined = false; if (ws) { try { ws.close(); } catch (e) { /* 已經關了 */ } } rtSet('off'); }
+  // 直播畫面：開始接收即時推送。onCmd(指令)；onState('live' / 'connecting' / 'off') 連線狀態變化時通知（連上時主程式可順便補讀一次資料庫，避免漏掉斷線期間的指令）
+  function listenCommands(onCmd, onState) { rt.onCmd = onCmd; rt.onState = onState || null; if (token) rtConnect(); }
+  // 主播按鈕小視窗：先把連線開著，按下去才不用等連線
+  function connectRealtime(onState) { if (onState) rt.onState = onState; if (token) rtConnect(); }
+
   // ---------- 主播按鈕的「指令」（面板點一下 → 直播畫面很快執行）----------
   // 用同一個雲端代號底下另一份文件 __cmd 傳話：面板寫一筆（有一個一直增加的序號），直播畫面每幾秒讀一次，序號變大就執行。
   // 主要走 Supabase；同時也寫一份到 Firebase，Supabase 連不上的時候直播畫面改讀 Firebase。
@@ -337,13 +388,17 @@ ML.createCloudSave = function (config, params, slot, opts) {
   async function sendCommand(cmd) {
     if (!token) return { ok: false, text: '還沒開啟雲端存檔' };
     const obj = Object.assign({}, cmd, { seq: Date.now() });
+    // 先即時推送（最快）；連線還沒開好就順便開起來，這次靠下面的資料庫補送
+    let pushed = false;
+    if (rtOn()) { if (rt.joined) pushed = rtRaw({ topic: rtTopic(), event: 'broadcast', payload: { type: 'broadcast', event: 'cmd', payload: obj }, ref: String(++rt.ref) }); else rtConnect(); }
     const fbP = (!sbOn || cfg.backup !== false)
       ? write(CMD_SLOT, { v: { integerValue: '1' }, data: { stringValue: JSON.stringify(obj) }, savedAt: { integerValue: String(Date.now()) } }, null)
       : null;
     if (sbOn) {
       const r = await sbPut(CMD_SLOT, obj, null);
-      if (sbWrote(r)) { if (fbP) fbP.catch(() => {}); return { ok: true }; }
+      if (sbWrote(r)) { if (fbP) fbP.catch(() => {}); return { ok: true, pushed }; }
       const f = fbP ? await fbP : null;
+      if (pushed) return { ok: true, pushed };   // 資料庫寫不進去，但即時推送已經送出去了
       return f && f.ok ? { ok: true } : { ok: false, text: sbExplain(r) + (f ? '；Firebase 備份也失敗：' + explain(f) : '') };
     }
     const f = await fbP;
@@ -377,6 +432,7 @@ ML.createCloudSave = function (config, params, slot, opts) {
     t = String(t || '').trim();
     if (t && !validToken(t)) return false;
     token = t; remote = { profiles: [], settings: null, updateTime: null, version: 0, exists: false, known: false, mode: 'sb', needsPush: false }; fbAhead = false;
+    if (rt.want || rt.ws) { rtStop(); if (t) rt.want = true, rtConnect(); }   // 換了代號：舊頻道斷開，用新的重連
     try { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); } catch (e) { /* 存不了不影響這次使用 */ }
     setStatus(t ? 'idle' : 'off', t ? '雲端存檔：已設定，尚未連線' : '雲端存檔：未開啟');
     return true;
@@ -387,5 +443,6 @@ ML.createCloudSave = function (config, params, slot, opts) {
     get settings() { return remote.settings; },   // 雲端上目前的主播設定（讀過之後才有）
     get status() { return status; }, onStatus(fn) { listeners.push(fn); },
     load, store, test, newToken, setToken, sendCommand, fetchCommand,
+    listenCommands, connectRealtime, stopRealtime: rtStop, get realtimeState() { return rt.state; }, get realtimeLive() { return rt.state === 'live'; },
   };
 };
