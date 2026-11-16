@@ -154,6 +154,12 @@
     結果用白話顯示在按鈕下面（時間、本機存了幾位、雲端存了幾位或失敗原因，失敗是紅字）。
     ⚠️ **管不到直播軟體裡的畫面**：那是另一個獨立視窗，沒辦法遠端叫它存（它每 30 秒自己存）。
     面板視窗只有假觀眾（沒接 TikFinity）時，雲端不會存任何東西，按鈕會直接說明原因，不假裝存了。
+  - **2026-11-16 起雲端改成「Supabase 主要、Firebase 備份」**（咖哩要求；起因是主播按鈕每秒讀一次會吃 Firebase 每天 5 萬次讀取的共用額度，約只夠 3 位主播同時用，Supabase 免費版不按讀取次數算）。下面「雲端存檔（Firebase…）」那段講的規則、雲端代號、衝突合併等**概念都沒變**，只是主要存放處換了：
+    - **Supabase**：咖哩另一個帳號的「凹子底專案」（專案 `tjrlpthprtrlmugrofpj`，新加坡，免費方案）。網址與公開金鑰（`sb_publishable_…`，本來就是給網頁用的）寫在 `js/config.js` 的 `save.cloud.supabase`。資料表 `live_docs`（雲端代號＋槽位 → JSON）**鎖死**：公開金鑰不能直接讀寫、不能列清單、不能刪除，只能呼叫 `live_get`／`live_put` 兩個函式，而且要知道完整雲端代號；`live_put` 帶版本號，衝突時回 conflict（跟原本 Firebase 的前提條件同一個效果）。建表 SQL 在 `supabase/schema.sql`（**2026-11-16 咖哩已在後台 SQL Editor 執行過**）。⚠️ Claude 的 Supabase 連接器連的是另一個帳號（`tianying-security`、`wei` 兩個專案，是咖哩的真實工作資料，**不要碰**），所以改資料庫結構時由 Claude 寫 SQL、咖哩貼到「凹子底專案」執行；平常改遊戲程式不用。
+    - **Firebase 備份**：每次存進 Supabase 之後，不等它、順便在 Firebase 寫一份（`config.save.cloud.backup`，`false` = 不寫）；備份失敗只在面板狀態多一句「⚠ Firebase 備份沒成功」，不影響存檔。**Supabase 連不上、金鑰不對、函式沒建時，讀寫自動改走 Firebase**（做法跟以前一樣），30 秒後再試 Supabase；恢復後會把這段時間只存在 Firebase 的進度合併回 Supabase（`fbAhead`）。**Supabase 還沒有資料、Firebase 有舊存檔時，第一次讀取會自動搬過來**（第一次存檔寫進 Supabase）。`primary: 'firebase'` 可暫時退回只用 Firebase。`backup: false` 時 Supabase 連不上會直接報錯，不偷偷碰 Firebase。
+    - **主播按鈕指令**也走 Supabase（`__cmd` 槽位）並同時寫 Firebase 備份；直播畫面平常**只讀 Supabase**（不吃 Firebase 額度），Supabase 連不上才改讀 Firebase 備份。輪詢間隔（`cmdPollSeconds` 1 秒、密集 0.5 秒）暫時沒動。
+    - 面板「測試連線」會兩邊各寫一份小資料再讀回，分開回報（Supabase 主要／Firebase 備份）。
+    - 驗證：`node tools/test_cloud.js` 42 項全過（用假的 Supabase／Firestore 測：第一次存檔、換畫面讀回、舊存檔自動搬、兩畫面衝突合併、設定保留、Supabase 掛了改走 Firebase 並在恢復後合併回去、金鑰不對／函式沒建、兩邊都掛不當機、備份壞了不影響主要、`backup:false` 不碰 Firebase、主播指令兩邊、`primary:'firebase'` 舊模式、面板只讀）；`supabase/schema.sql` 在咖哩的專案實跑過，並用公開金鑰從外面測過寫入／讀回／版本衝突／代號太短被拒／直接列表與刪除被拒；瀏覽器（本機網頁）用真的 Supabase 測過連線測試與送指令→讀回，單趟約 0.3 秒（從雲端機房量的，偏高；台灣直播電腦預期更快）。⚠️ 沒在直播軟體裡看過、沒用真的 TikTok 直播測過；沒做 Supabase Realtime 推送（目前仍是輪詢，只是不再吃 Firebase 額度）；面板／各 sync 提示文字有些仍寫「Firebase」未逐一改。
   - **雲端存檔（Firebase，2026-11-13 咖哩要求「改存雲端或資料庫」，選 Firebase）**：`js/cloud-save.js`。
     - 存在萌戰三國的 Firebase 專案 `mengzhan-sanguo` 的 Firestore：`curryLiveSaves/{雲端代號}/slots/{存檔名稱}`。
       **不用 Firebase 程式庫**，直接用瀏覽器呼叫 Firestore REST；網頁維持純靜態。金鑰（`config.save.cloud.apiKey`）是萌戰三國網頁本來就公開的那把。
@@ -335,7 +341,9 @@
 | `pad.html`／`js/hostpad.js` | 主播按鈕小視窗（從面板開，點一下傳指令給直播畫面） |
 | `js/version.js`／`version.json`／`js/updater.js`／`tools/bump_version.py` | 版本號與自動更新（上線前跑 `bump_version.py`） |
 | `js/save.js` | 存檔：觀眾的等級、經驗值、擊倒數（存在瀏覽器裡） |
-| `js/cloud-save.js` | 雲端存檔（Firebase Firestore REST） |
+| `js/cloud-save.js` | 雲端存檔（Supabase 主要＋Firebase Firestore REST 備份） |
+| `supabase/schema.sql` | Supabase 的資料表與函式（貼到後台 SQL Editor 執行；已在「凹子底專案」執行過） |
+| `tools/test_cloud.js` | 雲端存檔雙邊（Supabase／Firebase）自動測試（`node tools/test_cloud.js`） |
 | `firebase/firestore.rules` | 要貼進 Firebase 後台的完整規則（自動產生，含萌戰三國原本的規則） |
 | `firebase/test/` | 存檔規則的單元測試（Firestore 模擬器） |
 | `tools/make_firestore_rules.py` | 產生上面那份合併規則 |

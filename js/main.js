@@ -51,7 +51,7 @@
   window.addEventListener('pagehide', flushSave);       // 關掉或重新整理網頁前再存一次
   window.addEventListener('beforeunload', flushSave);
 
-  // ---------- 雲端存檔（Firebase）：只有直播畫面（obs=1）會寫入，面板視窗只讀取 ----------
+  // ---------- 雲端存檔（Supabase 主要、Firebase 備份）：只有直播畫面（obs=1）會寫入，面板視窗只讀取 ----------
   const cloud = ML.createCloudSave(config, params, save.slot, { canWrite: params.get('obs') === '1' });
   // 只存真實觀眾（面板測試用的假觀眾 fake: 不進雲端），而且只存有進度的（1 級、0 經驗、沒擊倒過人的不用存）
   const realProfiles = () => game.exportProfiles().filter(p => p.id.startsWith('tt:') && (p.level > 1 || p.xp > 0 || p.kills > 0 || p.adj));
