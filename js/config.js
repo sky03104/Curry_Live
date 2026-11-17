@@ -382,6 +382,10 @@ window.GAME_CONFIG = {
   // 某隻武將有連續圖時，在這裡登記（圖是一排橫放、每格一樣大，腳底對齊；做法見 tools/make_anim_sheet.py，它會印出這些數字）。
   //   eat：回血時播一次　idle：每次走到定點停下來時播一次（還沒有圖就先不寫）；有 idle2、idle3… 就每次停下來隨機挑一組播
   //   frames 幾格／cw ch 每格寬高（像素）／ground 腳底在第幾列／fps 每秒播幾格／repeat 連續播幾輪（預設 1）
+  // 一開始就在背景把全部武將的圖與動畫圖載好，之後上場、出招不用等下載（2026-11-17 咖哩要求）。
+  // all: false ＝ 回到「用到才載入」（比較省流量與記憶體）；intervalMs＝每隔幾毫秒載一隻，數字大一點比較不搶網路。
+  // ⚠️ 全部載入約下載 27 MB（第一次；之後瀏覽器有快取），動畫圖解碼後約占 200 MB 記憶體。
+  preload: { all: true, intervalMs: 120 },
   heroAnims: {
     // guanyu：3D 拍的連續圖試作（assets/heroes/guanyu_*.png）還沒採用，風格沒確定前不登記；試用時照 tools/render_hero_sprites.py 印出的 HEROANIMS 設定貼回這裡
     michelin: {

@@ -29,6 +29,8 @@
   function saveWheel() { try { if (game.takeWheelDirty()) localStorage.setItem(WKEY, JSON.stringify({ savedAt: Date.now(), data: game.exportWheel() })); } catch (e) { /* 存不了不影響 */ } }
   setInterval(saveWheel, 3000); window.addEventListener('pagehide', saveWheel);
   const sprite = ML.createHeroSprite(heroes.concat(game.bossHeroes()), config, 'assets/heroes');   // BOSS 的圖也要載入
+  // 一開始就在背景把全部武將的圖與動畫圖載好（config.preload.all；關掉就回到「用到才載入」）
+  if (config.preload && config.preload.all) sprite.preloadAll(heroes.filter(h => heroSettings.isOn(h.heroId)).concat(game.bossHeroes()), config.preload.intervalMs);
   // 場地：直播畫面讀網址的 &arena=；面板視窗讀這個瀏覽器記住的選擇（方便預覽）
   const arenas = ML.createArenas();
   let savedArena = ''; try { savedArena = localStorage.getItem('curryLive.arena') || ''; } catch (e) { /* 讀不到就用預設 */ }
