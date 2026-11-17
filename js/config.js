@@ -409,6 +409,13 @@ window.GAME_CONFIG = {
       walk: { src: 'hamster_walk.png', frames: 7, cw: 271, ch: 324, ground: 320, fps: 9 },   // 走路循環（原圖 16 格有的有羽扇有的沒有，只挑有羽扇的 7 格）
     },
     // 蕃薯：待機＝吃薯條（8 格，每秒 3 格連播 2 輪）；攻擊／技能＝撲出去咬（8 格，第 5 格咬下去；普攻 13 格/秒、技能 11 格/秒）
+    mantou: {   // 饅頭：Gemini／ChatGPT 生圖（8 格 4x2，make_anim_sheet.py --grid 4x2 --faces left --match-height 396）
+      idle: { src: 'mantou_idle.png', frames: 8, cw: 312, ch: 411, ground: 408, fps: 3, repeat: 2 },   // 待機：拿出超大罐頭開心地吃（素色橘標籤罐頭，沒有商標）；之後做呼吸待機再當 idle，這組改成 idle2
+      eat: { src: 'mantou_idle.png', frames: 8, cw: 312, ch: 411, ground: 408, fps: 3, repeat: 2 },   // 回血時也播同一組
+      walk: { src: 'mantou_walk.png', frames: 8, cw: 304, ch: 402, ground: 399, fps: 9 },   // 直立胖貓搖擺走路
+      attack: { src: 'mantou_attack.png', frames: 8, cw: 317, ch: 405, ground: 402, fps: 10, hitFrame: 5 },   // 肉球爪擊，第 5 格手伸到最前面
+      skill: { src: 'mantou_skill.png', frames: 8, cw: 331, ch: 421, ground: 417, fps: 8, hitFrame: 6 },   // 技能「肉球鎮營」：蹲下→跳起→披風飛揚落下→雙手往前壓（Gemini 的動作跟提示詞略有不同）
+    },
     xuejie: {
       idle: { src: 'xuejie_idle.png', frames: 7, cw: 252, ch: 415, ground: 412, fps: 3, repeat: 2 },   // 待機：拿麥克風唱歌（用 AI 原圖只有上半身的格子接上腿拼成，共 7 格；原圖第 7 格沒拿杯子沒用）
       eat: { src: 'xuejie_idle.png', frames: 7, cw: 252, ch: 415, ground: 412, fps: 3, repeat: 2 },   // 回血時也播同一組
