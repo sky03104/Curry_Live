@@ -1164,6 +1164,9 @@ ML.createGame = function (config, heroes) {
       const me = ev.user && players.get(ev.user.id);
       if (me) me.lastActive = time;
       // 轉輪：每份禮物的鑽石數都累積（真的 TikTok 禮物用鑽石數；面板測試的禮物照 wheel.fakeDiamonds）。TikTok 禮物會先後來 tiktokGift 和對應過的 gift 兩個事件，只在 tiktokGift 算一次
+      if (ev.type === 'tiktokGift' && !ev.mapped && (Number(ev.gift && ev.gift.diamonds) || 0) >= 100) {   // 值錢的禮物卻沒對應到任何動作：直接寫在畫面上，才看得出為什麼 BOSS 沒出來（直播畫面沒有事件紀錄可看）
+        notice(`🎁 ${ev.user.name} 送了「${(ev.gift && ev.gift.name) || '?'}」（單價 ${ev.gift.diamonds} 鑽 ×${ev.count || 1}），但這邊的禮物設定沒有對應動作，沒有生效`);
+      }
       if (ev.type === 'tiktokGift') wheelAdd(ev.user, (Number(ev.gift && ev.gift.diamonds) || 0) * Math.max(1, Math.floor(ev.count) || 1));
       else if (ev.type === 'gift' && !ev.tiktokGift) { const g = config.gifts.find(x => x.id === ev.giftId), d = (wc.fakeDiamonds || {})[g && g.action]; if (d) wheelAdd(ev.user, d * Math.max(1, Math.floor(ev.count) || 1)); }
       if (ev.type === 'chat') {
