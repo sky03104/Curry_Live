@@ -32,7 +32,7 @@ function setup() {
   t.tgift('丙', '玫瑰', 1); ok(game.getDuelInvite(), '別人送玫瑰不算接受');
   t.tgift('甲', '玫瑰', 1); ok(game.getDuelInvite(), '甲自己送玫瑰不算接受');
   t.chat('丙', '@甲 單挑'); ok(t.notes.some(x => x.includes('已經有一個單挑申請')), '已有申請時別人不能再發');
-  t.tgift('乙', '玫瑰', 1);
+  t.tgift('乙', '玫瑰花', 1);   // TikTok 實際名稱是「玫瑰花」
   ok(!game.getDuelInvite() && game.getMode() === 'duel', '乙送玫瑰 → 進入單挑');
   ok(game.getPlayer('tt:乙').hp === config.duel.hp && game.getPlayer('tt:甲').hp === config.duel.hp, '雙方血量一樣');
   ok(!fxs0(t).some(e => e.type === 'attack' && e.id === 'tt:乙'), '乙的玫瑰只當接受，沒有同時當普攻');

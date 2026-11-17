@@ -33,6 +33,8 @@ ML.createGame = function (config, heroes) {
   const duelPairLog = new Map(); // 兩人的組合（代號排序後相連）→ 最近單挑過的時間們（反覆單挑刷經驗要遞減）
   const duelNames = new Map(); // 助攻榜用：圍觀者代號 → 名字
   const noticeAt = new Map();  // 提醒訊息的節流：key → 上次提醒的時間，免得洗版
+  // 禮物名稱比對：只要禮物名稱「包含」設定的字就算（TikTok 的玫瑰實際叫「玫瑰花」，原本要完全一樣所以對不上）
+  function giftNameHas(list, nm) { return !!nm && (list || []).some(n => { const k = plain(n); return k && nm.indexOf(k) >= 0; }); }
   let duelSkipGift = null;     // 剛當成「回應單挑」的那份 TikTok 禮物：接著那份對應的遊戲禮物（普攻）要跳過，不然同一份玫瑰又會打人
 
   // ---------- 轉輪模式的狀態 ----------
@@ -1180,13 +1182,13 @@ ML.createGame = function (config, heroes) {
       }
       else if (ev.type === 'tiktokGift' && duelInvite && ev.user.id === duelInvite.to) {   // 被挑戰的人送禮：玫瑰＝接受、GG＝拒絕，其他禮物不算回應
         const nm = plain((ev.gift && ev.gift.name) || ''), gn = dc.giftNames || {};
-        if ((gn.accept || []).some(n => plain(n) === nm)) { duelSkipGift = ev.gift; acceptDuel(); }
-        else if ((gn.refuse || []).some(n => plain(n) === nm)) { duelSkipGift = ev.gift; refuseDuel(`${nameOfId(ev.user.id)} 送 GG 拒絕了單挑`); }
+        if (giftNameHas(gn.accept, nm)) { duelSkipGift = ev.gift; acceptDuel(); }
+        else if (giftNameHas(gn.refuse, nm)) { duelSkipGift = ev.gift; refuseDuel(`${nameOfId(ev.user.id)} 送 GG 拒絕了單挑`); }
       }
       else if (ev.type === 'tiktokGift' && mode === 'duel') duelGift(ev.user, (ev.gift && ev.gift.diamonds) || 1, ev.count || 1);
       else if (ev.type === 'tiktokGift' && mode === 'race') {   // 賽跑：用禮物名稱判斷是助力還是干擾
         const nm = plain((ev.gift && ev.gift.name) || ''), gn = tr.giftNames || {};
-        const kind = (gn.boost || []).some(n => plain(n) === nm) ? 'boost' : (gn.hinder || []).some(n => plain(n) === nm) ? 'hinder' : null;
+        const kind = giftNameHas(gn.boost, nm) ? 'boost' : giftNameHas(gn.hinder, nm) ? 'hinder' : null;
         if (kind) raceGift(ev.user, kind, ev.count || 1);
       }
     },
