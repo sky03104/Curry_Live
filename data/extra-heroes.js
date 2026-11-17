@@ -27,4 +27,6 @@ window.HEROES_DATA = window.HEROES_DATA.concat([
   { heroId: 'nekomeow', displayName: '那隻喵', faction: 'Meng', troop: 'Strategist', baseHp: 600, baseAtk: 68, baseArmor: 28, skillName: '雲爪妙計', extra: true },
   // 學姊（2026-11-16 咖哩第十隻）：萌國的長髮眼鏡女孩統帥（灰色連帽、牛仔外套、黑色上衣短褲、光腳，手拿冰抹茶拿鐵）。能力值取統帥平均（同布丁），技能「學姊罩你」，演出＝光環＋光柱。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。原圖的杯子上有星巴克的商標，已在圖上把商標塗成素色綠色圓形貼紙（見 CLAUDE.md）。
   { heroId: 'xuejie', displayName: '學姊', faction: 'Meng', troop: 'Commander', baseHp: 746, baseAtk: 55, baseArmor: 34, skillName: '學姊罩你', extra: true },
+  // 饅頭（2026-11-17 咖哩第十一隻）：萌國的灰虎斑胖貓猛將（紅纓頭盔、紅金鎧甲、紅披風、腰間佩劍，圓滾滾的白肚子）。能力值取猛將中間檔（同米其林），技能「肉球鎮營」，演出＝衝撞地裂。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
+  { heroId: 'mantou', displayName: '饅頭', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '肉球鎮營', extra: true },
 ]);
