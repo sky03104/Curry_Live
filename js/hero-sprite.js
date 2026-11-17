@@ -54,6 +54,7 @@ ML.createHeroSprite = function (heroes, config, basePath) {
     }
     return sheets.get(key);
   }
+  let preloadTotal = 0, preloadDone = 0;
   const ready = Promise.resolve();   // 不用等圖：畫面可以馬上開始跑
 
   // 示意用的怪獸（BOSS 的正式圖檔放進 assets/heroes/<id>.png 之後就不會再用到）：
@@ -83,6 +84,16 @@ ML.createHeroSprite = function (heroes, config, basePath) {
 
   return {
     ready,
+    // 一開始就把圖全部載好（背景慢慢載，不卡畫面）：list＝要載的武將（含 BOSS）。有逐格動畫的先載，沒有的後載，BOSS 最後。
+    // 每 intervalMs 毫秒載一隻（單張圖＋那隻的所有動畫圖）。載好的圖會留在記憶體，之後上場、出招就不用等下載。
+    preloadAll(list, intervalMs) {
+      const anims = h => Object.keys((config.heroAnims || {})[h.heroId] || {}).length;
+      const q = list.slice().sort((a, b) => (a.isBoss ? 1 : 0) - (b.isBoss ? 1 : 0) || anims(b) - anims(a));
+      preloadTotal = q.length; preloadDone = 0;
+      const step = () => { const h = q.shift(); if (!h) return; this.preload(h); preloadDone++; setTimeout(step, intervalMs || 120); };
+      setTimeout(step, 300);   // 等畫面先跑起來
+    },
+    preloadStatus() { return { total: preloadTotal, started: preloadDone, sheets: sheets.size, sheetsLoaded: [...sheets.values()].filter(Boolean).length }; },
     preload(hero) { load(hero); Object.keys((config.heroAnims || {})[hero.heroId] || {}).forEach(n => loadSheet(hero.heroId, n)); },   // 先去下載（上場時呼叫，讓第一次畫的時候圖已經在了）
     // 這隻武將有幾組待機動畫（idle、idle2、idle3…，依序）；停下來時輪流播
     idleNames(heroId) {
