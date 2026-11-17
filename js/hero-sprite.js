@@ -27,6 +27,7 @@ ML.createHeroSprite = function (heroes, config, basePath) {
   // 「用到才載入」（2026-11-14）：以前一開網頁就把全部武將圖（約 11 MB）載入，角色越多越慢；
   // 現在某隻武將第一次要畫（上場、換角、BOSS 出現）時，才去下載它那一張圖，之後就在記憶體裡。
   // 狀態：'loading' 下載中（這時先不畫，通常不到 0.1 秒）／'ok' 好了／'error' 載不到（畫底色塊＋名字，BOSS 畫示意怪獸）。
+  const retries = new Map(), RETRY_DELAYS = [2000, 5000, 15000, 30000, 60000, 60000, 60000, 60000];   // 載入失敗後第幾次重試要等幾毫秒
   const loadState = new Map();   // heroId → 'loading' | 'ok' | 'error'
   function load(h) {
     const id = h.heroId, s = loadState.get(id);
@@ -35,7 +36,11 @@ ML.createHeroSprite = function (heroes, config, basePath) {
     loadState.set(id, 'loading');
     const img = new Image();
     img.onload = () => { images.set(id, img); whites.set(id, makeWhite(img)); loadState.set(id, 'ok'); };
-    img.onerror = () => loadState.set(id, 'error');   // 圖載不到就畫底色塊＋名字，不讓整個遊戲停擺
+    img.onerror = () => {   // 圖載不到就先畫底色塊＋名字（BOSS 畫示意怪獸），不讓整個遊戲停擺；並且過幾秒自動重試（以前只試一次，網路剛好斷一下或網站剛更新，這隻就一直是示意怪獸，要重新整理才會好）
+      loadState.set(id, 'error');
+      const n = (retries.get(id) || 0) + 1; retries.set(id, n);
+      if (n <= RETRY_DELAYS.length) setTimeout(() => { if (loadState.get(id) === 'error') { loadState.delete(id); load(h); } }, RETRY_DELAYS[n - 1]);
+    };
     img.src = `${basePath}/${id}.png${window.APP_VERSION ? '?v=' + window.APP_VERSION : ''}`;   // 版本號當網址參數：更新後圖片也一起換新
     return 'loading';
   }
@@ -49,7 +54,11 @@ ML.createHeroSprite = function (heroes, config, basePath) {
     if (!sheets.has(key)) {
       sheets.set(key, null);
       const img = new Image();
-      img.onload = () => sheets.set(key, img);   // 載不到就維持 null，這個動作就不會播
+      img.onload = () => sheets.set(key, img);   // 載不到就維持 null，這個動作就不會播（過幾秒會自動重試）
+      img.onerror = () => {
+        const n = (retries.get(key) || 0) + 1; retries.set(key, n);
+        if (n <= RETRY_DELAYS.length) setTimeout(() => { if (sheets.get(key) === null) { sheets.delete(key); loadSheet(heroId, name); } }, RETRY_DELAYS[n - 1]);
+      };
       img.src = `${basePath}/${m.src}${window.APP_VERSION ? '?v=' + window.APP_VERSION : ''}`;
     }
     return sheets.get(key);
