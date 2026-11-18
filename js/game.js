@@ -234,18 +234,18 @@ ML.createGame = function (config, heroes) {
     }
 
     const lowText = text.toLowerCase();   // 英文名字（Joy）不分大小寫：打 joy、JOY 也算
-    // exactOnly 的武將（名字是愛心這種聊天裡常出現的字）：只有整句留言「剛好是那個名字（可重複幾次）」才算，夾在別的字裡不算；也不能靠留言換成她（只能第一次上場時召喚）
+    // exactOnly 的武將（名字是愛心這種聊天裡常出現的字）：只有整句留言「剛好是那個名字（可重複幾次）」才算，夾在別的字裡不算；已在場上的人要連打 3～6 顆才換成她（單顆愛心只會在第一次上場時召喚，免得大家習慣性發愛心就被換掉）
     const hit = nameTable.find(([name, h]) => !h.exactOnly && lowText.includes(name.toLowerCase()))
-      || (me ? null : nameTable.find(([name, h]) => h.exactOnly && exactNameOnly(name, text)));
+      || nameTable.find(([name, h]) => h.exactOnly && exactNameOnly(name, text, me ? 3 : 1));
     if (!hit) return;   // 沒提到武將
     if (me) { switchHero(me, text, hit[1]); return; }
     joinHero(user, hit[1]);
   }
 
   // 整句留言只有武將名（可重複 1～6 次、中間可有空白，愛心的變體選擇符 \uFE0F 不算）：例如「❤️」「❤❤❤」
-  function exactNameOnly(name, text) {
+  function exactNameOnly(name, text, minTimes) {
     const strip = t => String(t).replace(/[\uFE0E\uFE0F\u200D\s]/g, ''), n = strip(name), t = strip(text);
-    return !!n && !!t && t.length <= n.length * 6 && t.split(n).join('') === '';
+    return !!n && !!t && t.length >= n.length * (minTimes || 1) && t.length <= n.length * 6 && t.split(n).join('') === '';
   }
   // 讓一位觀眾帶著某隻武將上場（留言武將名、或還沒上場就送禮時自動上場都走這裡）。成功回傳場上的武將，不能上場（剛烙跑、場上滿了）回傳 null
   function joinHero(user, hero, quiet) {
