@@ -7,7 +7,11 @@
 想多用別的特效：把名稱加進 PICK、重新輸出再跑一次。"""
 import json, os, subprocess, sys
 PICK = ['melee/double-slash', 'melee/spin-slash', 'melee/dagger-flurry', 'melee/claw-swipe', 'impacts/crit-hit',
-        'lightning/zap-hit', 'fire/fire-ring', 'fire/fire-tornado', 'holy/heal-aoe', 'explosions/plasma-explosion']
+        'lightning/zap-hit', 'fire/fire-ring', 'fire/fire-tornado', 'holy/heal-aoe', 'explosions/plasma-explosion',
+        # 2026-11-18 武將專屬特效（每隻三國武將一組普攻＋技能）
+        'melee/heavy-cleave', 'melee/spear-sweep', 'melee/scythe-reap', 'melee/hammer-smash', 'projectiles/arrow', 'fire/fireball',
+        'fire/meteor', 'fire/flame-pillar', 'ice/frost-nova', 'ice/ice-spikes', 'shadow/dark-explosion', 'shadow/curse',
+        'nature/earth-spike', 'nature/quake', 'holy/smite', 'holy/holy-pillar', 'arcane/star-fall', 'arcane/arcane-missiles', 'water/wave-crash']
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def main(sheets):
@@ -22,6 +26,15 @@ def main(sheets):
         subprocess.run(['pngquant', '--quality=65-95', '--speed', '1', '--force', '--output', dst, src], capture_output=True)
         if not os.path.exists(dst): open(dst, 'wb').write(open(src, 'rb').read())
         frames = [[f['frame']['x'], f['frame']['y'], f['frame']['w'], f['frame']['h'], px, py, f['duration']] for f in j['frames']]
+        if len(frames) > 60:   # 超過 60 格：隔一格取一格、每格時間加倍（檔案小一半，看起來差不多），重新排成新圖
+            from PIL import Image
+            keep = frames[::2]; im = Image.open(dst).convert('RGBA'); cols = 10
+            sheet = Image.new('RGBA', (cols * fw, ((len(keep) + cols - 1) // cols) * fh), (0, 0, 0, 0)); nf = []
+            for n, f in enumerate(keep):
+                sheet.paste(im.crop((f[0], f[1], f[0] + fw, f[1] + fh)), ((n % cols) * fw, (n // cols) * fh))
+                nf.append([(n % cols) * fw, (n // cols) * fh, fw, fh, px, py, f[6] * 2])
+            sheet.save(dst, optimize=True); subprocess.run(['pngquant', '--quality=65-95', '--speed', '1', '--force', '--output', dst, dst], capture_output=True)
+            frames = nf
         out[key] = {'src': key + '.png', 'w': fw, 'h': fh, 'pivot': [px, py], 'frames': frames, 'pixel': True}
         print(key, len(frames), '格', os.path.getsize(dst) // 1024, 'KB')
     js = ('// 自動產生（tools/build_pixelfx_sprites.py），不要手改。pixelfx 特效，MIT，見 assets/fx/PIXELFX_LICENSE.txt\n'
