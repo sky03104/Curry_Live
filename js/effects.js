@@ -296,12 +296,17 @@ ML.createEffects = function () {
       return add({ type: 'sprite', name, x, y, scale, rot: o.rot || 0, flip: !!o.flip, cx: !!o.cx, loop: o.loop, alpha: o.alpha,
         ground: !!o.ground, life: o.life || total });
     },
+    // 隨機挑一個有載入的圖片特效（pixelfx 的特效跟原本的輪流用，每次看起來不一樣）
+    pick(names) { const ok = names.filter(n => SPR[n]); return ok.length ? ok[Math.floor(Math.random() * ok.length)] : null; },
     // 命中火花（打中的瞬間）
-    hit(x, y, size) { return fx.sprite('hit_spark', x, y, { w: size * 1.6, life: 0.5 }); },
+    hit(x, y, size) { return fx.sprite(Math.random() < 0.25 && SPR['px_impacts_crit-hit'] ? 'px_impacts_crit-hit' : 'hit_spark', x, y, { w: size * 1.6, life: 0.5 }); },
     // 大爆炸（全場攻擊、塔堡被打爆）
     explode(x, y, size, ground) { return fx.sprite('explosions_big-explosion', x, y, { w: size * 2.4, life: 1.0 }); },
     slash(x, y, angle, r, color) {
-      if (SPR['melee_axe-smear']) { fx.sprite('melee_axe-smear', x, y, { w: r * 2.6, rot: angle, life: 0.5 }); fx.hit(x, y, r * 0.8); return; }
+      if (SPR['melee_axe-smear']) {
+        const n = fx.pick(['melee_axe-smear', 'px_melee_double-slash', 'px_melee_spin-slash', 'px_melee_dagger-flurry']);   // 斬擊：原本的斜月斬＋pixelfx 的三種輪流用
+        fx.sprite(n, x, y, { w: r * 2.6, rot: angle, life: n.indexOf('px_') === 0 ? 0.8 : 0.5 }); fx.hit(x, y, r * 0.8); return;
+      }
       add({ type: 'slash', x, y, angle, r, color, life: 0.45 });
     },
     circle(x, y, r, color, life) {
@@ -309,7 +314,11 @@ ML.createEffects = function () {
       add({ type: 'circle', ground: true, x, y, r, color, life });
     },
     bolt(x, y, h, color, w) {
-      if (SPR['lightning_lightning-strike']) { fx.sprite('lightning_lightning-strike', x, y, { scale: Math.max(1.5, h / 110), life: 0.6 }); return; }
+      if (SPR['lightning_lightning-strike']) {
+        fx.sprite('lightning_lightning-strike', x, y, { scale: Math.max(1.5, h / 110), life: 0.6 });
+        if (SPR['px_lightning_zap-hit']) fx.sprite('px_lightning_zap-hit', x, y, { w: Math.max(90, h * 0.7), life: 0.9 });   // 落點多一團電火花（pixelfx）
+        return;
+      }
       const pts = jagged(x + rnd(-h * 0.15, h * 0.15), y - h, x, y, 9, h * 0.06);
       const mid = pts[5];
       add({ type: 'bolt', pts, branch: jagged(mid[0], mid[1], mid[0] + rnd(-1, 1) * h * 0.25, mid[1] + h * 0.25, 4, h * 0.04), color, w, life: 0.5 });
@@ -336,7 +345,11 @@ ML.createEffects = function () {
       }
     },
     claw(x, y, angle, r, color) {
-      if (SPR['melee_shadow-claw']) { fx.sprite('melee_shadow-claw', x, y, { w: r * 2.2, rot: angle + Math.PI * 0.5, life: 0.5 }); fx.hit(x, y, r * 0.7); return; }
+      if (SPR['melee_shadow-claw']) {
+        if (Math.random() < 0.5 && SPR['px_melee_claw-swipe']) fx.sprite('px_melee_claw-swipe', x, y, { w: r * 2.2, rot: angle, life: 0.9 });   // pixelfx 的爪痕（朝向打的方向）
+        else fx.sprite('melee_shadow-claw', x, y, { w: r * 2.2, rot: angle + Math.PI * 0.5, life: 0.5 });
+        fx.hit(x, y, r * 0.7); return;
+      }
       add({ type: 'claw', x, y, angle, r, color, life: 0.5 });
     },
     fang(x, y, r, color) { add({ type: 'fang', x, y, r, color, life: 0.5 }); fx.hit(x, y, r * 0.7); },
@@ -344,6 +357,8 @@ ML.createEffects = function () {
     shock(x, y, r, color, life) {
       if (SPR['explosions_fire-nova']) {
         const white = String(color).toLowerCase() === '#ffffff';
+        const alt = Math.random() < 0.4 ? (white ? 'px_explosions_plasma-explosion' : 'px_fire_fire-ring') : null;   // 一部分換成 pixelfx 的電漿爆炸／火圈
+        if (alt && SPR[alt]) { fx.sprite(alt, x, y, { w: r * (white ? 2.2 : 3.2), ground: true, life: alt === 'px_fire_fire-ring' ? 1.6 : 1.0 }); return; }
         fx.sprite(white ? 'explosions_arcane-burst' : 'explosions_fire-nova', x, y, { w: r * (white ? 2.2 : 2.6), ground: true, life: Math.max(0.8, (life || 0.7) * 1.4) }); return;
       }
       add({ type: 'shock', ground: true, x, y, r, color, life: life || 0.7 });
