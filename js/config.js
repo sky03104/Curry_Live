@@ -20,7 +20,7 @@ window.GAME_CONFIG = {
     xuejie:   { attack: { style: 'projectile', emoji: '🧋', color: '#d9b27a' }, skill: { style: 'heartWave', emoji: '🍵', color: '#7bd46b' } },   // 學姊：丟冰飲、抹茶光波
     nekomeow: { attack: { style: 'claw', color: '#8f9bff' }, skill: { style: 'emojiStorm', emoji: '🐾', n: 16, color: '#8f9bff' } },   // 那隻喵：藍紫爪痕、肉球旋風
     xiaoni:   { attack: { style: 'shockSmash', color: '#ffd35c' }, skill: { style: 'stampSmash', text: '100T', color: '#ffd35c' } },   // 小妮：重擊震波、100T 大字砸下來
-    heart:    { attack: { style: 'shockSmash', color: '#ff8fb8' }, skill: { style: 'emojiRain', emoji: '🍭', n: 9, big: 0.9, color: '#ff8fb8' } },   // ❤️：棒棒糖重擊震波、棒棒糖雨
+    heart:    { attack: { style: 'sweetSmash', color: '#ff8fb8' }, skill: { style: 'candyBang', n: 9, color: '#ff8fb8' } },   // ❤️：棒棒糖砸下去（糖果愛心炸開）、甜蜜糖果風暴（棒棒糖雨＋超大愛心）
     // ---- 三國武將專屬特效（2026-11-18，組合名稱見 hero-fx.js 的 PRESETS）----
     liubei: { attack: 'double', skill: 'holyPillar' },
     guanyu: { attack: 'heavy', skill: 'earthSpike' },
