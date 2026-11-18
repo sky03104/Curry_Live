@@ -190,6 +190,46 @@ window.ML = window.ML || {};
   };
 
 
+
+  // ❤️ 專屬：甜蜜系的兩組演出（棒棒糖當大錘子）
+  Object.assign(STYLES, {
+    // 甜蜜重擊（普攻）：衝過去，棒棒糖砸下去——粉紅震波＋糖果和愛心炸開＋粉紅火花（不用錘擊圖：它是土色，跟粉紅甜點不搭）
+    sweetSmash: {
+      onHit(tv, h, p) {
+        const c = pick(p, 'color', '#ff8fb8');
+        h.fx.shock(tv.x, tv.y + tv.size * 0.5, tv.size * 1.7, c, 0.7, true);
+        h.fx.sparks(tv.x, tv.y, c, 22, 480, 5, 0.7); h.fx.sparks(tv.x, tv.y, '#ffffff', 10, 380, 4, 0.5);
+        for (const ch of ['🍬', '💖', '🍭']) emojiBurst(tv, h, ch, 3, 420);
+        h.ring(tv, { life: 0.4, color: c, max: 1.4, width: 7 });
+        h.quake(0.55);
+      },
+    },
+    // 甜蜜糖果風暴（技能）：地上浮出粉紅法陣，一堆大棒棒糖從天上砸下來，落地炸出超大愛心、糖果雨和粉紅震波
+    candyBang: {
+      hit: 0.75,
+      fire(h, tv, p) {
+        const c = pick(p, 'color', '#ff8fb8');
+        h.fx.circle(tv.x, tv.y + tv.size * 0.5, tv.size * 1.6, c, 1.4);
+        const n = pick(p, 'n', 9), list = ['🍭', '🍭', '🍬', '🍭'];
+        for (let i = 0; i < n; i++) h.after(i * 0.05, () => {
+          const x = tv.x + rnd(-tv.size * 0.9, tv.size * 0.9);
+          h.fx.emoji(x, tv.y - tv.size * 2.8, list[i % list.length], tv.size * rnd(0.45, 1.1), rnd(-30, 30), rnd(520, 760), 900, 0.75, rnd(-6, 6), tv.y + tv.size * 0.5);
+        });
+      },
+      onHit(tv, h, p) {
+        const c = pick(p, 'color', '#ff8fb8'), fy = tv.y + tv.size * 0.5;
+        h.fx.stamp(tv.x, tv.y - tv.size * 0.2, '❤️', tv.size * 1.5, '#ff5c9a', 1);   // 超大愛心蓋章
+        h.fx.shock(tv.x, fy, tv.size * 2.6, c, 0.9, true); h.fx.shock(tv.x, fy, tv.size * 1.6, '#ffffff', 0.6, true);
+        h.fx.pillar(tv.x, fy, tv.size * 1.4, tv.size * 3.2, c);
+        h.fx.sparks(tv.x, tv.y, c, 46, 680, 7, 1); h.fx.sparks(tv.x, tv.y, '#ffffff', 18, 520, 5, 0.8);
+        for (const ch of ['🍭', '🍬', '💖', '💗']) emojiBurst(tv, h, ch, 5, 520);
+        h.fx.debris(tv.x, tv.y + tv.size * 0.4, '#ff9ec7', 10, 560, fy);
+        h.ring(tv, { life: 0.7, color: c, max: 2.6, width: 10 });
+        h.quake(1.3);
+      },
+    },
+  });
+
   // ============================================================
   // 圖片特效組合（pixelfx，三國武將用）：config.heroFx 裡只要寫組合名稱，例如  guanyu: { attack: 'heavy', skill: 'earthSpike' }
   // 組合在下面 PRESETS 定義：base＝用哪一種演出骨架，fire＝出招那一刻放的特效，list＝打中那一刻放的特效。

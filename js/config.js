@@ -20,6 +20,7 @@ window.GAME_CONFIG = {
     xuejie:   { attack: { style: 'projectile', emoji: '🧋', color: '#d9b27a' }, skill: { style: 'heartWave', emoji: '🍵', color: '#7bd46b' } },   // 學姊：丟冰飲、抹茶光波
     nekomeow: { attack: { style: 'claw', color: '#8f9bff' }, skill: { style: 'emojiStorm', emoji: '🐾', n: 16, color: '#8f9bff' } },   // 那隻喵：藍紫爪痕、肉球旋風
     xiaoni:   { attack: { style: 'shockSmash', color: '#ffd35c' }, skill: { style: 'stampSmash', text: '100T', color: '#ffd35c' } },   // 小妮：重擊震波、100T 大字砸下來
+    heart:    { attack: { style: 'sweetSmash', color: '#ff8fb8' }, skill: { style: 'candyBang', n: 9, color: '#ff8fb8' } },   // ❤️：棒棒糖砸下去（糖果愛心炸開）、甜蜜糖果風暴（棒棒糖雨＋超大愛心）
     // ---- 三國武將專屬特效（2026-11-18，組合名稱見 hero-fx.js 的 PRESETS）----
     liubei: { attack: 'double', skill: 'holyPillar' },
     guanyu: { attack: 'heavy', skill: 'earthSpike' },
@@ -458,6 +459,13 @@ window.GAME_CONFIG = {
       walk: { src: 'mantou_walk.png', frames: 8, cw: 304, ch: 402, ground: 399, fps: 9 },   // 直立胖貓搖擺走路
       attack: { src: 'mantou_attack.png', frames: 8, cw: 317, ch: 405, ground: 402, fps: 10, hitFrame: 5 },   // 肉球爪擊，第 5 格手伸到最前面
       skill: { src: 'mantou_skill.png', frames: 8, cw: 331, ch: 421, ground: 417, fps: 8, hitFrame: 6 },   // 技能「肉球鎮營」：蹲下→跳起→披風飛揚落下→雙手往前壓（Gemini 的動作跟提示詞略有不同）
+    },
+    heart: {   // ❤️：Gemini 生圖（8 格 4x2，make_anim_sheet.py --grid 4x2 --faces right，各組縮放不同，見 CLAUDE.md；pngquant 30-85 壓縮）
+      idle: { src: 'heart_idle.png', frames: 8, cw: 266, ch: 369, ground: 366, fps: 3, repeat: 2 },   // 待機：蹲在地上用手指畫圈圈
+      eat: { src: 'heart_idle.png', frames: 8, cw: 266, ch: 369, ground: 366, fps: 3, repeat: 2 },   // 回血時也播同一組
+      walk: { src: 'heart_walk.png', frames: 8, cw: 255, ch: 407, ground: 404, fps: 9 },   // 棒棒糖扛肩輕快走路
+      attack: { src: 'heart_attack.png', frames: 8, cw: 322, ch: 423, ground: 419, fps: 10, hitFrame: 6 },   // 棒棒糖揮擊，第 6 格打在地上（第 4、5 格的棒棒糖被原圖格子邊切掉一部分，所以命中對在完整的第 6 格）
+      skill: { src: 'heart_skill.png', frames: 8, cw: 312, ch: 464, ground: 461, fps: 8, hitFrame: 6 },   // 技能「甜蜜重擊」：跳起來→棒棒糖砸地（第 3、4 格用 --lift 0,0,40,55,25,0,0,0 抬高跳起）
     },
     xuejie: {
       idle: { src: 'xuejie_idle.png', frames: 7, cw: 252, ch: 415, ground: 412, fps: 3, repeat: 2 },   // 待機：拿麥克風唱歌（用 AI 原圖只有上半身的格子接上腿拼成，共 7 格；原圖第 7 格沒拿杯子沒用）

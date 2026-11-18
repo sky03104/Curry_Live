@@ -358,10 +358,10 @@ ML.createEffects = function () {
     },
     fang(x, y, r, color) { add({ type: 'fang', x, y, r, color, life: 0.5 }); fx.hit(x, y, r * 0.7); },
     stamp(x, y, text, size, color, life) { add({ type: 'stamp', x, y, text, size, color, life: life || 0.9 }); },
-    shock(x, y, r, color, life) {
+    shock(x, y, r, color, life, noAlt) {
       if (SPR['explosions_fire-nova']) {
         const white = String(color).toLowerCase() === '#ffffff';
-        const alt = Math.random() < 0.4 ? (white ? 'px_explosions_plasma-explosion' : 'px_fire_fire-ring') : null;   // 一部分換成 pixelfx 的電漿爆炸／火圈
+        const alt = !noAlt && Math.random() < 0.4 ? (white ? 'px_explosions_plasma-explosion' : 'px_fire_fire-ring') : null;   // 一部分換成 pixelfx 的電漿爆炸／火圈
         if (alt && SPR[alt]) { fx.sprite(alt, x, y, { w: r * (white ? 2.2 : 3.2), ground: true, life: alt === 'px_fire_fire-ring' ? 1.6 : 1.0 }); return; }
         fx.sprite(white ? 'explosions_arcane-burst' : 'explosions_fire-nova', x, y, { w: r * (white ? 2.2 : 2.6), ground: true, life: Math.max(0.8, (life || 0.7) * 1.4) }); return;
       }
