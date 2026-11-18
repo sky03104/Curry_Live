@@ -547,6 +547,7 @@ window.GAME_CONFIG = {
   // 例如想讓簡體字「吕布」也有效： '吕布': 'lvbu'
   heroAliases: {
     'Joy': 'joy',   // 九億的舊名字，觀眾打 Joy 也認
+    '❤️': 'heart',  // EN 的召喚字：整句愛心（exactOnly，見 game.js）
   },
 
   // ---------- 陣營 ----------

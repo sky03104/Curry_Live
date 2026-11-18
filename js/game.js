@@ -244,7 +244,7 @@ ML.createGame = function (config, heroes) {
 
   // 整句留言只有武將名（可重複 1～6 次、中間可有空白，愛心的變體選擇符 \uFE0F 不算）：例如「❤️」「❤❤❤」
   function exactNameOnly(name, text, minTimes) {
-    const strip = t => String(t).replace(/[\uFE0E\uFE0F\u200D\s]/g, ''), n = strip(name), t = strip(text);
+    const strip = t => String(t).replace(/[\uFE0E\uFE0F\u200D\s]/g, '').toLowerCase(), n = strip(name), t = strip(text);
     return !!n && !!t && t.length >= n.length * (minTimes || 1) && t.length <= n.length * 6 && t.split(n).join('') === '';
   }
   // 讓一位觀眾帶著某隻武將上場（留言武將名、或還沒上場就送禮時自動上場都走這裡）。成功回傳場上的武將，不能上場（剛烙跑、場上滿了）回傳 null
@@ -335,7 +335,7 @@ ML.createGame = function (config, heroes) {
   // 已在場上的觀眾可以換武將，血量照比例帶過去（剩三成血，換過去也是三成），所以不能靠換角補血。
   // 留言必須「剛好只有武將名」才算換角，避免聊天時提到別的武將（例如「呂布好強」）就被誤換。
   function switchHero(me, text, hero) {
-    if (!hit_name(text) || hero === me.hero) return;
+    if (!(hero.exactOnly || hit_name(text)) || hero === me.hero) return;   // exactOnly 的武將（EN）在 handleChat 已確認整句只有她的名字／愛心，不必再比對一次
     if (duel && (duel.a === me.id || duel.b === me.id)) { notice(`${me.name} 單挑中不能換武將`); return; }
     if (race && race.entrants.has(me.id) && hero.faction !== (tr.faction || 'Meng')) { notice(`${me.name} 參賽中只能換成萌國武將`); return; }
     if (time < (me.switchReadyAt || 0)) { notice(`${me.name} 剛換過武將，請稍等`); return; }
