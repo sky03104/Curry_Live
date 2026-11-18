@@ -7,7 +7,7 @@
 想多用別的特效：把名稱加進 PICK、重新輸出再跑一次。"""
 import json, os, subprocess, sys
 PICK = ['melee/double-slash', 'melee/spin-slash', 'melee/dagger-flurry', 'melee/claw-swipe', 'impacts/crit-hit',
-        'lightning/zap-hit', 'fire/fire-ring', 'explosions/plasma-explosion']
+        'lightning/zap-hit', 'fire/fire-ring', 'fire/fire-tornado', 'holy/heal-aoe', 'explosions/plasma-explosion']
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def main(sheets):

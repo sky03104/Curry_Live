@@ -283,6 +283,7 @@ ML.createEffects = function () {
     // 往上飄的光點（回血、復活）
     rise(x, y, color, n, spread) {
       if (SPR['holy_holy-heal']) fx.sprite('holy_holy-heal', x, y + spread * 1.2, { w: spread * 5, life: 1.2 });
+      if (SPR['px_holy_heal-aoe']) fx.sprite('px_holy_heal-aoe', x, y + spread * 1.2, { w: spread * 7, ground: true, life: 1.6 });   // 腳下一圈綠色治療光環（pixelfx）
       for (let c = 0; c < n; c++) {
         add({ type: 'p', x: x + rnd(-spread, spread), y: y + rnd(-spread, spread) * 0.6, vx: rnd(-15, 15), vy: rnd(-160, -70),
           g: 0, drag: 0.5, size: rnd(3, 6), color: Math.random() < 0.3 ? '#fff' : color, life: rnd(0.5, 0.9) });
@@ -328,6 +329,9 @@ ML.createEffects = function () {
       add({ type: 'pillar', x, y, w, h, color, life: 0.7 });
     },
     crack(x, y, r, color) {
+      if (SPR['px_fire_fire-tornado'] && Math.random() < 0.4) {   // 四成機率：地上捲起一道火焰龍捲風（pixelfx）
+        fx.sprite('px_fire_fire-tornado', x, y + r * 0.2, { w: r * 2.2, life: 1.8 }); fx.sprite('nature_fissure', x, y, { w: r * 2.4, cx: true, ground: true, life: 1.0 }); return;
+      }
       if (SPR['nature_fissure']) { fx.sprite('nature_fissure', x, y, { w: r * 2.4, cx: true, ground: true, life: 1.0 }); return; }
       const lines = [];
       for (let c = 0; c < 7; c++) { const a = c / 7 * Math.PI * 2 + rnd(-0.3, 0.3), d = rnd(0.6, 1) * r; lines.push(jagged(0, 0, Math.cos(a) * d, Math.sin(a) * d, 4, r * 0.1)); }
