@@ -29,4 +29,6 @@ window.HEROES_DATA = window.HEROES_DATA.concat([
   { heroId: 'xuejie', displayName: '學姊', faction: 'Meng', troop: 'Commander', baseHp: 746, baseAtk: 55, baseArmor: 34, skillName: '學姊罩你', extra: true },
   // 饅頭（2026-11-17 咖哩第十一隻）：萌國的灰虎斑胖貓猛將（紅纓頭盔、紅金鎧甲、紅披風、腰間佩劍，圓滾滾的白肚子）。能力值取猛將中間檔（同米其林），技能「肉球鎮營」，演出＝衝撞地裂。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
   { heroId: 'mantou', displayName: '饅頭', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '肉球鎮營', extra: true },
+  // ❤️（2026-11-18 咖哩第十二隻，heroId: heart）：萌國的棕髮瀏海女孩猛將（粉色毛衣、白色小裙、白球鞋，從上往下看的角度，手拿超大彩虹旋渦棒棒糖，糖上綁紅色蝴蝶結）。名字就是愛心符號「❤️」；因為愛心太常出現在聊天裡，**只有整句留言剛好是愛心（❤️、❤️❤️…最多 6 顆）才會召喚她**，聊天裡夾著愛心不算，也不能靠留言愛心換成她（exactOnly，見 game.js）。能力值取猛將中間檔（同米其林），技能「甜蜜重擊」（用超大棒棒糖打人）。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
+  { heroId: 'heart', displayName: '❤️', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '甜蜜重擊', extra: true, exactOnly: true },
 ]);
