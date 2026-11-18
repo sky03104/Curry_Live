@@ -109,6 +109,14 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       if (g) { effects.sprite('ui_level-up', g.cx, g.cy + g.R * 0.9, { scale: Math.max(2, g.R * 2.4 / 96), life: 1.4 }); effects.sparks(g.cx, g.cy, '#ffd35c', 60, 640, 7, 1); effects.pillar(g.cx, g.cy + g.R * 0.9, g.R * 0.7, g.R * 2.2, '#ffd35c'); }
       if (sv) { sv.hop = 1; sv.hopH = 1.4; sv.flash = 0.6; }
       quake = Math.max(quake, 0.6);
+      // 轉的人用自己的技能特效慶祝（打在自己身上，只有畫面效果，不算傷害）
+      const wp = game.getPlayer(e.id), wfx = (sv && sv.x !== null && wp && ML.heroFx) ? ML.heroFx.pick(config, wp.hero, 'skill') : null;
+      if (wfx) {
+        const wc = bright((config.factions[wp.hero.faction] || { color: '#cccccc' }).color);
+        const WH2 = { v: sv, fx: effects, color: wc, after, quake: n => { quake = Math.max(quake, Math.min(n, 0.8)); },
+          ring: (t, o) => rings.push(Object.assign({ v: t, age: 0 }, o)), float: () => {} };
+        try { if (wfx.def.fire) wfx.def.fire(WH2, sv, wfx.p); after(wfx.def.fire ? 0.35 : 0.05, () => { if (views.has(e.id)) wfx.def.onHit(sv, WH2, wfx.p); }); } catch (err) { /* 慶祝特效失敗不影響轉輪 */ }
+      }
       return;
     }
     if (e.type === 'duelGo') { quake = Math.max(quake, 1.2); return; }
@@ -608,6 +616,7 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
     updateLeavers(dt);
     quake = Math.max(0, quake - dt * 3);
     if (dim && (dim.age += dt) >= dim.life) dim = null;
+    const WHs = game.getWheel();
 
     for (const [id, v] of views) {
       const p = game.getPlayer(id);
@@ -622,6 +631,11 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       v.faceShown += clamp(v.face - v.faceShown, -dt * 12, dt * 12);   // 轉身不是瞬間翻面，而是很快地轉過去
       v.flash = Math.max(0, v.flash - dt * 4);
       if (v.anim && ((v.anim.t += dt) >= v.anim.dur + 0.3 || v.down || (v.lunge && !v.anim.fight))) v.anim = null;   // 播完（或倒地、出招）就結束
+      if (v.wheelSp && WHs && WHs.phase === 'spin' && WHs.spinner && WHs.spinner.id === v.id) {   // 轉輪旋轉中：轉的人一直播待機動畫，轉輪快停下來（後段）時跟著一下一下跳，越跳越快
+        if (!v.anim) startAnim(v, 'idle');
+        const pr = WHs.t / (WHs.dur || 6);
+        if (pr > 0.5) { v.spinHop = (v.spinHop || 0) - dt; if (v.spinHop <= 0) { v.hop = 1; v.hopH = 0.7 + (pr - 0.5) * 1.2; v.spinHop = 0.85 - (pr - 0.5) * 0.9; } }
+      }
       v.shake = Math.max(0, v.shake - dt * 4);
       v.hop = Math.max(0, v.hop - dt * 2.2);
       const kd = Math.max(0, 1 - dt * 7); v.kbx *= kd; v.kby *= kd;   // 擊退慢慢彈回原位
@@ -726,13 +740,27 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       text('🏆 比賽結果', cx, by - 44, 36, '#ffd35c');
       R.results.forEach((r, i) => { const p = game.getPlayer(r.id); text(`第 ${r.rank} 名　${short(p ? p.name : '', 8)}　+${r.xp} 經驗`, cx, by - 6 + i * 30, 24, ['#ffd35c', '#dcdcdc', '#d99a6c'][i]); });
       if (!R.results.length) text('沒有人完賽', cx, by + 10, 24, '#fff');
-    }
+      else if (R.results[0].rank === 1) drawWinnerShowcase('race:' + R.results[0].id + ':' + R.results.length, R.results[0].id, arena, by + 76);
+    } else showcase = null;
   }
 
 
   // ---------- 單挑賽：上方大血條、怒氣條、倒數、結果；申請階段的中間彈窗 ----------
   // 畫面被等比例縮小（直播橫幅）時，單挑的上方資訊要放大補回來，不然字太小
   const duelZoom = () => clamp(0.6 / viewK, 1, 1.5);
+  // 賽跑／障礙賽第一名、單挑贏家：結果橫幅左邊放一隻他的武將，播一次待機動畫（沒有待機動畫的就只有呼吸＋開頭跳一下）
+  let showcase = null;
+  function drawWinnerShowcase(key, id, arena, foot) {
+    const p = game.getPlayer(id); if (!p || p.isBoss || !p.hero) return;
+    if (!showcase || showcase.key !== key) {
+      const list = sprite.idleNames(p.hero.heroId), nm = list.length ? list[Math.floor(Math.random() * list.length)] : '', info = nm && sprite.animInfo(p.hero.heroId, nm);
+      showcase = { key, t0: time, name: info ? nm : '', dur: info ? info.dur : 0 };
+    }
+    const age = time - showcase.t0, size = clamp(arena.h * 0.4, 70, 150), x = arena.x + size * 0.75 + 12, hop = age < 0.5 ? Math.sin(age / 0.5 * Math.PI) * size * 0.25 : 0;
+    ctx.save();
+    sprite.draw(ctx, p.hero, x, foot - size / 2 - hop, size, { pose: 'idle', poseTime: age, flash: 0, lean: 0, facing: 1, phase: 0, moving: false, anim: showcase.name && age < showcase.dur + 0.3 ? { name: showcase.name, t: age } : null });
+    ctx.restore();
+  }
   // 右下角「圍觀的人」說明框：寬度跟右上角的助攻榜一樣，字太長就換行（最多三行，字會自動縮小到放得下）
   function duelHintBox(D, w) {
     // 一小段一小段排（不在「@名字」中間斷行）：放得下就接在同一行，放不下才換行
@@ -817,7 +845,8 @@ ML.createRenderer = function (canvas, game, config, sprite, effects, getLegend, 
       text(`+${R.winXp} 經驗　${R.streak} 連勝${R.broke ? `　打倒 ${R.broke} 連勝！` : ''}`, cx, by - 10, 24, '#b8ffb0');
       text(`${short(R.loserName, 8)}　−${R.loseXp} 經驗${R.levelDown ? '　掉等級了…' : ''}`, cx, by + 26, 22, '#ff9a9a');
       if (R.why) text(R.why, cx, by + 62, 15, '#e8dcc0', 'center', false);
-    }
+      drawWinnerShowcase('duel:' + R.winnerId + ':' + R.winXp, R.winnerId, arena, by + 82);
+    } else showcase = null;
   }
   // ---------- 轉輪：大轉輪、結果榜、提示 ----------
   function drawWheel() {
