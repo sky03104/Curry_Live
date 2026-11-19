@@ -31,4 +31,6 @@ window.HEROES_DATA = window.HEROES_DATA.concat([
   { heroId: 'mantou', displayName: '饅頭', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '肉球鎮營', extra: true },
   // ❤️（2026-11-18 咖哩第十二隻，heroId: heart）：萌國的棕髮瀏海女孩猛將（粉色毛衣、白色小裙、白球鞋，從上往下看的角度，手拿超大彩虹旋渦棒棒糖，糖上綁紅色蝴蝶結）。**2026-11-18 咖哩改名成「EN」**（heroId 仍是 heart）；召喚方式仍是整句愛心（別名，見 config.js 的 heroAliases），整句留言剛好是 EN 也行；因為愛心太常出現在聊天裡，**只有整句留言剛好是愛心（❤️、❤️❤️…最多 6 顆）才會召喚她**，聊天裡夾著愛心不算，也不能靠留言愛心換成她（exactOnly，見 game.js）。能力值取猛將中間檔（同米其林），技能「甜蜜重擊」（用超大棒棒糖打人）。名字以外的設定（兵種、數值、技能名）是 Claude 先定的。
   { heroId: 'heart', displayName: 'EN', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '甜蜜重擊', extra: true, exactOnly: true },
+  // 鯊魚煙（2026-11-19 咖哩第十三隻）：萌國的黑道大哥鯊魚猛將（直條紋西裝、黑色毛領披風、金鍊子、金錶、胸口紅玫瑰、嘴叼雪茄）。名字以外的設定（兵種、數值、技能名）是 Claude 先定的：猛將中間檔（同米其林），技能「煙霧瀰漫」（吸一口雪茄吐出大片煙霧）。
+  { heroId: 'sharksmoke', displayName: '鯊魚煙', faction: 'Meng', troop: 'Vanguard', baseHp: 928, baseAtk: 52, baseArmor: 47, skillName: '煙霧瀰漫', extra: true },
 ]);

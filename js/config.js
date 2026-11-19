@@ -16,6 +16,7 @@ window.GAME_CONFIG = {
     hamster:  { attack: { style: 'projectile', emoji: '🧀', color: '#ffd35c' }, skill: { style: 'emojiStorm', emoji: '🧀', n: 18, color: '#ffd35c' } },   // 西當普利鼠：丟起司、起司旋風
     yam:      { attack: { style: 'claw', color: '#b06cff' }, skill: { style: 'tigerPounce', color: '#b06cff' } },                      // 蕃薯：紫色爪痕、猛虎撲殺
     joy:      { attack: { style: 'claw', color: '#ff5a4d' }, skill: { style: 'emojiRain', emoji: '🍗', n: 10, big: 0.6, color: '#ffb36b' } },   // Joy：紅色爪痕、大雞腿雨
+    sharksmoke: { attack: { style: 'bite', color: '#ffffff' }, skill: { style: 'smokeBlow', color: '#cfd4dc' } },   // 鯊魚煙：張大嘴咬、吸一口雪茄吐大片煙霧
     mantou:   { attack: { style: 'claw', color: '#f2f2f8' }, skill: { style: 'stampSmash', text: '肉球', color: '#ffd35c' } },   // 饅頭：肉球爪擊、「肉球」大字蓋章
     xuejie:   { attack: { style: 'projectile', emoji: '🧋', color: '#d9b27a' }, skill: { style: 'heartWave', emoji: '🍵', color: '#7bd46b' } },   // 學姊：丟冰飲、抹茶光波
     nekomeow: { attack: { style: 'claw', color: '#8f9bff' }, skill: { style: 'emojiStorm', emoji: '🐾', n: 16, color: '#8f9bff' } },   // 那隻喵：藍紫爪痕、肉球旋風
@@ -522,7 +523,7 @@ window.GAME_CONFIG = {
   // 程式假設每張全身圖原本都是「面向左邊」，往右走時會把圖左右翻面。
   // 如果發現某隻武將走路時是倒退著走（背對前進方向），代表牠的原圖其實面向右，
   // 把牠的英文 ID 加進下面這個清單就會修正。例如： ['taishici', 'sunquan']
-  artFacesRight: ['taishici', 'xuejie'],
+  artFacesRight: ['taishici', 'xuejie', 'sharksmoke'],
 
   // ---------- 留言指令 ----------
   commands: {
