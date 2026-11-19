@@ -139,6 +139,27 @@ window.ML = window.ML || {};
         h.quake(0.7);
       },
     },
+    // 煙霧瀰漫（鯊魚煙）：從嘴裡吐出一大片煙霧飄向對手，煙霧在對手身上炸開、整片罩住
+    smokeBlow: {
+      hit: 0.7,
+      fire(h, tv, p) {
+        const c = pick(p, 'color', '#cfd4dc');
+        for (let i = 0; i < 14; i++) h.after(i * 0.04, () => {
+          const t = 0.55, dx = tv.x - h.v.x, dy = tv.y - h.v.y;
+          h.fx.emoji(h.v.x, h.v.y, i % 3 ? '💨' : '☁️', h.v.size * rnd(0.3, 0.55), dx / t + rnd(-70, 70), dy / t - 60 + rnd(-70, 70), 80, t + 0.15, rnd(-3, 3));
+        });
+        h.ring(h.v, { life: 0.7, color: c, max: 2.4, width: 8 });
+      },
+      onHit(tv, h, p) {
+        const c = pick(p, 'color', '#cfd4dc');
+        emojiBurst(tv, h, '☁️', 16, 460);
+        emojiBurst(tv, h, '💨', 10, 560);
+        h.fx.shock(tv.x, tv.y + tv.size * 0.5, tv.size * 2.4, c, 0.9, true);
+        h.fx.sparks(tv.x, tv.y, '#eef1f5', 26, 420, 6, 0.9);
+        h.ring(tv, { life: 0.9, color: c, max: 2.8, width: 9 });
+        h.quake(0.8);
+      },
+    },
     // 食物旋風：一圈表情符號繞著對手轉、往上捲
     emojiStorm: {
       hit: 0.7,

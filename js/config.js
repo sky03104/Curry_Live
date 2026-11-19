@@ -16,6 +16,7 @@ window.GAME_CONFIG = {
     hamster:  { attack: { style: 'projectile', emoji: '🧀', color: '#ffd35c' }, skill: { style: 'emojiStorm', emoji: '🧀', n: 18, color: '#ffd35c' } },   // 西當普利鼠：丟起司、起司旋風
     yam:      { attack: { style: 'claw', color: '#b06cff' }, skill: { style: 'tigerPounce', color: '#b06cff' } },                      // 蕃薯：紫色爪痕、猛虎撲殺
     joy:      { attack: { style: 'claw', color: '#ff5a4d' }, skill: { style: 'emojiRain', emoji: '🍗', n: 10, big: 0.6, color: '#ffb36b' } },   // Joy：紅色爪痕、大雞腿雨
+    sharksmoke: { attack: { style: 'bite', color: '#ffffff' }, skill: { style: 'smokeBlow', color: '#cfd4dc' } },   // 鯊魚煙：張大嘴咬、吸一口雪茄吐大片煙霧
     mantou:   { attack: { style: 'claw', color: '#f2f2f8' }, skill: { style: 'stampSmash', text: '肉球', color: '#ffd35c' } },   // 饅頭：肉球爪擊、「肉球」大字蓋章
     xuejie:   { attack: { style: 'projectile', emoji: '🧋', color: '#d9b27a' }, skill: { style: 'heartWave', emoji: '🍵', color: '#7bd46b' } },   // 學姊：丟冰飲、抹茶光波
     nekomeow: { attack: { style: 'claw', color: '#8f9bff' }, skill: { style: 'emojiStorm', emoji: '🐾', n: 16, color: '#8f9bff' } },   // 那隻喵：藍紫爪痕、肉球旋風
@@ -453,6 +454,14 @@ window.GAME_CONFIG = {
       walk: { src: 'hamster_walk.png', frames: 7, cw: 271, ch: 324, ground: 320, fps: 9 },   // 走路循環（原圖 16 格有的有羽扇有的沒有，只挑有羽扇的 7 格）
     },
     // 蕃薯：待機＝吃薯條（8 格，每秒 3 格連播 2 輪）；攻擊／技能＝撲出去咬（8 格，第 5 格咬下去；普攻 13 格/秒、技能 11 格/秒）
+    sharksmoke: {   // 鯊魚煙：Gemini 生圖（8 格 4x2，make_anim_sheet.py --grid 4x2 --faces right --match-height 315；idle／attack 兩張相鄰格子的披風黏在一起，加 --cut 316:0-848,632:0-848,948:0-848 切開）
+      idle: { src: 'sharksmoke_idle.png', frames: 8, cw: 282, ch: 329, ground: 326, fps: 3, repeat: 2 },   // 待機一：抽雪茄
+      idle2: { src: 'sharksmoke_dinner.png', frames: 8, cw: 262, ch: 324, ground: 321, fps: 3, repeat: 2 },   // 待機二：坐在餐桌前吃牛排
+      eat: { src: 'sharksmoke_idle.png', frames: 8, cw: 282, ch: 329, ground: 326, fps: 3, repeat: 2 },   // 回血時播抽雪茄
+      walk: { src: 'sharksmoke_walk.png', frames: 8, cw: 275, ch: 324, ground: 320, fps: 9 },   // 黑道大哥搖擺走路
+      attack: { src: 'sharksmoke_attack.png', frames: 8, cw: 281, ch: 331, ground: 328, fps: 10, hitFrame: 5 },   // 張大嘴咬，第 5 格咬合
+      skill: { src: 'sharksmoke_skill.png', frames: 8, cw: 314, ch: 326, ground: 323, fps: 8, hitFrame: 6 },   // 技能「煙霧瀰漫」：吸一口雪茄，第 6 格吐出煙
+    },
     mantou: {   // 饅頭：Gemini／ChatGPT 生圖（8 格 4x2，make_anim_sheet.py --grid 4x2 --faces left --match-height 396）
       idle: { src: 'mantou_idle.png', frames: 8, cw: 312, ch: 411, ground: 408, fps: 3, repeat: 2 },   // 待機：拿出超大罐頭開心地吃（素色橘標籤罐頭，沒有商標）；之後做呼吸待機再當 idle，這組改成 idle2
       eat: { src: 'mantou_idle.png', frames: 8, cw: 312, ch: 411, ground: 408, fps: 3, repeat: 2 },   // 回血時也播同一組
@@ -522,7 +531,7 @@ window.GAME_CONFIG = {
   // 程式假設每張全身圖原本都是「面向左邊」，往右走時會把圖左右翻面。
   // 如果發現某隻武將走路時是倒退著走（背對前進方向），代表牠的原圖其實面向右，
   // 把牠的英文 ID 加進下面這個清單就會修正。例如： ['taishici', 'sunquan']
-  artFacesRight: ['taishici', 'xuejie'],
+  artFacesRight: ['taishici', 'xuejie', 'sharksmoke'],
 
   // ---------- 留言指令 ----------
   commands: {
