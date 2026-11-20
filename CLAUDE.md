@@ -390,6 +390,7 @@
 | `assets/audio/wheel_voice.mp3`／`tools/make_wheel_voice.py` | 「我要轉輪」語音檔（咖哩自己錄的）／當初合成語音的程式（開源 MeloTTS，已不使用） |
 | `tools/test_wheel.js` | 轉輪模式規則的自動測試（`node tools/test_wheel.js`） |
 | `tools/test_duel.js` | 單挑賽規則的自動測試（`node tools/test_duel.js`，不用開瀏覽器） |
+| `songrequest/index.html` | **另一個小程式：TikTok 直播點歌**（單頁；留言 `#歌名` → YouTube 搜尋 → 內嵌播放＋待播清單；網址 `…/Curry_Live/songrequest/`，OBS 加 `?obs=1`；設定存在網址裡；2026-11-20 最小版，沒在真的 TikFinity／YouTube 金鑰下測過） |
 | `tools/sync_from_curry_games.py` | 從 Curry_Games 同步資料與全身圖 |
 
 ## 工作方式
