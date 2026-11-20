@@ -21,7 +21,7 @@ body.obs #layout{padding:0}
 #card{width:360px;background:var(--card);border-radius:14px;padding:12px}
 #head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 #head h1{font-size:16px;margin:0;font-weight:800}
-#bar{display:flex;gap:6px;opacity:0;transition:opacity .15s}
+#bar{position:absolute;right:6px;bottom:6px;z-index:5;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px;opacity:0;transition:opacity .15s}
 #card:hover #bar,body:not(.obs) #bar{opacity:1}
 #bar button{font:inherit;font-size:12px;font-weight:700;color:#fff;background:#333;border:1px solid #555;border-radius:6px;padding:3px 8px;cursor:pointer}
 #bar button:hover{background:#444}
@@ -31,6 +31,11 @@ body.obs #layout{padding:0}
 #idle.hide{display:none}
 #unblock{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.75);color:#fff;font-weight:800;font-size:16px;border:0;cursor:pointer;font-family:inherit}
 #unblock.show{display:flex}
+#lyr{display:none;margin-top:8px;padding:8px 6px;background:#000;border-radius:8px;text-align:center}
+#lyr.on{display:block}
+#lyr p{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
+#lPrev,#lNext{font-size:13px;color:#d0d3da;min-height:18px}
+#lCur{font-size:19px;color:#fff;min-height:28px;line-height:28px;white-space:normal!important}
 #now{margin-top:8px;min-height:44px}
 #nowTitle{font-weight:800;font-size:15px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 #nowBy{font-size:13px;font-weight:700;color:#e5e7ee;margin-top:2px}
@@ -68,18 +73,21 @@ body.obs #panel{display:none}
   <div id="card">
     <div id="head">
       <h1>🎵 點歌：留言 #歌名</h1>
+    </div>
+    <div id="pbox">
+      <div id="yt"></div>
       <div id="bar">
         <button id="bPause" title="暫停／繼續">⏯</button>
         <button id="bSkip" title="跳過這首">⏭ 跳過</button>
         <button id="bClear" title="清空待播清單">🗑 清空</button>
+        <button id="bLyrE" title="歌詞太晚出現時按（提前 0.5 秒）">歌詞提前</button>
+        <button id="bLyrL" title="歌詞太早出現時按（延後 0.5 秒）">歌詞延後</button>
       </div>
-    </div>
-    <div id="pbox">
-      <div id="yt"></div>
       <div id="idle">還沒有歌<br>留言 #歌名 就能點歌</div>
       <button id="unblock">▶ 點一下開始播放</button>
     </div>
     <div id="now"><div id="nowTitle"></div><div id="nowBy"></div></div>
+    <div id="lyr"><p id="lPrev"></p><p id="lCur"></p><p id="lNext"></p></div>
     <div id="qtitle"></div>
     <ul id="queue"></ul>
     <div id="toasts"></div>
@@ -106,6 +114,8 @@ body.obs #panel{display:none}
     <textarea id="f_ban" placeholder="例如：鋼琴教學, 廣告, 某某歌手"></textarea>
     <div class="hint">歌名或頻道名稱只要含其中一個字，就不能點。</div>
 
+    <label style="display:flex;gap:6px;align-items:center;margin-top:12px"><input type="checkbox" id="f_lyr"> 顯示歌詞（自動查 LRCLIB，查不到就不顯示）</label>
+
     <h3>③ 貼到 OBS 的網址</h3>
     <input type="text" id="obsUrl" readonly>
     <div style="margin-top:6px"><button id="copyUrl">📋 複製網址</button></div>
@@ -131,7 +141,7 @@ body.obs #panel{display:none}
 /* ================= 設定 ================= */
 var P = new URLSearchParams(location.search);
 var OBS = P.get('obs') === '1';
-var DEF = { key: '', host: '', max: 2, len: 8, ban: '' };
+var DEF = { key: '', host: '', max: 2, len: 8, ban: '', lyr: 1 };
 
 function loadCfg() {
   var c = Object.assign({}, DEF);
@@ -141,11 +151,13 @@ function loadCfg() {
   if (P.has('max'))  c.max  = P.get('max');
   if (P.has('len'))  c.len  = P.get('len');
   if (P.has('ban'))  c.ban  = P.get('ban');
+  if (P.has('lyr'))  c.lyr  = P.get('lyr');
   c.max = Math.max(1, Math.min(20, parseInt(c.max, 10) || DEF.max));
   c.len = Math.max(1, Math.min(60, parseInt(c.len, 10) || DEF.len));
   c.key = String(c.key || '').trim();
   c.host = String(c.host || '').trim();
   c.ban = String(c.ban || '');
+  c.lyr = (c.lyr === 0 || c.lyr === false || String(c.lyr) === '0') ? 0 : 1;
   return c;
 }
 var cfg = loadCfg();
@@ -157,6 +169,9 @@ function banWords() {
 /* 主播指令（想換說法就改這裡） */
 var CMD_SKIP  = /^!?(跳過|下一首|skip)$/i;
 var CMD_CLEAR = /^!?(清空|清空清單|clear)$/i;
+var CMD_LYR_E = /^!?歌詞提前$/;
+var CMD_LYR_L = /^!?歌詞延後$/;
+var CMD_LYR_0 = /^!?歌詞歸零$/;
 
 /* ================= 狀態 ================= */
 var now = null;              // 正在播：{id,title,channel,sec,uid,who}
@@ -253,6 +268,7 @@ function playNext() {
   now = queue.shift() || null;
   if (now) { played.add(now.id); startNow(); }
   else if (playerReady) { try { player.stopVideo(); } catch (e) {} }
+  lyrLoad(now);
   render();
 }
 function togglePause() {
@@ -352,6 +368,9 @@ function onChat(ev) {
   if (isHost(ev)) {
     if (CMD_SKIP.test(text))  { doSkip();  return; }
     if (CMD_CLEAR.test(text)) { doClear(); return; }
+    if (CMD_LYR_E.test(text)) { lyrShift(0.5); return; }
+    if (CMD_LYR_L.test(text)) { lyrShift(-0.5); return; }
+    if (CMD_LYR_0.test(text)) { lyrReset(); return; }
   }
   var m = /^#\s*(.+)$/.exec(text);
   if (!m) return;
@@ -367,6 +386,103 @@ function isHost(ev) {
 }
 function doSkip()  { if (!now) return; say('主播跳過了這首', true); playNext(); }
 function doClear() { queue.length = 0; say('待播清單已清空', true); render(); }
+
+/* ================= 歌詞（LRCLIB，帶時間軸） ================= */
+var lyr = { lines: null, offset: 0, token: 0, idx: -2 };
+var lyrCache = new Map();     // 影片 id → 歌詞行 或 null（查不到）
+
+var NOISE = /official|music|video|\bmv\b|m\/v|lyrics?|audio|\bhd\b|4k|hq|karaoke|\blive\b|官方|完整|歌詞|字幕|動態|高音質|現場|音樂|版$/i;
+function cleanTitle(t) {
+  return String(t || '')
+    // 括號：裡面是雜訊（Official、MV、歌詞…）就整組刪掉；是歌名就保留內容
+    .replace(/[\[【(（「『《]([^\]】)）」』》]*)[\]】)）」』》]/g, function (_, inner) { return NOISE.test(inner) ? ' ' : ' ' + inner + ' '; })
+    .replace(/\b(official|music video|mv|lyrics?|lyric video|audio|hd|4k|hq|karaoke)\b/ig, ' ')
+    .replace(/(官方|完整版|歌詞版|動態歌詞|高音質|字幕|歌詞|現場版)/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+function lyrQueries(title, channel) {
+  var c = cleanTitle(title), qs = [];
+  var m = /^(.+?)\s*[-–—|｜:：]\s*(.+)$/.exec(c);
+  if (m) qs.push((m[2] + ' ' + m[1]).trim());                       // 「歌手 - 歌名」→ 歌名 歌手
+  var cjk = c.replace(/[A-Za-z0-9'’.&!?,]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (cjk && cjk !== c && cjk.length >= 2) qs.push(cjk);            // 只留中文（去掉英文副標，較容易命中）
+  qs.push(c);
+  var ch = String(channel || '').replace(/\s*-\s*topic$/i, '').replace(/(official|官方).*$/i, '').trim();
+  if (ch && c.indexOf(ch) < 0) qs.push(c + ' ' + ch);
+  var seen = {}; return qs.filter(function (q) { q = q.trim(); if (!q || seen[q]) return false; seen[q] = 1; return true; }).slice(0, 4);
+}
+function parseLrc(text) {
+  var out = [];
+  String(text || '').split(/\r?\n/).forEach(function (ln) {
+    var re = /\[(\d+):(\d+(?:[.:]\d+)?)\]/g, m, ts = [], last = 0;
+    while ((m = re.exec(ln))) { ts.push(+m[1] * 60 + parseFloat(m[2].replace(':', '.'))); last = re.lastIndex; }
+    if (!ts.length) return;
+    var tx = ln.slice(last).trim();
+    ts.forEach(function (t) { out.push({ t: t, s: tx }); });
+  });
+  out.sort(function (a, b) { return a.t - b.t; });
+  return out;
+}
+/* 從搜尋結果挑「有時間軸、長度差不多」的，取長度最接近的 */
+function pickLyric(list, sec) {
+  var best = null, bd = 1e9;
+  (list || []).forEach(function (r) {
+    var syn = r.syncedLyrics || r.synced_lyrics;
+    if (!syn || r.instrumental) return;
+    var d = Math.abs((+r.duration || 0) - sec);
+    if (d <= 8 && d < bd) { best = syn; bd = d; }
+  });
+  return best ? parseLrc(best) : null;
+}
+function lyrFetch(song) {
+  if (lyrCache.has(song.id)) return Promise.resolve(lyrCache.get(song.id));
+  var qs = lyrQueries(song.title, song.channel);
+  var p = Promise.resolve(null);
+  qs.forEach(function (q) {
+    p = p.then(function (found) {
+      if (found) return found;
+      return fetch('https://lrclib.net/api/search?q=' + encodeURIComponent(q))
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (list) { var l = pickLyric(list, song.sec); return l && l.length >= 3 ? l : null; })
+        .catch(function () { return null; });
+    });
+  });
+  return p.then(function (l) { lyrCache.set(song.id, l); return l; });
+}
+function lyrLoad(song) {
+  lyr.token++; lyr.lines = null; lyr.offset = 0; lyr.idx = -2;
+  $('lyr').classList.remove('on');
+  $('lPrev').textContent = $('lCur').textContent = $('lNext').textContent = '';
+  if (!song || !cfg.lyr) return;
+  var tk = lyr.token;
+  lyrFetch(song).then(function (l) {
+    if (tk !== lyr.token || !l) return;                  // 已換歌，或查不到
+    lyr.lines = l; lyr.idx = -2;
+    $('lyr').classList.add('on');
+    lyrTick();
+  });
+}
+function lyrShift(d) {
+  if (!lyr.lines) { say('這首沒有歌詞可以調整'); return; }
+  lyr.offset += d; lyr.idx = -2;
+  say('歌詞' + (lyr.offset >= 0 ? '提前 ' : '延後 ') + Math.abs(lyr.offset).toFixed(1) + ' 秒', true);
+  lyrTick();
+}
+function lyrReset() { lyr.offset = 0; lyr.idx = -2; say('歌詞時間已歸零', true); lyrTick(); }
+function lyrTick() {
+  if (!lyr.lines || !playerReady) return;
+  var t;
+  try { t = player.getCurrentTime(); } catch (e) { return; }
+  t += lyr.offset;
+  var L = lyr.lines, i = -1;
+  for (var k = 0; k < L.length; k++) { if (L[k].t <= t) i = k; else break; }
+  if (i === lyr.idx) return;
+  lyr.idx = i;
+  $('lPrev').textContent = i > 0 ? L[i - 1].s : '';
+  $('lCur').textContent = i >= 0 ? (L[i].s || '♪') : '♪';
+  $('lNext').textContent = i + 1 < L.length ? L[i + 1].s : '';
+}
+setInterval(lyrTick, 200);
 
 /* ================= TikFinity ================= */
 var tfState = '未連線';
@@ -399,22 +515,25 @@ function buildUrl() {
   if (cfg.max !== DEF.max) u.searchParams.set('max', cfg.max);
   if (cfg.len !== DEF.len) u.searchParams.set('len', cfg.len);
   if (cfg.ban.trim()) u.searchParams.set('ban', cfg.ban.trim());
+  if (!cfg.lyr) u.searchParams.set('lyr', '0');
   return u.toString();
 }
 function initPanel() {
   if (location.protocol === 'file:') $('fileWarn').style.display = '';
   $('f_key').value = cfg.key; $('f_host').value = cfg.host;
-  $('f_max').value = cfg.max; $('f_len').value = cfg.len; $('f_ban').value = cfg.ban;
+  $('f_max').value = cfg.max; $('f_len').value = cfg.len; $('f_ban').value = cfg.ban; $('f_lyr').checked = !!cfg.lyr;
   function sync() {
     cfg.key = $('f_key').value.trim();
     cfg.host = $('f_host').value.trim();
     cfg.max = Math.max(1, Math.min(20, parseInt($('f_max').value, 10) || DEF.max));
     cfg.len = Math.max(1, Math.min(60, parseInt($('f_len').value, 10) || DEF.len));
     cfg.ban = $('f_ban').value;
+    cfg.lyr = $('f_lyr').checked ? 1 : 0;
     try { localStorage.setItem('songreq.cfg', JSON.stringify(cfg)); } catch (e) {}
     $('obsUrl').value = buildUrl();
   }
   ['f_key', 'f_host', 'f_max', 'f_len', 'f_ban'].forEach(function (id) { $(id).addEventListener('input', sync); });
+  $('f_lyr').addEventListener('change', function () { sync(); lyrLoad(now); });
   sync();
   $('copyUrl').onclick = function () {
     $('obsUrl').select();
@@ -434,6 +553,8 @@ document.body.classList.toggle('obs', OBS);
 $('bSkip').onclick = doSkip;
 $('bClear').onclick = doClear;
 $('bPause').onclick = togglePause;
+$('bLyrE').onclick = function () { lyrShift(0.5); };
+$('bLyrL').onclick = function () { lyrShift(-0.5); };
 $('unblock').onclick = function () { if (playerReady) player.playVideo(); $('unblock').classList.remove('show'); };
 $('qtitle').textContent = '';
 render();
@@ -442,7 +563,7 @@ loadPlayerApi();
 if (OBS || P.get('tikfinity') === '1') connectTikFinity();
 
 /* 測試用 */
-window.__song = { onChat: onChat, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played) }; }, cfg: cfg };
+window.__song = { onChat: onChat, cleanTitle: cleanTitle, lyrQueries: lyrQueries, parseLrc: parseLrc, pickLyric: pickLyric, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played) }; }, cfg: cfg };
 })();
 </script>
 </body>
