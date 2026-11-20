@@ -20,7 +20,7 @@ body.obs #layout{padding:0}
 /* ===== 直播畫面卡片（影片壓縮會糊掉彩色字，所以字用純白＋粗體＋近黑底） ===== */
 #card{width:540px;background:var(--card);border-radius:14px;padding:12px}
 #head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
-#head h1{font-size:16px;margin:0;font-weight:800}
+#head h1{font-size:16px;margin:0;font-weight:800;white-space:nowrap;flex:0 0 auto}
 #bar{position:absolute;right:6px;bottom:6px;z-index:5;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px;opacity:0;transition:opacity .15s}
 #card:hover #bar,body:not(.obs) #bar{opacity:1}
 #bar button{font:inherit;font-size:12px;font-weight:700;color:#fff;background:#333;border:1px solid #555;border-radius:6px;padding:3px 8px;cursor:pointer}
@@ -31,6 +31,9 @@ body.obs #layout{padding:0}
 #idle.hide{display:none}
 #unblock{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.75);color:#fff;font-weight:800;font-size:16px;border:0;cursor:pointer;font-family:inherit}
 #unblock.show{display:flex}
+#pbox.off:not(.forceshow){position:absolute;left:-10000px;top:0;width:540px;pointer-events:none}
+#bar.inhead{position:static;opacity:0;flex:1 1 auto}
+#card:hover #bar.inhead,body:not(.obs) #bar.inhead{opacity:1}
 #lyr{display:none;margin:0 0 10px;padding:10px 8px;background:#000;border-radius:10px;text-align:center}
 #lyr.on{display:block}
 #lyr p{margin:0;font-weight:900}
@@ -79,6 +82,8 @@ body.obs #panel{display:none}
       <div id="yt"></div>
       <div id="bar">
         <button id="bPause" title="暫停／繼續">⏯</button>
+        <button id="bVolD" title="音量 −10">🔉</button>
+        <button id="bVolU" title="音量 +10">🔊</button>
         <button id="bSkip" title="跳過這首">⏭ 跳過</button>
         <button id="bClear" title="清空待播清單">🗑 清空</button>
         <button id="bLyrE" title="歌詞太晚出現時按（提前 0.5 秒）">歌詞提前</button>
@@ -114,6 +119,11 @@ body.obs #panel{display:none}
     <textarea id="f_ban" placeholder="例如：鋼琴教學, 廣告, 某某歌手"></textarea>
     <div class="hint">歌名或頻道名稱只要含其中一個字，就不能點。</div>
 
+    <label for="f_vol" style="margin-top:12px">音量：<b id="volLabel"></b></label>
+    <input type="range" id="f_vol" min="0" max="100" step="5" style="width:100%">
+    <div class="hint">這是 YouTube 播放器本身的音量，設定改了 OBS 約 30 秒內自動套用。直播中也可以留言 <b>音量 30</b>（只有你的帳號有效，暫時調整），或按播放器上的 🔉🔊。</div>
+    <label style="display:flex;gap:6px;align-items:center;margin-top:10px"><input type="checkbox" id="f_pl"> 在畫面上顯示播放器（影片）</label>
+    <div class="hint">關掉＝畫面上看不到影片，只有聲音、歌名、歌詞和待播清單。</div>
     <label style="display:flex;gap:6px;align-items:center;margin-top:12px"><input type="checkbox" id="f_lyr"> 顯示歌詞（自動查 LRCLIB，查不到就不顯示）</label>
 
     <h3>③ 貼到 OBS 的網址</h3>
@@ -142,7 +152,7 @@ body.obs #panel{display:none}
 /* ================= 設定 ================= */
 var P = new URLSearchParams(location.search);
 var OBS = P.get('obs') === '1';
-var DEF = { key: '', host: '', max: 2, len: 8, ban: '', lyr: 1 };
+var DEF = { key: '', host: '', max: 2, len: 8, ban: '', lyr: 1, vol: 80, pl: 1 };
 
 function loadCfg() {
   var c = Object.assign({}, DEF);
@@ -153,6 +163,8 @@ function loadCfg() {
   if (P.has('len'))  c.len  = P.get('len');
   if (P.has('ban'))  c.ban  = P.get('ban');
   if (P.has('lyr'))  c.lyr  = P.get('lyr');
+  if (P.has('vol'))  c.vol  = P.get('vol');
+  if (P.has('pl'))   c.pl   = P.get('pl');
   return normCfg(c);
 }
 function normCfg(c) {
@@ -162,6 +174,8 @@ function normCfg(c) {
   c.host = String(c.host || '').trim();
   c.ban = String(c.ban || '');
   c.lyr = (c.lyr === 0 || c.lyr === false || String(c.lyr) === '0') ? 0 : 1;
+  var v = parseInt(c.vol, 10); c.vol = isNaN(v) ? DEF.vol : Math.max(0, Math.min(100, v));
+  c.pl = (c.pl === 0 || c.pl === false || String(c.pl) === '0') ? 0 : 1;
   return c;
 }
 var cfg = loadCfg();
@@ -173,6 +187,7 @@ function banWords() {
 /* 主播指令（想換說法就改這裡） */
 var CMD_SKIP  = /^!?(跳過|下一首|skip)$/i;
 var CMD_CLEAR = /^!?(清空|清空清單|clear)$/i;
+var CMD_VOL = /^!?音量\s*(\d{1,3})$/;
 var CMD_LYR_E = /^!?歌詞提前$/;
 var CMD_LYR_L = /^!?歌詞延後$/;
 var CMD_LYR_0 = /^!?歌詞歸零$/;
@@ -248,22 +263,33 @@ function loadPlayerApi() {
     player = new YT.Player('yt', {
       width: '100%', height: '100%', playerVars: vars,
       events: {
-        onReady: function () { playerReady = true; startNow(); },
+        onReady: function () { playerReady = true; applyVol(); startNow(); },
         onStateChange: function (e) {
           if (e.data === 0) playNext();                 // 播完
-          if (e.data === 1) $('unblock').classList.remove('show');
+          if (e.data === 1) { $('unblock').classList.remove('show'); $('pbox').classList.remove('forceshow'); applyVol(); }
         },
         onError: function () {                          // 不能嵌入／已刪除等
           say('這首放不出來，已自動換下一首');
           playNext();
         },
-        onAutoplayBlocked: function () { $('unblock').classList.add('show'); }
+        onAutoplayBlocked: function () { $('unblock').classList.add('show'); $('pbox').classList.add('forceshow'); }
       }
     });
   };
   var s = document.createElement('script');
   s.src = 'https://www.youtube.com/iframe_api';
   document.head.appendChild(s);
+}
+function applyVol() { if (playerReady) { try { player.setVolume(cfg.vol); } catch (e) {} } }
+function setVol(n) {
+  cfg.vol = Math.max(0, Math.min(100, Math.round(n)));
+  applyVol(); say('音量 ' + cfg.vol + '%', true);
+  if (!OBS && $('f_vol')) { $('f_vol').value = cfg.vol; $('volLabel').textContent = cfg.vol + '%'; }
+}
+function applyShow() {
+  $('pbox').classList.toggle('off', !cfg.pl);
+  (cfg.pl ? $('pbox') : $('head')).appendChild($('bar'));
+  $('bar').classList.toggle('inhead', !cfg.pl);
 }
 function startNow() {
   if (now && playerReady) player.loadVideoById(now.id);
@@ -372,6 +398,8 @@ function onChat(ev) {
   if (isHost(ev)) {
     if (CMD_SKIP.test(text))  { doSkip();  return; }
     if (CMD_CLEAR.test(text)) { doClear(); return; }
+    var vm = CMD_VOL.exec(text);
+    if (vm) { setVol(+vm[1]); return; }
     if (CMD_LYR_E.test(text)) { lyrShift(0.5); return; }
     if (CMD_LYR_L.test(text)) { lyrShift(-0.5); return; }
     if (CMD_LYR_0.test(text)) { lyrReset(); return; }
@@ -410,10 +438,16 @@ function newCode() {
   return out;
 }
 var cloudCode = '', pulled = false;
+var cloudLastVol = null;
 function applyCloud(d) {
-  var before = JSON.stringify(cfg);
-  var c = Object.assign({}, cfg, { key: d.key, host: d.host, max: d.max, len: d.len, ban: d.ban, lyr: d.lyr });
+  var before = JSON.stringify(cfg), oldPl = cfg.pl, oldVol = cfg.vol;
+  var volChanged = d.vol != null && d.vol !== cloudLastVol;     // 音量只在雲端那份有變時才套用，免得蓋掉直播中臨時調的音量
+  if (d.vol != null) cloudLastVol = d.vol;
+  var c = Object.assign({}, cfg, { key: d.key, host: d.host, max: d.max, len: d.len, ban: d.ban, lyr: d.lyr,
+    vol: volChanged ? d.vol : cfg.vol, pl: d.pl != null ? d.pl : cfg.pl });
   Object.assign(cfg, normCfg(c));
+  if (cfg.vol !== oldVol) applyVol();
+  if (cfg.pl !== oldPl) applyShow();
   if (JSON.stringify(cfg) === before) return;
   if (!cfg.lyr) { lyr.token++; lyr.lines = null; $('lyr').classList.remove('on'); }
   else if (now && !lyr.lines) lyrLoad(now);
@@ -568,6 +602,8 @@ function buildLongUrl() {
   if (cfg.len !== DEF.len) u.searchParams.set('len', cfg.len);
   if (cfg.ban.trim()) u.searchParams.set('ban', cfg.ban.trim());
   if (!cfg.lyr) u.searchParams.set('lyr', '0');
+  if (cfg.vol !== DEF.vol) u.searchParams.set('vol', cfg.vol);
+  if (!cfg.pl) u.searchParams.set('pl', '0');
   return u.toString();
 }
 function buildShortUrl() { return baseUrl() + '?obs=1&c=' + encodeURIComponent(cloudCode); }
@@ -580,7 +616,7 @@ function showUrl() {
 }
 function pushCloud() {
   cloudState = 'pending'; showUrl();
-  var data = { key: cfg.key, host: cfg.host, max: cfg.max, len: cfg.len, ban: cfg.ban, lyr: cfg.lyr };
+  var data = { key: cfg.key, host: cfg.host, max: cfg.max, len: cfg.len, ban: cfg.ban, lyr: cfg.lyr, vol: cfg.vol, pl: cfg.pl };
   return sbCall('live_put', { p_code: cloudCode, p_slot: SLOT, p_data: data, p_expected: null })
     .then(function (r) { cloudState = (r.ok && r.body && r.body.ok === true) ? 'ok' : 'fail'; }, function () { cloudState = 'fail'; })
     .then(showUrl);
@@ -589,7 +625,7 @@ function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(pushCl
 function initPanel() {
   if (location.protocol === 'file:') $('fileWarn').style.display = '';
   $('f_key').value = cfg.key; $('f_host').value = cfg.host;
-  $('f_max').value = cfg.max; $('f_len').value = cfg.len; $('f_ban').value = cfg.ban; $('f_lyr').checked = !!cfg.lyr;
+  $('f_max').value = cfg.max; $('f_len').value = cfg.len; $('f_ban').value = cfg.ban; $('f_lyr').checked = !!cfg.lyr; $('f_vol').value = cfg.vol; $('volLabel').textContent = cfg.vol + '%'; $('f_pl').checked = !!cfg.pl;
   function sync() {
     cfg.key = $('f_key').value.trim();
     cfg.host = $('f_host').value.trim();
@@ -597,11 +633,17 @@ function initPanel() {
     cfg.len = Math.max(1, Math.min(60, parseInt($('f_len').value, 10) || DEF.len));
     cfg.ban = $('f_ban').value;
     cfg.lyr = $('f_lyr').checked ? 1 : 0;
+    cfg.vol = Math.max(0, Math.min(100, parseInt($('f_vol').value, 10) || 0));
+    $('volLabel').textContent = cfg.vol + '%';
+    cfg.pl = $('f_pl').checked ? 1 : 0;
+    applyVol(); applyShow();
     try { localStorage.setItem('songreq.cfg', JSON.stringify(cfg)); } catch (e) {}
     schedulePush();
   }
   ['f_key', 'f_host', 'f_max', 'f_len', 'f_ban'].forEach(function (id) { $(id).addEventListener('input', sync); });
   $('f_lyr').addEventListener('change', function () { sync(); lyrLoad(now); });
+  $('f_vol').addEventListener('input', sync);
+  $('f_pl').addEventListener('change', sync);
   try { cloudCode = localStorage.getItem('songreq.code') || ''; } catch (e) {}
   if (!cloudCode) { cloudCode = newCode(); try { localStorage.setItem('songreq.code', cloudCode); } catch (e) {} }
   $('newCode').onclick = function () {
@@ -625,9 +667,12 @@ function initPanel() {
 
 /* ================= 啟動 ================= */
 document.body.classList.toggle('obs', OBS);
+applyShow();
 $('bSkip').onclick = doSkip;
 $('bClear').onclick = doClear;
 $('bPause').onclick = togglePause;
+$('bVolD').onclick = function () { setVol(cfg.vol - 10); };
+$('bVolU').onclick = function () { setVol(cfg.vol + 10); };
 $('bLyrE').onclick = function () { lyrShift(0.5); };
 $('bLyrL').onclick = function () { lyrShift(-0.5); };
 $('unblock').onclick = function () { if (playerReady) player.playVideo(); $('unblock').classList.remove('show'); };
@@ -639,7 +684,7 @@ loadPlayerApi();
 if (OBS || P.get('tikfinity') === '1') connectTikFinity();
 
 /* 測試用 */
-window.__song = { pull: function () { return cloudPull(); }, onChat: onChat, cleanTitle: cleanTitle, lyrQueries: lyrQueries, parseLrc: parseLrc, pickLyric: pickLyric, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played) }; }, cfg: cfg };
+window.__song = { setVol: setVol, pull: function () { return cloudPull(); }, onChat: onChat, cleanTitle: cleanTitle, lyrQueries: lyrQueries, parseLrc: parseLrc, pickLyric: pickLyric, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played) }; }, cfg: cfg };
 })();
 </script>
 </body>
