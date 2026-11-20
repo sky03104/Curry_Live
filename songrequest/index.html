@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>直播點歌</title>
+<style>
+:root{
+  --bg:#17181c; --panel:#23252b; --line:#3a3d46;
+  --text:#fff; --muted:#b8bcc8; --accent:#ff4d6d; --ok:#4ade80;
+  --card:rgba(0,0,0,.82);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:var(--text);background:var(--bg);color-scheme:dark}
+body.obs{background:transparent;overflow:hidden}
+#layout{display:flex;gap:20px;flex-wrap:wrap;padding:16px;align-items:flex-start}
+body.obs #layout{padding:0}
+
+/* ===== 直播畫面卡片（影片壓縮會糊掉彩色字，所以字用純白＋粗體＋近黑底） ===== */
+#card{width:540px;background:var(--card);border-radius:14px;padding:12px}
+#head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+#head h1{font-size:16px;margin:0;font-weight:800}
+#bar{position:absolute;right:6px;bottom:6px;z-index:5;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px;opacity:0;transition:opacity .15s}
+#card:hover #bar,body:not(.obs) #bar{opacity:1}
+#bar button{font:inherit;font-size:12px;font-weight:700;color:#fff;background:#333;border:1px solid #555;border-radius:6px;padding:3px 8px;cursor:pointer}
+#bar button:hover{background:#444}
+#pbox{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden}
+#pbox iframe,#pbox #yt{position:absolute;inset:0;width:100%;height:100%;border:0}
+#idle{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;font-weight:700;font-size:15px;background:#000}
+#idle.hide{display:none}
+#unblock{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.75);color:#fff;font-weight:800;font-size:16px;border:0;cursor:pointer;font-family:inherit}
+#unblock.show{display:flex}
+#lyr{display:none;margin:0 0 10px;padding:10px 8px;background:#000;border-radius:10px;text-align:center}
+#lyr.on{display:block}
+#lyr p{margin:0;font-weight:900}
+#lPrev,#lNext{font-size:24px;color:#d0d3da;min-height:34px;line-height:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lCur{font-size:42px;color:#fff;min-height:104px;line-height:52px;display:flex;align-items:center;justify-content:center;padding:4px 0;word-break:break-all}
+#now{margin-top:8px;min-height:44px}
+#nowTitle{font-weight:800;font-size:15px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#nowBy{font-size:13px;font-weight:700;color:#e5e7ee;margin-top:2px}
+#qtitle{font-size:13px;font-weight:800;margin:10px 0 4px;color:#e5e7ee}
+#queue{list-style:none;margin:0;padding:0}
+#queue li{display:flex;gap:6px;font-size:13px;font-weight:700;padding:3px 0;border-top:1px solid #2c2c2c}
+#queue li .n{flex:0 0 18px;color:#e5e7ee}
+#queue li .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#queue li .d{flex:0 0 auto;color:#e5e7ee}
+#queue .empty,#queue .more{color:#e5e7ee;font-weight:600;border-top:0}
+#toasts{margin-top:8px;display:flex;flex-direction:column;gap:3px}
+#toasts div{font-size:12.5px;font-weight:700;background:#000;border-left:4px solid var(--accent);padding:3px 8px;border-radius:4px}
+#toasts div.ok{border-left-color:var(--ok)}
+
+/* ===== 設定面板（只在一般瀏覽器出現，OBS 網址 ?obs=1 不會有） ===== */
+#panel{width:440px;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+body.obs #panel{display:none}
+#panel h2{font-size:16px;margin:0 0 10px}
+#panel h3{font-size:14px;margin:16px 0 6px;color:var(--muted)}
+#panel label{display:block;font-size:13px;margin:8px 0 3px;color:var(--muted)}
+#panel input[type=text],#panel input[type=number],#panel textarea{width:100%;font:inherit;font-size:14px;color:#fff;background:#14151a;border:1px solid var(--line);border-radius:6px;padding:7px 9px}
+#panel textarea{min-height:56px;resize:vertical}
+#panel .row{display:flex;gap:10px}
+#panel .row>div{flex:1}
+#panel button{font:inherit;font-size:13px;font-weight:700;color:#fff;background:var(--accent);border:0;border-radius:6px;padding:7px 12px;cursor:pointer}
+#panel button.gray{background:#3a3d46}
+#panel .hint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5}
+#panel .warn{background:#3b2a12;border:1px solid #7a5a1c;color:#ffd58a;padding:8px 10px;border-radius:6px;font-size:13px;margin-bottom:10px}
+#obsUrl{font-size:12px!important;word-break:break-all}
+#status{font-size:12px;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+<div id="layout">
+  <div id="card">
+    <div id="lyr"><p id="lPrev"></p><p id="lCur"></p><p id="lNext"></p></div>
+    <div id="head">
+      <h1>🎵 點歌：留言 #歌名</h1>
+    </div>
+    <div id="pbox">
+      <div id="yt"></div>
+      <div id="bar">
+        <button id="bPause" title="暫停／繼續">⏯</button>
+        <button id="bSkip" title="跳過這首">⏭ 跳過</button>
+        <button id="bClear" title="清空待播清單">🗑 清空</button>
+        <button id="bLyrE" title="歌詞太晚出現時按（提前 0.5 秒）">歌詞提前</button>
+        <button id="bLyrL" title="歌詞太早出現時按（延後 0.5 秒）">歌詞延後</button>
+      </div>
+      <div id="idle">還沒有歌<br>留言 #歌名 就能點歌</div>
+      <button id="unblock">▶ 點一下開始播放</button>
+    </div>
+    <div id="now"><div id="nowTitle"></div><div id="nowBy"></div></div>
+    <div id="qtitle"></div>
+    <ul id="queue"></ul>
+    <div id="toasts"></div>
+  </div>
+
+  <div id="panel">
+    <h2>點歌設定</h2>
+    <div class="warn" id="fileWarn" style="display:none">⚠ 你是用「雙擊檔案」開的網頁，YouTube 播放器會被擋。請改用網址開（例如 GitHub Pages 的網址）。</div>
+
+    <label for="f_key">① YouTube 金鑰（API Key）</label>
+    <input type="text" id="f_key" placeholder="AIza…" autocomplete="off">
+    <div class="hint">用來搜尋歌曲。到 Google Cloud 建專案 → 啟用「YouTube Data API v3」→ 建立「API 金鑰」。免費額度每天約可搜尋 100 次（每次留言點歌搜一次，相同歌名不重複算）。</div>
+
+    <label for="f_host">② 你的 TikTok 帳號（主播）</label>
+    <input type="text" id="f_host" placeholder="例如 curry_live（不用加 @）" autocomplete="off">
+    <div class="hint">只有這個帳號的留言可以用「跳過」「清空」。比對的是帳號代號，不是暱稱，別人改暱稱冒充不了。</div>
+
+    <div class="row">
+      <div><label for="f_max">每人最多排幾首</label><input type="number" id="f_max" min="1" max="20"></div>
+      <div><label for="f_len">歌曲最長幾分鐘</label><input type="number" id="f_len" min="1" max="60"></div>
+    </div>
+
+    <label for="f_ban">黑名單關鍵字（用逗號分開）</label>
+    <textarea id="f_ban" placeholder="例如：鋼琴教學, 廣告, 某某歌手"></textarea>
+    <div class="hint">歌名或頻道名稱只要含其中一個字，就不能點。</div>
+
+    <label style="display:flex;gap:6px;align-items:center;margin-top:12px"><input type="checkbox" id="f_lyr"> 顯示歌詞（自動查 LRCLIB，查不到就不顯示）</label>
+
+    <h3>③ 貼到 OBS 的網址</h3>
+    <input type="text" id="obsUrl" readonly>
+    <div style="margin-top:6px"><button id="copyUrl">📋 複製網址</button></div>
+    <div class="hint">OBS 瀏覽器來源：貼上網址、寬 540 高 760 左右，並勾選「透過 OBS 控制音訊」。要手動操作時，在來源上按右鍵 →「互動」，滑鼠移到畫面上就會出現跳過／清空按鈕。設定改了要重貼網址。</div>
+
+    <h3>測試（假裝觀眾留言）</h3>
+    <div class="row">
+      <div><input type="text" id="t_name" value="測試觀眾"></div>
+      <div><input type="text" id="t_text" value="#稻香 周杰倫"></div>
+    </div>
+    <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button id="t_send">送出留言</button>
+      <label style="margin:0;display:flex;gap:4px;align-items:center"><input type="checkbox" id="t_host"> 用主播身分（可測「跳過」「清空」）</label>
+    </div>
+    <div id="status"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+/* ================= 設定 ================= */
+var P = new URLSearchParams(location.search);
+var OBS = P.get('obs') === '1';
+var DEF = { key: '', host: '', max: 2, len: 8, ban: '', lyr: 1 };
+
+function loadCfg() {
+  var c = Object.assign({}, DEF);
+  try { Object.assign(c, JSON.parse(localStorage.getItem('songreq.cfg') || '{}')); } catch (e) {}
+  if (P.has('key'))  c.key  = P.get('key');
+  if (P.has('host')) c.host = P.get('host');
+  if (P.has('max'))  c.max  = P.get('max');
+  if (P.has('len'))  c.len  = P.get('len');
+  if (P.has('ban'))  c.ban  = P.get('ban');
+  if (P.has('lyr'))  c.lyr  = P.get('lyr');
+  c.max = Math.max(1, Math.min(20, parseInt(c.max, 10) || DEF.max));
+  c.len = Math.max(1, Math.min(60, parseInt(c.len, 10) || DEF.len));
+  c.key = String(c.key || '').trim();
+  c.host = String(c.host || '').trim();
+  c.ban = String(c.ban || '');
+  c.lyr = (c.lyr === 0 || c.lyr === false || String(c.lyr) === '0') ? 0 : 1;
+  return c;
+}
+var cfg = loadCfg();
+function hostId() { return cfg.host.replace(/^@/, '').trim().toLowerCase(); }
+function banWords() {
+  return cfg.ban.split(/[,，、\n]/).map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
+}
+
+/* 主播指令（想換說法就改這裡） */
+var CMD_SKIP  = /^!?(跳過|下一首|skip)$/i;
+var CMD_CLEAR = /^!?(清空|清空清單|clear)$/i;
+var CMD_LYR_E = /^!?歌詞提前$/;
+var CMD_LYR_L = /^!?歌詞延後$/;
+var CMD_LYR_0 = /^!?歌詞歸零$/;
+
+/* ================= 狀態 ================= */
+var now = null;              // 正在播：{id,title,channel,sec,uid,who}
+var queue = [];              // 待播
+var played = new Set();      // 這次開啟後播過的歌（不再重複排）
+var cache = new Map();       // 歌名 → 搜尋結果（省 YouTube 額度）
+var toasts = [];
+var chain = Promise.resolve();
+
+/* ================= 小工具 ================= */
+function $(id) { return document.getElementById(id); }
+function norm(s) { return String(s == null ? '' : s).normalize('NFKC').replace(/[​-‏⁠﻿]/g, '').trim(); }
+function fmt(sec) { var m = Math.floor(sec / 60), s = sec % 60; return m + ':' + (s < 10 ? '0' : '') + s; }
+function short(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; }
+function isoSec(d) {
+  var m = /^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(d || '');
+  if (!m) return 0;
+  return (+m[1] || 0) * 86400 + (+m[2] || 0) * 3600 + (+m[3] || 0) * 60 + (+m[4] || 0);
+}
+function say(text, ok) {
+  var t = { text: text, ok: !!ok };
+  toasts.push(t);
+  if (toasts.length > 3) toasts.shift();
+  render();
+  setTimeout(function () {
+    var i = toasts.indexOf(t);
+    if (i >= 0) { toasts.splice(i, 1); render(); }
+  }, 9000);
+}
+
+/* ================= 畫面 ================= */
+function render() {
+  $('idle').classList.toggle('hide', !!now);
+  $('nowTitle').textContent = now ? '▶ ' + now.title : '';
+  $('nowBy').textContent = now ? '點歌：' + short(now.who, 12) + '　' + fmt(now.sec) : '';
+  $('qtitle').textContent = queue.length ? '待播（' + queue.length + ' 首）' : '';
+  var ul = $('queue');
+  ul.textContent = '';
+  var show = queue.slice(0, 6);
+  show.forEach(function (s, i) {
+    var li = document.createElement('li');
+    var n = document.createElement('span'); n.className = 'n'; n.textContent = (i + 1) + '.';
+    var t = document.createElement('span'); t.className = 't'; t.textContent = s.title + ' — ' + short(s.who, 8);
+    var d = document.createElement('span'); d.className = 'd'; d.textContent = fmt(s.sec);
+    li.appendChild(n); li.appendChild(t); li.appendChild(d);
+    ul.appendChild(li);
+  });
+  if (queue.length > show.length) {
+    var more = document.createElement('li'); more.className = 'more';
+    more.textContent = '…還有 ' + (queue.length - show.length) + ' 首';
+    ul.appendChild(more);
+  }
+  var tb = $('toasts');
+  tb.textContent = '';
+  toasts.forEach(function (t) {
+    var d = document.createElement('div');
+    if (t.ok) d.className = 'ok';
+    d.textContent = t.text;
+    tb.appendChild(d);
+  });
+}
+
+/* ================= YouTube 播放器 ================= */
+var player = null, playerReady = false;
+
+function loadPlayerApi() {
+  window.onYouTubeIframeAPIReady = function () {
+    var vars = { autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1, controls: 0, disablekb: 1 };
+    if (/^https?:$/.test(location.protocol)) vars.origin = location.origin;
+    player = new YT.Player('yt', {
+      width: '100%', height: '100%', playerVars: vars,
+      events: {
+        onReady: function () { playerReady = true; startNow(); },
+        onStateChange: function (e) {
+          if (e.data === 0) playNext();                 // 播完
+          if (e.data === 1) $('unblock').classList.remove('show');
+        },
+        onError: function () {                          // 不能嵌入／已刪除等
+          say('這首放不出來，已自動換下一首');
+          playNext();
+        },
+        onAutoplayBlocked: function () { $('unblock').classList.add('show'); }
+      }
+    });
+  };
+  var s = document.createElement('script');
+  s.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(s);
+}
+function startNow() {
+  if (now && playerReady) player.loadVideoById(now.id);
+}
+function playNext() {
+  now = queue.shift() || null;
+  if (now) { played.add(now.id); startNow(); }
+  else if (playerReady) { try { player.stopVideo(); } catch (e) {} }
+  lyrLoad(now);
+  render();
+}
+function togglePause() {
+  if (!playerReady || !now) return;
+  if (player.getPlayerState() === 1) player.pauseVideo(); else player.playVideo();
+}
+
+/* ================= 搜尋 ================= */
+function apiGet(path, params) {
+  var u = new URL('https://www.googleapis.com/youtube/v3/' + path);
+  Object.keys(params).forEach(function (k) { u.searchParams.set(k, params[k]); });
+  u.searchParams.set('key', cfg.key);
+  return fetch(u.toString()).then(function (r) {
+    if (r.ok) return r.json();
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      var reason = j && j.error && j.error.errors && j.error.errors[0] && j.error.errors[0].reason;
+      var e = new Error(reason || ('HTTP ' + r.status));
+      e.reason = reason || '';
+      throw e;
+    });
+  });
+}
+function friendly(e) {
+  var r = e && e.reason || '';
+  if (r === 'quotaExceeded' || r === 'dailyLimitExceeded' || r === 'rateLimitExceeded') return '今天的 YouTube 搜尋額度用完了';
+  if (r === 'keyInvalid' || r === 'badRequest' || r === 'forbidden' || r === 'accessNotConfigured') return 'YouTube 金鑰不對或沒啟用';
+  return '搜尋失敗，晚點再試';
+}
+
+/* 回傳 {ok:true, song} 或 {ok:false, why} */
+function findSong(query) {
+  var ck = query.toLowerCase();
+  if (cache.has(ck)) return Promise.resolve(cache.get(ck));
+  return apiGet('search', {
+    part: 'snippet', type: 'video', q: query, maxResults: 8,
+    videoEmbeddable: 'true', videoSyndicated: 'true'
+  }).then(function (s) {
+    var ids = (s.items || []).map(function (i) { return i.id && i.id.videoId; }).filter(Boolean);
+    if (!ids.length) return { ok: false, why: '找不到「' + short(query, 20) + '」' };
+    return apiGet('videos', { part: 'snippet,contentDetails,status', id: ids.join(',') }).then(function (v) {
+      var byId = {};
+      (v.items || []).forEach(function (it) { byId[it.id] = it; });
+      var bans = banWords(), firstWhy = '';
+      for (var i = 0; i < ids.length; i++) {
+        var it = byId[ids[i]];
+        if (!it) continue;
+        var sec = isoSec(it.contentDetails && it.contentDetails.duration);
+        var title = it.snippet.title, channel = it.snippet.channelTitle || '';
+        var hay = (title + ' ' + channel).toLowerCase();
+        var why = '';
+        if (!(it.status && it.status.embeddable)) why = '這首不能嵌入播放';
+        else if (it.snippet.liveBroadcastContent && it.snippet.liveBroadcastContent !== 'none') why = '直播不能點';
+        else if (sec <= 0) why = '這首長度讀不到';
+        else if (sec > cfg.len * 60) why = '太長了（上限 ' + cfg.len + ' 分鐘）';
+        else if (bans.some(function (w) { return hay.indexOf(w) >= 0; })) why = '這首不在可點範圍';
+        if (!why) {
+          var r = { ok: true, song: { id: it.id, title: title, channel: channel, sec: sec } };
+          cache.set(ck, r);
+          return r;
+        }
+        if (!firstWhy) firstWhy = why;               // 以第一名（最像的）被拒的原因回報
+      }
+      return { ok: false, why: firstWhy || '找不到「' + short(query, 20) + '」' };
+    });
+  });
+}
+
+/* ================= 點歌流程 ================= */
+function userCount(uid) {
+  return queue.filter(function (s) { return s.uid === uid; }).length + (now && now.uid === uid ? 1 : 0);
+}
+function request(ev, query) {
+  var who = short(ev.name, 12);
+  if (!cfg.key) { say('主播還沒設定 YouTube 金鑰'); return Promise.resolve(); }
+  if (query.length > 60) { say(who + '：歌名太長了'); return Promise.resolve(); }
+  var lower = query.toLowerCase();
+  if (banWords().some(function (w) { return lower.indexOf(w) >= 0; })) { say(who + '：這首不能點'); return Promise.resolve(); }
+  if (userCount(ev.uid) >= cfg.max) { say(who + '：你已經排了 ' + cfg.max + ' 首，等播完再點'); return Promise.resolve(); }
+  return findSong(query).then(function (r) {
+    if (!r.ok) { say(who + '：' + r.why); return; }
+    var s = r.song;
+    if (userCount(ev.uid) >= cfg.max) { say(who + '：你已經排了 ' + cfg.max + ' 首，等播完再點'); return; }
+    if ((now && now.id === s.id) || queue.some(function (q) { return q.id === s.id; })) { say(who + '：「' + short(s.title, 16) + '」已經在清單裡了'); return; }
+    if (played.has(s.id)) { say(who + '：「' + short(s.title, 16) + '」剛剛播過了'); return; }
+    s.uid = ev.uid; s.who = ev.name;
+    queue.push(s);
+    if (!now) { playNext(); say(who + ' 點的歌開始播放', true); }
+    else say(who + ' 點歌成功，排第 ' + queue.length + ' 位', true);
+    render();
+  }).catch(function (e) { say(friendly(e)); });
+}
+
+/* ev: {uid, uniqueId, userId, name, text, hostTest} */
+function onChat(ev) {
+  var text = norm(ev.text);
+  if (!text) return;
+  if (isHost(ev)) {
+    if (CMD_SKIP.test(text))  { doSkip();  return; }
+    if (CMD_CLEAR.test(text)) { doClear(); return; }
+    if (CMD_LYR_E.test(text)) { lyrShift(0.5); return; }
+    if (CMD_LYR_L.test(text)) { lyrShift(-0.5); return; }
+    if (CMD_LYR_0.test(text)) { lyrReset(); return; }
+  }
+  var m = /^#\s*(.+)$/.exec(text);
+  if (!m) return;
+  var q = m[1].trim();
+  if (!q) return;
+  chain = chain.then(function () { return request(ev, q); }).catch(function (e) { console.error(e); });
+}
+function isHost(ev) {
+  if (ev.hostTest) return true;
+  var h = hostId();
+  if (!h) return false;
+  return (ev.uniqueId && ev.uniqueId.toLowerCase() === h) || (ev.userId && String(ev.userId).toLowerCase() === h);
+}
+function doSkip()  { if (!now) return; say('主播跳過了這首', true); playNext(); }
+function doClear() { queue.length = 0; say('待播清單已清空', true); render(); }
+
+/* ================= 歌詞（LRCLIB，帶時間軸） ================= */
+var lyr = { lines: null, offset: 0, token: 0, idx: -2 };
+var lyrCache = new Map();     // 影片 id → 歌詞行 或 null（查不到）
+
+var NOISE = /official|music|video|\bmv\b|m\/v|lyrics?|audio|\bhd\b|4k|hq|karaoke|\blive\b|官方|完整|歌詞|字幕|動態|高音質|現場|音樂|版$/i;
+function cleanTitle(t) {
+  return String(t || '')
+    // 括號：裡面是雜訊（Official、MV、歌詞…）就整組刪掉；是歌名就保留內容
+    .replace(/[\[【(（「『《]([^\]】)）」』》]*)[\]】)）」』》]/g, function (_, inner) { return NOISE.test(inner) ? ' ' : ' ' + inner + ' '; })
+    .replace(/\b(official|music video|mv|lyrics?|lyric video|audio|hd|4k|hq|karaoke)\b/ig, ' ')
+    .replace(/(官方|完整版|歌詞版|動態歌詞|高音質|字幕|歌詞|現場版)/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+function lyrQueries(title, channel) {
+  var c = cleanTitle(title), qs = [];
+  var m = /^(.+?)\s*[-–—|｜:：]\s*(.+)$/.exec(c);
+  if (m) qs.push((m[2] + ' ' + m[1]).trim());                       // 「歌手 - 歌名」→ 歌名 歌手
+  var cjk = c.replace(/[A-Za-z0-9'’.&!?,]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (cjk && cjk !== c && cjk.length >= 2) qs.push(cjk);            // 只留中文（去掉英文副標，較容易命中）
+  qs.push(c);
+  var ch = String(channel || '').replace(/\s*-\s*topic$/i, '').replace(/(official|官方).*$/i, '').trim();
+  if (ch && c.indexOf(ch) < 0) qs.push(c + ' ' + ch);
+  var seen = {}; return qs.filter(function (q) { q = q.trim(); if (!q || seen[q]) return false; seen[q] = 1; return true; }).slice(0, 4);
+}
+function parseLrc(text) {
+  var out = [];
+  String(text || '').split(/\r?\n/).forEach(function (ln) {
+    var re = /\[(\d+):(\d+(?:[.:]\d+)?)\]/g, m, ts = [], last = 0;
+    while ((m = re.exec(ln))) { ts.push(+m[1] * 60 + parseFloat(m[2].replace(':', '.'))); last = re.lastIndex; }
+    if (!ts.length) return;
+    var tx = ln.slice(last).trim();
+    ts.forEach(function (t) { out.push({ t: t, s: tx }); });
+  });
+  out.sort(function (a, b) { return a.t - b.t; });
+  return out;
+}
+/* 從搜尋結果挑「有時間軸、長度差不多」的，取長度最接近的 */
+function pickLyric(list, sec) {
+  var best = null, bd = 1e9;
+  (list || []).forEach(function (r) {
+    var syn = r.syncedLyrics || r.synced_lyrics;
+    if (!syn || r.instrumental) return;
+    var d = Math.abs((+r.duration || 0) - sec);
+    if (d <= 8 && d < bd) { best = syn; bd = d; }
+  });
+  return best ? parseLrc(best) : null;
+}
+function lyrFetch(song) {
+  if (lyrCache.has(song.id)) return Promise.resolve(lyrCache.get(song.id));
+  var qs = lyrQueries(song.title, song.channel);
+  var p = Promise.resolve(null);
+  qs.forEach(function (q) {
+    p = p.then(function (found) {
+      if (found) return found;
+      return fetch('https://lrclib.net/api/search?q=' + encodeURIComponent(q))
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (list) { var l = pickLyric(list, song.sec); return l && l.length >= 3 ? l : null; })
+        .catch(function () { return null; });
+    });
+  });
+  return p.then(function (l) { lyrCache.set(song.id, l); return l; });
+}
+function lyrLoad(song) {
+  lyr.token++; lyr.lines = null; lyr.offset = 0; lyr.idx = -2;
+  $('lyr').classList.remove('on');
+  $('lPrev').textContent = $('lCur').textContent = $('lNext').textContent = '';
+  if (!song || !cfg.lyr) return;
+  var tk = lyr.token;
+  lyrFetch(song).then(function (l) {
+    if (tk !== lyr.token || !l) return;                  // 已換歌，或查不到
+    lyr.lines = l; lyr.idx = -2;
+    $('lyr').classList.add('on');
+    lyrTick();
+  });
+}
+function lyrShift(d) {
+  if (!lyr.lines) { say('這首沒有歌詞可以調整'); return; }
+  lyr.offset += d; lyr.idx = -2;
+  say('歌詞' + (lyr.offset >= 0 ? '提前 ' : '延後 ') + Math.abs(lyr.offset).toFixed(1) + ' 秒', true);
+  lyrTick();
+}
+function lyrReset() { lyr.offset = 0; lyr.idx = -2; say('歌詞時間已歸零', true); lyrTick(); }
+function lyrTick() {
+  if (!lyr.lines || !playerReady) return;
+  var t;
+  try { t = player.getCurrentTime(); } catch (e) { return; }
+  t += lyr.offset;
+  var L = lyr.lines, i = -1;
+  for (var k = 0; k < L.length; k++) { if (L[k].t <= t) i = k; else break; }
+  if (i === lyr.idx) return;
+  lyr.idx = i;
+  $('lPrev').textContent = i > 0 ? L[i - 1].s : '';
+  $('lCur').textContent = i >= 0 ? (L[i].s || '♪') : '♪';
+  $('lNext').textContent = i + 1 < L.length ? L[i + 1].s : '';
+}
+setInterval(lyrTick, 200);
+
+/* ================= TikFinity ================= */
+var tfState = '未連線';
+function connectTikFinity() {
+  var ws;
+  function retry() { setTimeout(connectTikFinity, 3000); }
+  try { ws = new WebSocket('ws://localhost:21213/'); } catch (e) { retry(); return; }
+  ws.onopen = function () { tfState = '已連上 TikFinity'; updStatus(); };
+  ws.onclose = function () { tfState = '沒連到 TikFinity（3 秒後重試）'; updStatus(); retry(); };
+  ws.onerror = function () { try { ws.close(); } catch (e) {} };
+  ws.onmessage = function (e) {
+    var m; try { m = JSON.parse(e.data); } catch (x) { return; }
+    if (!m || m.event !== 'chat') return;
+    var d = m.data || {}, u = d.user || d;
+    var uniqueId = String(u.uniqueId || d.uniqueId || u.displayId || '');
+    var userId = String(u.userId || d.userId || u.id || '');
+    var name = u.nickname || d.nickname || uniqueId || '觀眾';
+    var text = d.comment != null ? d.comment : (d.content != null ? d.content : d.text);
+    onChat({ uid: userId || uniqueId || name, uniqueId: uniqueId, userId: userId, name: String(name), text: text });
+  };
+}
+function updStatus() { if (!OBS) $('status').textContent = 'TikFinity：' + tfState; }
+
+/* ================= 面板（非 OBS） ================= */
+function buildUrl() {
+  var u = new URL(location.href.split('?')[0].split('#')[0]);
+  u.searchParams.set('obs', '1');
+  if (cfg.key) u.searchParams.set('key', cfg.key);
+  if (cfg.host) u.searchParams.set('host', cfg.host);
+  if (cfg.max !== DEF.max) u.searchParams.set('max', cfg.max);
+  if (cfg.len !== DEF.len) u.searchParams.set('len', cfg.len);
+  if (cfg.ban.trim()) u.searchParams.set('ban', cfg.ban.trim());
+  if (!cfg.lyr) u.searchParams.set('lyr', '0');
+  return u.toString();
+}
+function initPanel() {
+  if (location.protocol === 'file:') $('fileWarn').style.display = '';
+  $('f_key').value = cfg.key; $('f_host').value = cfg.host;
+  $('f_max').value = cfg.max; $('f_len').value = cfg.len; $('f_ban').value = cfg.ban; $('f_lyr').checked = !!cfg.lyr;
+  function sync() {
+    cfg.key = $('f_key').value.trim();
+    cfg.host = $('f_host').value.trim();
+    cfg.max = Math.max(1, Math.min(20, parseInt($('f_max').value, 10) || DEF.max));
+    cfg.len = Math.max(1, Math.min(60, parseInt($('f_len').value, 10) || DEF.len));
+    cfg.ban = $('f_ban').value;
+    cfg.lyr = $('f_lyr').checked ? 1 : 0;
+    try { localStorage.setItem('songreq.cfg', JSON.stringify(cfg)); } catch (e) {}
+    $('obsUrl').value = buildUrl();
+  }
+  ['f_key', 'f_host', 'f_max', 'f_len', 'f_ban'].forEach(function (id) { $(id).addEventListener('input', sync); });
+  $('f_lyr').addEventListener('change', function () { sync(); lyrLoad(now); });
+  sync();
+  $('copyUrl').onclick = function () {
+    $('obsUrl').select();
+    try { navigator.clipboard.writeText($('obsUrl').value); } catch (e) { document.execCommand('copy'); }
+    $('copyUrl').textContent = '✅ 已複製';
+    setTimeout(function () { $('copyUrl').textContent = '📋 複製網址'; }, 1500);
+  };
+  $('t_send').onclick = function () {
+    var name = $('t_name').value.trim() || '測試觀眾';
+    onChat({ uid: 'test:' + name, uniqueId: 'test_' + name, userId: '', name: name, text: $('t_text').value, hostTest: $('t_host').checked });
+  };
+  if (P.get('tikfinity') === '1') updStatus(); else $('status').textContent = '這個頁面沒連 TikFinity（OBS 網址會自動連，這裡只用來測試）。';
+}
+
+/* ================= 啟動 ================= */
+document.body.classList.toggle('obs', OBS);
+$('bSkip').onclick = doSkip;
+$('bClear').onclick = doClear;
+$('bPause').onclick = togglePause;
+$('bLyrE').onclick = function () { lyrShift(0.5); };
+$('bLyrL').onclick = function () { lyrShift(-0.5); };
+$('unblock').onclick = function () { if (playerReady) player.playVideo(); $('unblock').classList.remove('show'); };
+$('qtitle').textContent = '';
+render();
+if (!OBS) initPanel();
+loadPlayerApi();
+if (OBS || P.get('tikfinity') === '1') connectTikFinity();
+
+/* 測試用 */
+window.__song = { onChat: onChat, cleanTitle: cleanTitle, lyrQueries: lyrQueries, parseLrc: parseLrc, pickLyric: pickLyric, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played) }; }, cfg: cfg };
+})();
+</script>
+</body>
+</html>
