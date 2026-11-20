@@ -118,8 +118,9 @@ body.obs #panel{display:none}
 
     <h3>③ 貼到 OBS 的網址</h3>
     <input type="text" id="obsUrl" readonly>
-    <div style="margin-top:6px"><button id="copyUrl">📋 複製網址</button></div>
-    <div class="hint">OBS 瀏覽器來源：貼上網址、寬 540 高 760 左右，並勾選「透過 OBS 控制音訊」。要手動操作時，在來源上按右鍵 →「互動」，滑鼠移到畫面上就會出現跳過／清空按鈕。設定改了要重貼網址。</div>
+    <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap"><button id="copyUrl">📋 複製網址</button><button id="newCode" class="gray">🔑 換新代號</button></div>
+    <div class="hint" id="cloudStatus"></div>
+    <div class="hint">OBS 瀏覽器來源：貼上網址、寬 540 高 760 左右，並勾選「透過 OBS 控制音訊」。要手動操作時，在來源上按右鍵 →「互動」，滑鼠移到畫面上就會出現跳過／清空按鈕。<br>⚠ 網址裡的代號等於密碼（你的 YouTube 金鑰存在雲端，靠這個代號保密），不要貼給別人。</div>
 
     <h3>測試（假裝觀眾留言）</h3>
     <div class="row">
@@ -152,6 +153,9 @@ function loadCfg() {
   if (P.has('len'))  c.len  = P.get('len');
   if (P.has('ban'))  c.ban  = P.get('ban');
   if (P.has('lyr'))  c.lyr  = P.get('lyr');
+  return normCfg(c);
+}
+function normCfg(c) {
   c.max = Math.max(1, Math.min(20, parseInt(c.max, 10) || DEF.max));
   c.len = Math.max(1, Math.min(60, parseInt(c.len, 10) || DEF.len));
   c.key = String(c.key || '').trim();
@@ -387,6 +391,53 @@ function isHost(ev) {
 function doSkip()  { if (!now) return; say('主播跳過了這首', true); playNext(); }
 function doClear() { queue.length = 0; say('待播清單已清空', true); render(); }
 
+/* ================= 雲端設定（短網址用） =================
+   設定存在 Supabase（跟亂鬥遊戲同一個資料庫、同一套鎖死的函式），OBS 網址只帶一個「雲端代號」。
+   面板改設定 → 存雲端；OBS 畫面每 30 秒讀一次並套用。代號就是密碼，外流等於金鑰外流。 */
+var SB = { url: 'https://tjrlpthprtrlmugrofpj.supabase.co', key: 'sb_publishable_u9lUyPB8fr2jmHji_ZVAJA_OtxLQuoS' };
+var SLOT = 'songreq';
+function sbCall(fn, args) {
+  return fetch(SB.url + '/rest/v1/rpc/' + fn, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SB.key }, body: JSON.stringify(args)
+  }).then(function (r) {
+    return r.json().then(function (b) { return { ok: r.ok, body: b }; }, function () { return { ok: r.ok, body: null }; });
+  });
+}
+function newCode() {
+  var a = new Uint8Array(24), out = 'sr', cs = 'abcdefghijkmnpqrstuvwxyz23456789';
+  (window.crypto || window.msCrypto).getRandomValues(a);
+  for (var i = 0; i < a.length; i++) out += cs[a[i] % cs.length];
+  return out;
+}
+var cloudCode = '', pulled = false;
+function applyCloud(d) {
+  var before = JSON.stringify(cfg);
+  var c = Object.assign({}, cfg, { key: d.key, host: d.host, max: d.max, len: d.len, ban: d.ban, lyr: d.lyr });
+  Object.assign(cfg, normCfg(c));
+  if (JSON.stringify(cfg) === before) return;
+  if (!cfg.lyr) { lyr.token++; lyr.lines = null; $('lyr').classList.remove('on'); }
+  else if (now && !lyr.lines) lyrLoad(now);
+  if (pulled) say('設定已更新（主播在面板改的）', true);
+}
+function cloudPull() {
+  return sbCall('live_get', { p_code: cloudCode, p_slot: SLOT }).then(function (r) {
+    if (!r.ok) throw new Error('bad');
+    var row = Array.isArray(r.body) ? r.body[0] : null;
+    if (row && row.data) applyCloud(row.data);
+    pulled = true;
+  });
+}
+function startCloudPull() {
+  var tries = 0;
+  (function go() {
+    cloudPull().then(function () { setTimeout(go, 30000); }, function () {
+      tries++;
+      if (tries === 3) say('讀不到雲端設定，請檢查網路（還是會每隔幾秒再試）');
+      setTimeout(go, tries < 3 ? 3000 : 10000);
+    });
+  })();
+}
+
 /* ================= 歌詞（LRCLIB，帶時間軸） ================= */
 var lyr = { lines: null, offset: 0, token: 0, idx: -2 };
 var lyrCache = new Map();     // 影片 id → 歌詞行 或 null（查不到）
@@ -507,8 +558,9 @@ function connectTikFinity() {
 function updStatus() { if (!OBS) $('status').textContent = 'TikFinity：' + tfState; }
 
 /* ================= 面板（非 OBS） ================= */
-function buildUrl() {
-  var u = new URL(location.href.split('?')[0].split('#')[0]);
+function baseUrl() { return location.href.split('?')[0].split('#')[0].replace(/index\.html$/, ''); }
+function buildLongUrl() {
+  var u = new URL(baseUrl());
   u.searchParams.set('obs', '1');
   if (cfg.key) u.searchParams.set('key', cfg.key);
   if (cfg.host) u.searchParams.set('host', cfg.host);
@@ -518,6 +570,22 @@ function buildUrl() {
   if (!cfg.lyr) u.searchParams.set('lyr', '0');
   return u.toString();
 }
+function buildShortUrl() { return baseUrl() + '?obs=1&c=' + encodeURIComponent(cloudCode); }
+var cloudState = 'pending', pushTimer = null;
+function showUrl() {
+  $('obsUrl').value = cloudState === 'fail' ? buildLongUrl() : buildShortUrl();
+  var st = { pending: '☁ 設定存到雲端中…', ok: '☁ 設定已存到雲端。之後改設定不用重貼網址，直播畫面約 30 秒內自動套用。',
+             fail: '⚠ 存雲端失敗（網路或資料庫問題），目前改用「長網址」，設定都寫在網址裡，改了要重貼。' }[cloudState];
+  $('cloudStatus').textContent = st;
+}
+function pushCloud() {
+  cloudState = 'pending'; showUrl();
+  var data = { key: cfg.key, host: cfg.host, max: cfg.max, len: cfg.len, ban: cfg.ban, lyr: cfg.lyr };
+  return sbCall('live_put', { p_code: cloudCode, p_slot: SLOT, p_data: data, p_expected: null })
+    .then(function (r) { cloudState = (r.ok && r.body && r.body.ok === true) ? 'ok' : 'fail'; }, function () { cloudState = 'fail'; })
+    .then(showUrl);
+}
+function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(pushCloud, 800); }
 function initPanel() {
   if (location.protocol === 'file:') $('fileWarn').style.display = '';
   $('f_key').value = cfg.key; $('f_host').value = cfg.host;
@@ -530,10 +598,17 @@ function initPanel() {
     cfg.ban = $('f_ban').value;
     cfg.lyr = $('f_lyr').checked ? 1 : 0;
     try { localStorage.setItem('songreq.cfg', JSON.stringify(cfg)); } catch (e) {}
-    $('obsUrl').value = buildUrl();
+    schedulePush();
   }
   ['f_key', 'f_host', 'f_max', 'f_len', 'f_ban'].forEach(function (id) { $(id).addEventListener('input', sync); });
   $('f_lyr').addEventListener('change', function () { sync(); lyrLoad(now); });
+  try { cloudCode = localStorage.getItem('songreq.code') || ''; } catch (e) {}
+  if (!cloudCode) { cloudCode = newCode(); try { localStorage.setItem('songreq.code', cloudCode); } catch (e) {} }
+  $('newCode').onclick = function () {
+    if (!confirm('換新代號後，OBS 裡的舊網址就不會再收到設定更新，要重貼新網址。確定要換嗎？')) return;
+    cloudCode = newCode(); try { localStorage.setItem('songreq.code', cloudCode); } catch (e) {}
+    pushCloud();
+  };
   sync();
   $('copyUrl').onclick = function () {
     $('obsUrl').select();
@@ -559,11 +634,12 @@ $('unblock').onclick = function () { if (playerReady) player.playVideo(); $('unb
 $('qtitle').textContent = '';
 render();
 if (!OBS) initPanel();
+else if (P.get('c')) { cloudCode = P.get('c'); startCloudPull(); }
 loadPlayerApi();
 if (OBS || P.get('tikfinity') === '1') connectTikFinity();
 
 /* 測試用 */
-window.__song = { onChat: onChat, cleanTitle: cleanTitle, lyrQueries: lyrQueries, parseLrc: parseLrc, pickLyric: pickLyric, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played) }; }, cfg: cfg };
+window.__song = { pull: function () { return cloudPull(); }, onChat: onChat, cleanTitle: cleanTitle, lyrQueries: lyrQueries, parseLrc: parseLrc, pickLyric: pickLyric, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played) }; }, cfg: cfg };
 })();
 </script>
 </body>
