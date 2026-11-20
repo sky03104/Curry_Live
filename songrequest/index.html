@@ -18,7 +18,7 @@ body.obs{background:transparent;overflow:hidden}
 body.obs #layout{padding:0}
 
 /* ===== 直播畫面卡片（影片壓縮會糊掉彩色字，所以字用純白＋粗體＋近黑底） ===== */
-#card{width:360px;background:var(--card);border-radius:14px;padding:12px}
+#card{width:540px;background:var(--card);border-radius:14px;padding:12px}
 #head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 #head h1{font-size:16px;margin:0;font-weight:800}
 #bar{position:absolute;right:6px;bottom:6px;z-index:5;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px;opacity:0;transition:opacity .15s}
@@ -34,8 +34,8 @@ body.obs #layout{padding:0}
 #lyr{display:none;margin:0 0 10px;padding:10px 8px;background:#000;border-radius:10px;text-align:center}
 #lyr.on{display:block}
 #lyr p{margin:0;font-weight:900}
-#lPrev,#lNext{font-size:17px;color:#d0d3da;min-height:24px;line-height:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#lCur{font-size:28px;color:#fff;min-height:68px;line-height:34px;display:flex;align-items:center;justify-content:center;padding:4px 0;word-break:break-all}
+#lPrev,#lNext{font-size:24px;color:#d0d3da;min-height:34px;line-height:34px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lCur{font-size:42px;color:#fff;min-height:104px;line-height:52px;display:flex;align-items:center;justify-content:center;padding:4px 0;word-break:break-all}
 #now{margin-top:8px;min-height:44px}
 #nowTitle{font-weight:800;font-size:15px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 #nowBy{font-size:13px;font-weight:700;color:#e5e7ee;margin-top:2px}
@@ -119,7 +119,7 @@ body.obs #panel{display:none}
     <h3>③ 貼到 OBS 的網址</h3>
     <input type="text" id="obsUrl" readonly>
     <div style="margin-top:6px"><button id="copyUrl">📋 複製網址</button></div>
-    <div class="hint">OBS 瀏覽器來源：貼上網址、寬 360 高 520 左右，並勾選「透過 OBS 控制音訊」。要手動操作時，在來源上按右鍵 →「互動」，滑鼠移到畫面上就會出現跳過／清空按鈕。設定改了要重貼網址。</div>
+    <div class="hint">OBS 瀏覽器來源：貼上網址、寬 540 高 760 左右，並勾選「透過 OBS 控制音訊」。要手動操作時，在來源上按右鍵 →「互動」，滑鼠移到畫面上就會出現跳過／清空按鈕。設定改了要重貼網址。</div>
 
     <h3>測試（假裝觀眾留言）</h3>
     <div class="row">
