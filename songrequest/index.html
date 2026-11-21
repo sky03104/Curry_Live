@@ -136,7 +136,7 @@ body.obs #panel{display:none}
 
     <h3>③ 貼到 OBS 的網址</h3>
     <input type="text" id="obsUrl" readonly>
-    <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap"><button id="copyUrl">📋 複製網址</button><button id="newCode" class="gray">🔑 換新代號</button></div>
+    <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap"><button id="copyUrl">📋 複製網址</button><button id="newCode" class="gray">🔑 換新代號</button><button id="openPad" class="gray">🎛 開啟主播控制台</button></div>
     <div class="hint" id="cloudStatus"></div>
     <div class="hint">OBS 瀏覽器來源：貼上網址、寬 540 高 760 左右，並勾選「透過 OBS 控制音訊」。要手動操作時，在來源上按右鍵 →「互動」，滑鼠移到畫面上就會出現跳過／清空按鈕。<br>⚠ 網址裡的代號等於密碼（你的 YouTube 金鑰存在雲端，靠這個代號保密），不要貼給別人。</div>
 
@@ -203,12 +203,15 @@ var CMD_VOL = /^!?音量\s*(\d{1,3})$/;
 var CMD_LYR_E = /^!?歌詞提前$/;
 var CMD_LYR_L = /^!?歌詞延後$/;
 var CMD_LYR_0 = /^!?歌詞歸零$/;
+var CMD_STOP = /^!?停止點歌$/;
+var CMD_START = /^!?開始點歌$/;
 
 /* ================= 狀態 ================= */
 var now = null;              // 正在播：{id,title,channel,sec,uid,who}
 var queue = [];              // 待播
 var history = [];            // 這次觀眾點過、播過的歌（依順序），沒人點歌時拿來自動重播
 var replayIdx = 0;           // 下一首要自動重播第幾首
+var paused = false, stopped = false, arBeforeStop = 1;   // 暫停中／主播按了「停止點歌」
 var played = new Set();      // 這次開啟後播過的歌（不再重複排）
 var cache = new Map();       // 歌名 → 搜尋結果（省 YouTube 額度）
 var toasts = [];
@@ -238,7 +241,9 @@ function say(text, ok) {
 /* ================= 畫面 ================= */
 function render() {
   $('idle').classList.toggle('hide', !!now);
-  $('pbox').classList.toggle('idlehide', OBS && !now);          // 沒歌在放時，OBS 畫面不留一塊黑色空播放器
+  $('pbox').classList.toggle('idlehide', OBS && !now);
+  applyShow();
+  scheduleState();          // 沒歌在放時，OBS 畫面不留一塊黑色空播放器
   $('nowTitle').textContent = now ? '▶ ' + now.title : '';
   $('nowBy').textContent = now ? (now.auto ? '自動重播（沒人點歌）　' : '點歌：' + short(now.who, 12) + '　') + fmt(now.sec) : '';
   $('qtitle').textContent = queue.length ? '待播（' + queue.length + ' 首）' : '';
@@ -281,7 +286,8 @@ function loadPlayerApi() {
         onReady: function () { playerReady = true; applyVol(); startNow(); },
         onStateChange: function (e) {
           if (e.data === 0) playNext();                 // 播完
-          if (e.data === 1) { $('unblock').classList.remove('show'); $('pbox').classList.remove('forceshow'); applyVol(); }
+          if (e.data === 2) { paused = true; scheduleState(); }
+          if (e.data === 1) { paused = false; $('unblock').classList.remove('show'); $('pbox').classList.remove('forceshow'); applyVol(); scheduleState(); }
         },
         onError: function () {                          // 不能嵌入／已刪除等
           say('這首放不出來，已自動換下一首');
@@ -306,8 +312,10 @@ function setVol(n) {
 }
 function applyShow() {
   $('pbox').classList.toggle('off', !cfg.pl);
-  (cfg.pl ? $('pbox') : $('head')).appendChild($('bar'));
-  $('bar').classList.toggle('inhead', !cfg.pl);
+  var inPbox = cfg.pl && !(OBS && !now);                 // 播放器藏起來（關掉顯示、或沒歌在放）時，按鈕改放標題列，才按得到
+  var want = inPbox ? $('pbox') : $('head');
+  if ($('bar').parentElement !== want) want.appendChild($('bar'));
+  $('bar').classList.toggle('inhead', !inPbox);
 }
 function startNow() {
   if (now && playerReady) player.loadVideoById(now.id);
@@ -326,7 +334,8 @@ function playNext() {
 }
 function togglePause() {
   if (!playerReady || !now) return;
-  if (player.getPlayerState() === 1) player.pauseVideo(); else player.playVideo();
+  if (player.getPlayerState() === 1) { paused = true; player.pauseVideo(); } else { paused = false; player.playVideo(); }
+  scheduleState();
 }
 
 /* ================= 搜尋 ================= */
@@ -430,6 +439,7 @@ function userCount(uid) {
 }
 function request(ev, query) {
   var who = short(ev.name, 12);
+  if (stopped) { say(who + '：點歌目前停止中'); return Promise.resolve(); }
   if (!cfg.key) { say('主播還沒設定 YouTube 金鑰'); return Promise.resolve(); }
   if (query.length > 60) { say(who + '：歌名太長了'); return Promise.resolve(); }
   var lower = query.toLowerCase();
@@ -462,6 +472,8 @@ function onChat(ev) {
     if (CMD_LYR_E.test(text)) { lyrShift(0.5); return; }
     if (CMD_LYR_L.test(text)) { lyrShift(-0.5); return; }
     if (CMD_LYR_0.test(text)) { lyrReset(); return; }
+    if (CMD_STOP.test(text)) { doStop(); return; }
+    if (CMD_START.test(text)) { doStart(); return; }
   }
   var m = /^#\s*(.+)$/.exec(text);
   if (!m) return;
@@ -477,6 +489,74 @@ function isHost(ev) {
 }
 function doSkip()  { if (!now) return; say('主播跳過了這首', true); playNext(); }
 function doClear() { queue.length = 0; say('待播清單已清空', true); render(); }
+function doStop() {
+  if (stopped) return;
+  stopped = true; arBeforeStop = cfg.ar; cfg.ar = 0;
+  queue.length = 0; paused = true;
+  if (playerReady && now) { try { player.pauseVideo(); } catch (e) {} }
+  say('點歌已停止（主播）', true); render(); scheduleState();
+}
+function doStart() {
+  if (!stopped) return;
+  stopped = false; cfg.ar = arBeforeStop; paused = false;
+  if (now && playerReady) { try { player.playVideo(); } catch (e) {} }
+  else if (!now) applyAr();
+  say('點歌已開始', true); render(); scheduleState();
+}
+
+/* ================= 主播控制台（遠端，pad.html） =================
+   OBS 畫面把目前狀態寫到雲端（songreq-state），並每 1.5 秒讀控制台送來的指令（songreq-cmd）。
+   控制台把最近 20 個指令放在同一份文件裡，每個有遞增的編號；OBS 只執行比自己記的編號新的。 */
+var STSLOT = 'songreq-state', CMDSLOT = 'songreq-cmd';
+var lastCmdId = null, lastStateJson = '', stTimer = null;
+function stateObj() {
+  return {
+    v: 1, t: Date.now(),
+    now: now ? { id: now.id, title: now.title, who: now.who, sec: now.sec, auto: !!now.auto } : null,
+    queue: queue.slice(0, 40).map(function (x) { return { id: x.id, title: x.title, who: x.who, sec: x.sec }; }),
+    paused: !!paused, stopped: !!stopped, vol: cfg.vol, ar: cfg.ar, lyr: lyr.lines ? 1 : 0, off: lyr.offset
+  };
+}
+function scheduleState() { if (!OBS || !cloudCode) return; clearTimeout(stTimer); stTimer = setTimeout(function () { pushState(false); }, 400); }
+function pushState(force) {
+  if (!OBS || !cloudCode) return Promise.resolve();
+  var o = stateObj(), j = JSON.stringify(Object.assign({}, o, { t: 0 }));
+  if (!force && j === lastStateJson) return Promise.resolve();
+  lastStateJson = j;
+  return sbCall('live_put', { p_code: cloudCode, p_slot: STSLOT, p_data: o, p_expected: null }).catch(function () {});
+}
+function runCmd(cmd, arg) {
+  switch (cmd) {
+    case 'pause':  if (playerReady && now) { paused = true; try { player.pauseVideo(); } catch (e) {} } break;
+    case 'resume': if (playerReady && now) { paused = false; try { player.playVideo(); } catch (e) {} } break;
+    case 'skip':   doSkip(); break;
+    case 'clear':  doClear(); break;
+    case 'stop':   doStop(); break;
+    case 'start':  doStart(); break;
+    case 'vol':    setVol(+arg || 0); break;
+    case 'lyrE':   lyrShift(0.5); break;
+    case 'lyrL':   lyrShift(-0.5); break;
+    case 'lyrReset': lyrReset(); break;
+    case 'ar':     cfg.ar = (+arg) ? 1 : 0; if (cfg.ar) applyAr(); say('自動重播' + (cfg.ar ? '已開啟' : '已關閉'), true); break;
+    case 'remove': queue = queue.filter(function (x) { return x.id !== arg; }); say('已從待播清單刪除一首', true); render(); break;
+    case 'top':
+      for (var i = 0; i < queue.length; i++) if (queue[i].id === arg) { queue.unshift(queue.splice(i, 1)[0]); break; }
+      say('已把一首插到最前面', true); render(); break;
+  }
+  scheduleState();
+}
+function pollCmds() {
+  if (!OBS || !cloudCode) return Promise.resolve();
+  return sbCall('live_get', { p_code: cloudCode, p_slot: CMDSLOT }).then(function (r) {
+    if (!r.ok) return;
+    var row = Array.isArray(r.body) ? r.body[0] : null;
+    var list = row && row.data && Array.isArray(row.data.cmds) ? row.data.cmds : [];
+    list = list.filter(function (c) { return c && typeof c.id === 'number' && typeof c.cmd === 'string'; }).sort(function (a, b) { return a.id - b.id; });
+    if (lastCmdId === null) { lastCmdId = list.length ? list[list.length - 1].id : 0; return; }   // 第一次只記下編號，不重播舊指令
+    list.forEach(function (c) { if (c.id > lastCmdId) { lastCmdId = c.id; runCmd(c.cmd, c.arg); } });
+  }, function () {});
+}
+
 
 /* ================= 雲端設定（短網址用） =================
    設定存在 Supabase（跟亂鬥遊戲同一個資料庫、同一套鎖死的函式），OBS 網址只帶一個「雲端代號」。
@@ -497,13 +577,15 @@ function newCode() {
   return out;
 }
 var cloudCode = '', pulled = false;
-var cloudLastVol = null;
+var cloudLastVol = null, cloudLastAr = null;
 function applyCloud(d) {
   var before = JSON.stringify(cfg), oldPl = cfg.pl, oldVol = cfg.vol, oldAr = cfg.ar;
   var volChanged = d.vol != null && d.vol !== cloudLastVol;     // 音量只在雲端那份有變時才套用，免得蓋掉直播中臨時調的音量
   if (d.vol != null) cloudLastVol = d.vol;
+  var arChanged = d.ar != null && d.ar !== cloudLastAr;         // 自動重播同理：主播在控制台臨時開關後，不被雲端舊值蓋回去
+  if (d.ar != null) cloudLastAr = d.ar;
   var c = Object.assign({}, cfg, { key: d.key, key2: d.key2 != null ? d.key2 : cfg.key2, host: d.host, max: d.max, len: d.len, ban: d.ban, lyr: d.lyr,
-    vol: volChanged ? d.vol : cfg.vol, pl: d.pl != null ? d.pl : cfg.pl, ar: d.ar != null ? d.ar : cfg.ar });
+    vol: volChanged ? d.vol : cfg.vol, pl: d.pl != null ? d.pl : cfg.pl, ar: arChanged ? d.ar : cfg.ar });
   Object.assign(cfg, normCfg(c));
   if (cfg.vol !== oldVol) applyVol();
   if (cfg.pl !== oldPl) applyShow();
@@ -785,6 +867,10 @@ function initPanel() {
   $('f_ar').addEventListener('change', sync);
   try { cloudCode = localStorage.getItem('songreq.code') || ''; } catch (e) {}
   if (!cloudCode) { cloudCode = newCode(); try { localStorage.setItem('songreq.code', cloudCode); } catch (e) {} }
+  $('openPad').onclick = function () {
+    var w = window.open(new URL('pad.html?c=' + encodeURIComponent(cloudCode), baseUrl()).toString(), 'songpad', 'width=440,height=760');
+    if (!w) alert('瀏覽器擋住了彈出視窗，請允許後再按一次');
+  };
   $('newCode').onclick = function () {
     if (!confirm('換新代號後，OBS 裡的舊網址就不會再收到設定更新，要重貼新網址。確定要換嗎？')) return;
     cloudCode = newCode(); try { localStorage.setItem('songreq.code', cloudCode); } catch (e) {}
@@ -819,12 +905,12 @@ $('unblock').onclick = function () { if (playerReady) player.playVideo(); $('unb
 $('qtitle').textContent = '';
 render();
 if (!OBS) initPanel();
-else if (P.get('c')) { cloudCode = P.get('c'); startCloudPull(); }
+else if (P.get('c')) { cloudCode = P.get('c'); startCloudPull(); setInterval(pollCmds, 1000); setInterval(function () { pushState(true); }, 20000); setTimeout(function () { pushState(true); }, 1500); }
 loadPlayerApi();
 if (OBS || P.get('tikfinity') === '1') connectTikFinity();
 
 /* 測試用 */
-window.__song = { store: store, saveCache: saveCache, loadSongCache: loadSongCache, forgetSong: forgetSong, trimStore: trimStore, setVol: setVol, pull: function () { return cloudPull(); }, onChat: onChat, cleanTitle: cleanTitle, lyrQueries: lyrQueries, parseLrc: parseLrc, pickLyric: pickLyric, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played) }; }, cfg: cfg };
+window.__song = { runCmd: runCmd, pollCmds: pollCmds, pushState: pushState, stateObj: stateObj, store: store, saveCache: saveCache, loadSongCache: loadSongCache, forgetSong: forgetSong, trimStore: trimStore, setVol: setVol, pull: function () { return cloudPull(); }, onChat: onChat, cleanTitle: cleanTitle, lyrQueries: lyrQueries, parseLrc: parseLrc, pickLyric: pickLyric, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played) }; }, cfg: cfg };
 })();
 </script>
 </body>
