@@ -105,6 +105,9 @@ body.obs #panel{display:none}
     <label for="f_key">① YouTube 金鑰（API Key）</label>
     <input type="text" id="f_key" placeholder="AIza…" autocomplete="off">
     <div class="hint">用來搜尋歌曲。到 Google Cloud 建專案 → 啟用「YouTube Data API v3」→ 建立「API 金鑰」。免費額度每天約可搜尋 100 次（每次留言點歌搜一次，相同歌名不重複算）。</div>
+    <label for="f_key2" style="margin-top:10px">①-2 備用金鑰（選填）</label>
+    <input type="text" id="f_key2" placeholder="沒有就留空" autocomplete="off">
+    <div class="hint">主要金鑰當天額度用完才會自動換這一把。⚠ 額度是算在「專案」上，同一個專案的兩把金鑰共用額度，所以備用金鑰要來自<b>不同專案</b>才有用。用多個專案是否符合 YouTube 規定官方沒有明說，風險自己評估。</div>
 
     <label for="f_host">② 你的 TikTok 帳號（主播）</label>
     <input type="text" id="f_host" placeholder="例如 curry_live（不用加 @）" autocomplete="off">
@@ -152,12 +155,13 @@ body.obs #panel{display:none}
 /* ================= 設定 ================= */
 var P = new URLSearchParams(location.search);
 var OBS = P.get('obs') === '1';
-var DEF = { key: '', host: '', max: 2, len: 8, ban: '', lyr: 1, vol: 80, pl: 1 };
+var DEF = { key: '', key2: '', host: '', max: 2, len: 8, ban: '', lyr: 1, vol: 80, pl: 1 };
 
 function loadCfg() {
   var c = Object.assign({}, DEF);
   try { Object.assign(c, JSON.parse(localStorage.getItem('songreq.cfg') || '{}')); } catch (e) {}
   if (P.has('key'))  c.key  = P.get('key');
+  if (P.has('key2')) c.key2 = P.get('key2');
   if (P.has('host')) c.host = P.get('host');
   if (P.has('max'))  c.max  = P.get('max');
   if (P.has('len'))  c.len  = P.get('len');
@@ -171,6 +175,7 @@ function normCfg(c) {
   c.max = Math.max(1, Math.min(20, parseInt(c.max, 10) || DEF.max));
   c.len = Math.max(1, Math.min(60, parseInt(c.len, 10) || DEF.len));
   c.key = String(c.key || '').trim();
+  c.key2 = String(c.key2 || '').trim();
   c.host = String(c.host || '').trim();
   c.ban = String(c.ban || '');
   c.lyr = (c.lyr === 0 || c.lyr === false || String(c.lyr) === '0') ? 0 : 1;
@@ -307,14 +312,45 @@ function togglePause() {
 }
 
 /* ================= 搜尋 ================= */
-function apiGet(path, params) {
+/* 金鑰：主要 cfg.key、備用 cfg.key2。某把當天額度用完（quotaExceeded）就記下來，改用另一把；
+   YouTube 額度每天太平洋時間午夜重置，所以用「太平洋時區的日期」判斷今天用完了沒。 */
+function pacificDay() {
+  try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date()); }
+  catch (e) { return new Date().toISOString().slice(0, 10); }
+}
+function exhaustedMap() { try { return JSON.parse(localStorage.getItem('songreq.exh') || '{}'); } catch (e) { return {}; } }
+function markExhausted(key) {
+  var m = exhaustedMap(), d = pacificDay(), out = {};
+  out[key] = d; Object.keys(m).forEach(function (k) { if (m[k] === d) out[k] = d; });
+  try { localStorage.setItem('songreq.exh', JSON.stringify(out)); } catch (e) {}
+  memExh[key] = d;
+}
+var memExh = {};
+function isExhausted(key) { var d = pacificDay(); return memExh[key] === d || exhaustedMap()[key] === d; }
+function liveKey() {
+  var ks = [cfg.key, cfg.key2].filter(Boolean);
+  for (var i = 0; i < ks.length; i++) if (!isExhausted(ks[i])) return ks[i];
+  return ks[0] || '';                                   // 兩把都用完了：還是用第一把，讓錯誤訊息照常出現
+}
+var QUOTA_REASONS = { quotaExceeded: 1, dailyLimitExceeded: 1 };
+function apiGet(path, params, tried) {
+  tried = tried || [];
+  var key = liveKey();
   var u = new URL('https://www.googleapis.com/youtube/v3/' + path);
   Object.keys(params).forEach(function (k) { u.searchParams.set(k, params[k]); });
-  u.searchParams.set('key', cfg.key);
+  u.searchParams.set('key', key);
   return fetch(u.toString()).then(function (r) {
     if (r.ok) return r.json();
     return r.json().catch(function () { return {}; }).then(function (j) {
       var reason = j && j.error && j.error.errors && j.error.errors[0] && j.error.errors[0].reason;
+      if (QUOTA_REASONS[reason]) {
+        markExhausted(key);
+        var next = liveKey();
+        if (next && next !== key && tried.indexOf(next) < 0) {      // 還有沒用完的金鑰：換過去再試一次
+          say('一把金鑰今天的額度用完了，已改用另一把', true);
+          return apiGet(path, params, tried.concat(key));
+        }
+      }
       var e = new Error(reason || ('HTTP ' + r.status));
       e.reason = reason || '';
       throw e;
@@ -443,7 +479,7 @@ function applyCloud(d) {
   var before = JSON.stringify(cfg), oldPl = cfg.pl, oldVol = cfg.vol;
   var volChanged = d.vol != null && d.vol !== cloudLastVol;     // 音量只在雲端那份有變時才套用，免得蓋掉直播中臨時調的音量
   if (d.vol != null) cloudLastVol = d.vol;
-  var c = Object.assign({}, cfg, { key: d.key, host: d.host, max: d.max, len: d.len, ban: d.ban, lyr: d.lyr,
+  var c = Object.assign({}, cfg, { key: d.key, key2: d.key2 != null ? d.key2 : cfg.key2, host: d.host, max: d.max, len: d.len, ban: d.ban, lyr: d.lyr,
     vol: volChanged ? d.vol : cfg.vol, pl: d.pl != null ? d.pl : cfg.pl });
   Object.assign(cfg, normCfg(c));
   if (cfg.vol !== oldVol) applyVol();
@@ -597,6 +633,7 @@ function buildLongUrl() {
   var u = new URL(baseUrl());
   u.searchParams.set('obs', '1');
   if (cfg.key) u.searchParams.set('key', cfg.key);
+  if (cfg.key2) u.searchParams.set('key2', cfg.key2);
   if (cfg.host) u.searchParams.set('host', cfg.host);
   if (cfg.max !== DEF.max) u.searchParams.set('max', cfg.max);
   if (cfg.len !== DEF.len) u.searchParams.set('len', cfg.len);
@@ -616,7 +653,7 @@ function showUrl() {
 }
 function pushCloud() {
   cloudState = 'pending'; showUrl();
-  var data = { key: cfg.key, host: cfg.host, max: cfg.max, len: cfg.len, ban: cfg.ban, lyr: cfg.lyr, vol: cfg.vol, pl: cfg.pl };
+  var data = { key: cfg.key, key2: cfg.key2, host: cfg.host, max: cfg.max, len: cfg.len, ban: cfg.ban, lyr: cfg.lyr, vol: cfg.vol, pl: cfg.pl };
   return sbCall('live_put', { p_code: cloudCode, p_slot: SLOT, p_data: data, p_expected: null })
     .then(function (r) { cloudState = (r.ok && r.body && r.body.ok === true) ? 'ok' : 'fail'; }, function () { cloudState = 'fail'; })
     .then(showUrl);
@@ -624,10 +661,11 @@ function pushCloud() {
 function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(pushCloud, 800); }
 function initPanel() {
   if (location.protocol === 'file:') $('fileWarn').style.display = '';
-  $('f_key').value = cfg.key; $('f_host').value = cfg.host;
+  $('f_key').value = cfg.key; $('f_key2').value = cfg.key2; $('f_host').value = cfg.host;
   $('f_max').value = cfg.max; $('f_len').value = cfg.len; $('f_ban').value = cfg.ban; $('f_lyr').checked = !!cfg.lyr; $('f_vol').value = cfg.vol; $('volLabel').textContent = cfg.vol + '%'; $('f_pl').checked = !!cfg.pl;
   function sync() {
     cfg.key = $('f_key').value.trim();
+    cfg.key2 = $('f_key2').value.trim();
     cfg.host = $('f_host').value.trim();
     cfg.max = Math.max(1, Math.min(20, parseInt($('f_max').value, 10) || DEF.max));
     cfg.len = Math.max(1, Math.min(60, parseInt($('f_len').value, 10) || DEF.len));
@@ -640,7 +678,7 @@ function initPanel() {
     try { localStorage.setItem('songreq.cfg', JSON.stringify(cfg)); } catch (e) {}
     schedulePush();
   }
-  ['f_key', 'f_host', 'f_max', 'f_len', 'f_ban'].forEach(function (id) { $(id).addEventListener('input', sync); });
+  ['f_key', 'f_key2', 'f_host', 'f_max', 'f_len', 'f_ban'].forEach(function (id) { $(id).addEventListener('input', sync); });
   $('f_lyr').addEventListener('change', function () { sync(); lyrLoad(now); });
   $('f_vol').addEventListener('input', sync);
   $('f_pl').addEventListener('change', sync);
