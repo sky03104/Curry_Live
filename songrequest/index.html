@@ -275,6 +275,7 @@ function loadPlayerApi() {
         },
         onError: function () {                          // 不能嵌入／已刪除等
           say('這首放不出來，已自動換下一首');
+          if (now) forgetSong(now.id);
           playNext();
         },
         onAutoplayBlocked: function () { $('unblock').classList.add('show'); $('pbox').classList.add('forceshow'); }
@@ -365,9 +366,12 @@ function friendly(e) {
 }
 
 /* 回傳 {ok:true, song} 或 {ok:false, why} */
+function copyVerdict(r) { return r.ok ? { ok: true, song: Object.assign({}, r.song) } : r; }
 function findSong(query) {
-  var ck = query.toLowerCase();
-  if (cache.has(ck)) return Promise.resolve(cache.get(ck));
+  var ck = query.toLowerCase().replace(/\s+/g, ' ');
+  if (cache.has(ck)) return Promise.resolve(copyVerdict(cache.get(ck)));
+  var st = lookupStore(ck, query);                       // 雲端記憶（跨場次）：命中就不花 YouTube 額度
+  if (st) return Promise.resolve(st);
   return apiGet('search', {
     part: 'snippet', type: 'video', q: query, maxResults: 8,
     videoEmbeddable: 'true', videoSyndicated: 'true'
@@ -393,7 +397,8 @@ function findSong(query) {
         if (!why) {
           var r = { ok: true, song: { id: it.id, title: title, channel: channel, sec: sec } };
           cache.set(ck, r);
-          return r;
+          rememberSong(ck, r.song);
+          return copyVerdict(r);
         }
         if (!firstWhy) firstWhy = why;               // 以第一名（最像的）被拒的原因回報
       }
@@ -495,6 +500,7 @@ function cloudPull() {
     var row = Array.isArray(r.body) ? r.body[0] : null;
     if (row && row.data) applyCloud(row.data);
     pulled = true;
+    loadSongCache();
   });
 }
 function startCloudPull() {
@@ -507,6 +513,78 @@ function startCloudPull() {
     });
   })();
 }
+
+/* ================= 歌名記憶（跨場次，存雲端） =================
+   「觀眾打的歌名 → 找到的影片」存在同一個雲端代號底下的另一格（songreq-cache），下次開播先讀回來，
+   命中就不用再搜（省 YouTube 額度）。只有「歌名打得一樣」才會命中；命中時仍用目前的長度／黑名單設定重新判斷。 */
+var CSLOT = 'songreq-cache', CAP = 400;
+var store = {}, forgotten = {}, cacheLoaded = false, cacheTimer = null, cacheSaving = null;
+function cleanEntry(e) {
+  if (!e || typeof e !== 'object') return null;
+  if (typeof e.id !== 'string' || !/^[\w-]{6,20}$/.test(e.id)) return null;
+  var sec = +e.s; if (!(sec > 0 && sec < 86400)) return null;
+  return { id: e.id, t: String(e.t == null ? '' : e.t).slice(0, 200), c: String(e.c == null ? '' : e.c).slice(0, 100), s: Math.round(sec), u: +e.u > 0 ? +e.u : 0 };
+}
+function lookupStore(ck, query) {
+  var e = store[ck];
+  if (!e) return null;
+  var hay = (e.t + ' ' + e.c).toLowerCase(), r;
+  if (e.s > cfg.len * 60) r = { ok: false, why: '太長了（上限 ' + cfg.len + ' 分鐘）' };
+  else if (banWords().some(function (w) { return hay.indexOf(w) >= 0; })) r = { ok: false, why: '這首不在可點範圍' };
+  else r = { ok: true, song: { id: e.id, title: e.t, channel: e.c, sec: e.s } };
+  e.u = Date.now(); scheduleCacheSave();
+  return r;
+}
+function rememberSong(ck, song) {
+  store[ck] = { id: song.id, t: song.title, c: song.channel, s: song.sec, u: Date.now() };
+  delete forgotten[song.id];
+  scheduleCacheSave();
+}
+function forgetSong(id) {
+  forgotten[id] = 1;
+  Object.keys(store).forEach(function (k) { if (store[k].id === id) delete store[k]; });
+  cache.forEach(function (v, k) { if (v.ok && v.song.id === id) cache.delete(k); });
+  scheduleCacheSave();
+}
+function mergeStore(remote) {
+  Object.keys(remote || {}).forEach(function (k) {
+    var e = cleanEntry(remote[k]);
+    if (!e || forgotten[e.id]) return;
+    if (!store[k] || store[k].u < e.u) store[k] = e;
+  });
+}
+function trimStore() {
+  var ks = Object.keys(store);
+  if (ks.length <= CAP) return;
+  ks.sort(function (a, b) { return store[b].u - store[a].u; });
+  ks.slice(CAP).forEach(function (k) { delete store[k]; });
+}
+function loadSongCache() {
+  if (!cloudCode || cacheLoaded) return Promise.resolve();
+  return sbCall('live_get', { p_code: cloudCode, p_slot: CSLOT }).then(function (r) {
+    if (!r.ok) return;
+    var row = Array.isArray(r.body) ? r.body[0] : null;
+    if (row && row.data) mergeStore(row.data.items);
+    cacheLoaded = true;
+  }, function () {});
+}
+function scheduleCacheSave() { clearTimeout(cacheTimer); cacheTimer = setTimeout(saveCache, 5000); }
+function saveCache(attempt) {
+  attempt = attempt || 0;
+  if (!cloudCode) return Promise.resolve();
+  return sbCall('live_get', { p_code: cloudCode, p_slot: CSLOT }).then(function (r) {
+    if (!r.ok) return;
+    var row = Array.isArray(r.body) ? r.body[0] : null;
+    if (row && row.data) mergeStore(row.data.items);
+    trimStore();
+    var out = {};
+    Object.keys(store).forEach(function (k) { out[k] = store[k]; });
+    return sbCall('live_put', { p_code: cloudCode, p_slot: CSLOT, p_data: { v: 1, items: out }, p_expected: row ? row.version : 0 }).then(function (w) {
+      if (w.ok && w.body && w.body.reason === 'conflict' && attempt < 2) return saveCache(attempt + 1);
+    });
+  }, function () {});
+}
+window.addEventListener('pagehide', function () { if (cacheTimer) { clearTimeout(cacheTimer); saveCache(); } });
 
 /* ================= 歌詞（LRCLIB，帶時間軸） ================= */
 var lyr = { lines: null, offset: 0, token: 0, idx: -2 };
@@ -689,6 +767,7 @@ function initPanel() {
     cloudCode = newCode(); try { localStorage.setItem('songreq.code', cloudCode); } catch (e) {}
     pushCloud();
   };
+  loadSongCache();
   sync();
   $('copyUrl').onclick = function () {
     $('obsUrl').select();
@@ -722,7 +801,7 @@ loadPlayerApi();
 if (OBS || P.get('tikfinity') === '1') connectTikFinity();
 
 /* 測試用 */
-window.__song = { setVol: setVol, pull: function () { return cloudPull(); }, onChat: onChat, cleanTitle: cleanTitle, lyrQueries: lyrQueries, parseLrc: parseLrc, pickLyric: pickLyric, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played) }; }, cfg: cfg };
+window.__song = { store: store, saveCache: saveCache, loadSongCache: loadSongCache, forgetSong: forgetSong, trimStore: trimStore, setVol: setVol, pull: function () { return cloudPull(); }, onChat: onChat, cleanTitle: cleanTitle, lyrQueries: lyrQueries, parseLrc: parseLrc, pickLyric: pickLyric, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played) }; }, cfg: cfg };
 })();
 </script>
 </body>
