@@ -127,6 +127,8 @@ body.obs #panel{display:none}
     <div class="hint">這是 YouTube 播放器本身的音量，設定改了 OBS 約 30 秒內自動套用。直播中也可以留言 <b>音量 30</b>（只有你的帳號有效，暫時調整），或按播放器上的 🔉🔊。</div>
     <label style="display:flex;gap:6px;align-items:center;margin-top:10px"><input type="checkbox" id="f_pl"> 在畫面上顯示播放器（影片）</label>
     <div class="hint">關掉＝畫面上看不到影片，只有聲音、歌名、歌詞和待播清單。</div>
+    <label style="display:flex;gap:6px;align-items:center;margin-top:10px"><input type="checkbox" id="f_ar"> 沒人點歌時，自動重播這場觀眾點過的歌</label>
+    <div class="hint">從這場點的第一首開始照順序放，放完一輪回到第一首。觀眾一點歌，等正在放的這首放完就換觀眾的。重新整理 OBS 後，這場點過的歌會重新累積。</div>
     <label style="display:flex;gap:6px;align-items:center;margin-top:12px"><input type="checkbox" id="f_lyr"> 顯示歌詞（自動查 LRCLIB，查不到就不顯示）</label>
 
     <h3>③ 貼到 OBS 的網址</h3>
@@ -155,7 +157,7 @@ body.obs #panel{display:none}
 /* ================= 設定 ================= */
 var P = new URLSearchParams(location.search);
 var OBS = P.get('obs') === '1';
-var DEF = { key: '', key2: '', host: '', max: 2, len: 8, ban: '', lyr: 1, vol: 80, pl: 1 };
+var DEF = { key: '', key2: '', host: '', max: 2, len: 8, ban: '', lyr: 1, vol: 80, pl: 1, ar: 1 };
 
 function loadCfg() {
   var c = Object.assign({}, DEF);
@@ -169,6 +171,7 @@ function loadCfg() {
   if (P.has('lyr'))  c.lyr  = P.get('lyr');
   if (P.has('vol'))  c.vol  = P.get('vol');
   if (P.has('pl'))   c.pl   = P.get('pl');
+  if (P.has('ar'))   c.ar   = P.get('ar');
   return normCfg(c);
 }
 function normCfg(c) {
@@ -181,6 +184,7 @@ function normCfg(c) {
   c.lyr = (c.lyr === 0 || c.lyr === false || String(c.lyr) === '0') ? 0 : 1;
   var v = parseInt(c.vol, 10); c.vol = isNaN(v) ? DEF.vol : Math.max(0, Math.min(100, v));
   c.pl = (c.pl === 0 || c.pl === false || String(c.pl) === '0') ? 0 : 1;
+  c.ar = (c.ar === 0 || c.ar === false || String(c.ar) === '0') ? 0 : 1;
   return c;
 }
 var cfg = loadCfg();
@@ -200,6 +204,8 @@ var CMD_LYR_0 = /^!?歌詞歸零$/;
 /* ================= 狀態 ================= */
 var now = null;              // 正在播：{id,title,channel,sec,uid,who}
 var queue = [];              // 待播
+var history = [];            // 這次觀眾點過、播過的歌（依順序），沒人點歌時拿來自動重播
+var replayIdx = 0;           // 下一首要自動重播第幾首
 var played = new Set();      // 這次開啟後播過的歌（不再重複排）
 var cache = new Map();       // 歌名 → 搜尋結果（省 YouTube 額度）
 var toasts = [];
@@ -230,7 +236,7 @@ function say(text, ok) {
 function render() {
   $('idle').classList.toggle('hide', !!now);
   $('nowTitle').textContent = now ? '▶ ' + now.title : '';
-  $('nowBy').textContent = now ? '點歌：' + short(now.who, 12) + '　' + fmt(now.sec) : '';
+  $('nowBy').textContent = now ? (now.auto ? '自動重播（沒人點歌）　' : '點歌：' + short(now.who, 12) + '　') + fmt(now.sec) : '';
   $('qtitle').textContent = queue.length ? '待播（' + queue.length + ' 首）' : '';
   var ul = $('queue');
   ul.textContent = '';
@@ -275,7 +281,7 @@ function loadPlayerApi() {
         },
         onError: function () {                          // 不能嵌入／已刪除等
           say('這首放不出來，已自動換下一首');
-          if (now) forgetSong(now.id);
+          if (now) { forgetSong(now.id); dropHistory(now.id); }
           playNext();
         },
         onAutoplayBlocked: function () { $('unblock').classList.add('show'); $('pbox').classList.add('forceshow'); }
@@ -286,6 +292,8 @@ function loadPlayerApi() {
   s.src = 'https://www.youtube.com/iframe_api';
   document.head.appendChild(s);
 }
+function dropHistory(id) { history = history.filter(function (h) { return h.id !== id; }); }
+function applyAr() { if (cfg.ar && !now && history.length) playNext(); }       // 剛打開「自動重播」時，如果正好沒歌在放就開始
 function applyVol() { if (playerReady) { try { player.setVolume(cfg.vol); } catch (e) {} } }
 function setVol(n) {
   cfg.vol = Math.max(0, Math.min(100, Math.round(n)));
@@ -302,7 +310,12 @@ function startNow() {
 }
 function playNext() {
   now = queue.shift() || null;
-  if (now) { played.add(now.id); startNow(); }
+  if (now) { played.add(now.id); history.push({ id: now.id, title: now.title, channel: now.channel, sec: now.sec }); }
+  else if (cfg.ar && history.length) {                    // 沒人點歌、也沒待播：從第一首開始自動重播這場點過的歌，播完一輪回到第一首
+    var h = history[replayIdx % history.length]; replayIdx++;
+    now = { id: h.id, title: h.title, channel: h.channel, sec: h.sec, uid: '', who: '自動重播', auto: true };
+  }
+  if (now) startNow();
   else if (playerReady) { try { player.stopVideo(); } catch (e) {} }
   lyrLoad(now);
   render();
@@ -427,6 +440,7 @@ function request(ev, query) {
     s.uid = ev.uid; s.who = ev.name;
     queue.push(s);
     if (!now) { playNext(); say(who + ' 點的歌開始播放', true); }
+    else if (now.auto && queue.length === 1) say(who + ' 點歌成功，這首放完就換你的', true);
     else say(who + ' 點歌成功，排第 ' + queue.length + ' 位', true);
     render();
   }).catch(function (e) { say(friendly(e)); });
@@ -481,14 +495,15 @@ function newCode() {
 var cloudCode = '', pulled = false;
 var cloudLastVol = null;
 function applyCloud(d) {
-  var before = JSON.stringify(cfg), oldPl = cfg.pl, oldVol = cfg.vol;
+  var before = JSON.stringify(cfg), oldPl = cfg.pl, oldVol = cfg.vol, oldAr = cfg.ar;
   var volChanged = d.vol != null && d.vol !== cloudLastVol;     // 音量只在雲端那份有變時才套用，免得蓋掉直播中臨時調的音量
   if (d.vol != null) cloudLastVol = d.vol;
   var c = Object.assign({}, cfg, { key: d.key, key2: d.key2 != null ? d.key2 : cfg.key2, host: d.host, max: d.max, len: d.len, ban: d.ban, lyr: d.lyr,
-    vol: volChanged ? d.vol : cfg.vol, pl: d.pl != null ? d.pl : cfg.pl });
+    vol: volChanged ? d.vol : cfg.vol, pl: d.pl != null ? d.pl : cfg.pl, ar: d.ar != null ? d.ar : cfg.ar });
   Object.assign(cfg, normCfg(c));
   if (cfg.vol !== oldVol) applyVol();
   if (cfg.pl !== oldPl) applyShow();
+  if (cfg.ar !== oldAr) applyAr();
   if (JSON.stringify(cfg) === before) return;
   if (!cfg.lyr) { lyr.token++; lyr.lines = null; $('lyr').classList.remove('on'); }
   else if (now && !lyr.lines) lyrLoad(now);
@@ -719,6 +734,7 @@ function buildLongUrl() {
   if (!cfg.lyr) u.searchParams.set('lyr', '0');
   if (cfg.vol !== DEF.vol) u.searchParams.set('vol', cfg.vol);
   if (!cfg.pl) u.searchParams.set('pl', '0');
+  if (!cfg.ar) u.searchParams.set('ar', '0');
   return u.toString();
 }
 function buildShortUrl() { return baseUrl() + '?obs=1&c=' + encodeURIComponent(cloudCode); }
@@ -731,7 +747,7 @@ function showUrl() {
 }
 function pushCloud() {
   cloudState = 'pending'; showUrl();
-  var data = { key: cfg.key, key2: cfg.key2, host: cfg.host, max: cfg.max, len: cfg.len, ban: cfg.ban, lyr: cfg.lyr, vol: cfg.vol, pl: cfg.pl };
+  var data = { key: cfg.key, key2: cfg.key2, host: cfg.host, max: cfg.max, len: cfg.len, ban: cfg.ban, lyr: cfg.lyr, vol: cfg.vol, pl: cfg.pl, ar: cfg.ar };
   return sbCall('live_put', { p_code: cloudCode, p_slot: SLOT, p_data: data, p_expected: null })
     .then(function (r) { cloudState = (r.ok && r.body && r.body.ok === true) ? 'ok' : 'fail'; }, function () { cloudState = 'fail'; })
     .then(showUrl);
@@ -740,7 +756,7 @@ function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(pushCl
 function initPanel() {
   if (location.protocol === 'file:') $('fileWarn').style.display = '';
   $('f_key').value = cfg.key; $('f_key2').value = cfg.key2; $('f_host').value = cfg.host;
-  $('f_max').value = cfg.max; $('f_len').value = cfg.len; $('f_ban').value = cfg.ban; $('f_lyr').checked = !!cfg.lyr; $('f_vol').value = cfg.vol; $('volLabel').textContent = cfg.vol + '%'; $('f_pl').checked = !!cfg.pl;
+  $('f_max').value = cfg.max; $('f_len').value = cfg.len; $('f_ban').value = cfg.ban; $('f_lyr').checked = !!cfg.lyr; $('f_vol').value = cfg.vol; $('volLabel').textContent = cfg.vol + '%'; $('f_pl').checked = !!cfg.pl; $('f_ar').checked = !!cfg.ar;
   function sync() {
     cfg.key = $('f_key').value.trim();
     cfg.key2 = $('f_key2').value.trim();
@@ -752,6 +768,8 @@ function initPanel() {
     cfg.vol = Math.max(0, Math.min(100, parseInt($('f_vol').value, 10) || 0));
     $('volLabel').textContent = cfg.vol + '%';
     cfg.pl = $('f_pl').checked ? 1 : 0;
+    var oldAr = cfg.ar; cfg.ar = $('f_ar').checked ? 1 : 0;
+    if (cfg.ar && !oldAr) applyAr();
     applyVol(); applyShow();
     try { localStorage.setItem('songreq.cfg', JSON.stringify(cfg)); } catch (e) {}
     schedulePush();
@@ -760,6 +778,7 @@ function initPanel() {
   $('f_lyr').addEventListener('change', function () { sync(); lyrLoad(now); });
   $('f_vol').addEventListener('input', sync);
   $('f_pl').addEventListener('change', sync);
+  $('f_ar').addEventListener('change', sync);
   try { cloudCode = localStorage.getItem('songreq.code') || ''; } catch (e) {}
   if (!cloudCode) { cloudCode = newCode(); try { localStorage.setItem('songreq.code', cloudCode); } catch (e) {} }
   $('newCode').onclick = function () {
