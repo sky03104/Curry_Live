@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>點歌控制台</title>
+<style>
+:root{
+  --bg:#17181c; --panel:#23252b; --line:#3a3d46; --text:#fff; --muted:#b8bcc8;
+  --accent:#ff4d6d; --ok:#4ade80; --warn:#fbbf24; --btn:#2f323b;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--text);color-scheme:dark;padding:14px;max-width:460px;margin:0 auto}
+h1{font-size:17px;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+#dot{width:10px;height:10px;border-radius:50%;background:#666;display:inline-block}
+#dot.on{background:var(--ok)} #dot.off{background:var(--accent)}
+#status{font-size:12px;color:var(--muted);margin-bottom:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.card h2{font-size:13px;color:var(--muted);margin:0 0 8px;font-weight:600}
+#nowTitle{font-weight:800;font-size:16px;line-height:1.35;word-break:break-all}
+#nowBy{font-size:13px;color:var(--muted);margin-top:3px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+button{font:inherit;font-size:14px;font-weight:700;color:#fff;background:var(--btn);border:1px solid var(--line);border-radius:8px;padding:9px 12px;cursor:pointer;flex:1 1 auto;min-width:0}
+button:hover{background:#3a3e49}
+button:disabled{opacity:.45;cursor:default}
+button.main{background:var(--accent);border-color:var(--accent)}
+button.big{padding:13px 12px;font-size:15px}
+button.stop{background:#7f1d2d;border-color:#b3283f}
+button.go{background:#14532d;border-color:#22803f}
+button.small{padding:5px 9px;font-size:12px;flex:0 0 auto}
+.banner{display:none;background:#3b2a12;border:1px solid #7a5a1c;color:#ffd58a;padding:9px 11px;border-radius:8px;font-size:13px;margin-bottom:12px;line-height:1.5}
+.banner.show{display:block}
+.banner.stopped{background:#3b1220;border-color:#7f1d2d;color:#ffb4c1}
+input[type=range]{width:100%}
+label.chk{display:flex;gap:8px;align-items:center;font-size:14px;margin-top:10px}
+#queue{list-style:none;margin:0;padding:0}
+#queue li{display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:13.5px}
+#queue li:first-child{border-top:0}
+#queue .n{flex:0 0 20px;color:var(--muted)}
+#queue .t{flex:1;min-width:0}
+#queue .t b{display:block;font-weight:700;word-break:break-all}
+#queue .t span{color:var(--muted);font-size:12px}
+.empty{color:var(--muted);font-size:13px}
+#msg{font-size:12px;color:var(--muted);min-height:16px;margin-top:6px}
+#msg.err{color:#ff8da1}
+.foot{font-size:11px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.6}
+</style>
+</head>
+<body>
+<h1><span id="dot"></span>🎛 點歌控制台</h1>
+<div id="status">連線中…</div>
+<div id="noCode" class="banner">找不到雲端代號。請從點歌設定面板按「🎛 開啟主播控制台」打開這個頁面。</div>
+<div id="offline" class="banner">OBS 畫面沒有回應（可能沒開、還沒載入，或用的是舊的長網址）。確認 OBS 網址是 <b>?obs=1&amp;c=…</b> 開頭的短網址。</div>
+<div id="stoppedBar" class="banner stopped">⛔ 點歌已停止中：觀眾點歌會被擋下、不會自動重播。要恢復請按「開始點歌」。</div>
+
+<div class="card">
+  <h2>正在播放</h2>
+  <div id="nowTitle">—</div>
+  <div id="nowBy"></div>
+  <div class="row">
+    <button id="bPause" class="main">⏯ 暫停</button>
+    <button id="bSkip">⏭ 跳過</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>下播／停止</h2>
+  <div class="row" style="margin-top:0">
+    <button id="bStop" class="big stop">⛔ 停止點歌</button>
+    <button id="bStart" class="big go">▶ 開始點歌</button>
+  </div>
+  <div class="foot" style="text-align:left;margin-top:8px">停止＝暫停播放、清空待播、擋下新點歌、關掉自動重播。</div>
+</div>
+
+<div class="card">
+  <h2>音量與重播</h2>
+  <div style="display:flex;align-items:center;gap:10px"><input type="range" id="vol" min="0" max="100" step="5"><b id="volN" style="min-width:44px;text-align:right">—</b></div>
+  <div class="row" style="margin-top:8px"><button id="bVolD">🔉 −10</button><button id="bVolU">🔊 +10</button></div>
+  <label class="chk"><input type="checkbox" id="ar"> 沒人點歌時自動重播這場點過的歌</label>
+</div>
+
+<div class="card">
+  <h2>歌詞：<span id="lyrState">—</span></h2>
+  <div class="row" style="margin-top:0"><button id="bLE">歌詞提前 0.5s</button><button id="bLL">歌詞延後 0.5s</button><button id="bL0">歸零</button></div>
+</div>
+
+<div class="card">
+  <h2>待播清單（<span id="qn">0</span>）</h2>
+  <ul id="queue"></ul>
+  <div class="row"><button id="bClear">🗑 清空待播清單</button></div>
+</div>
+
+<div id="msg"></div>
+<div class="foot" id="foot"></div>
+
+<script>
+(function () {
+'use strict';
+var SB = { url: 'https://tjrlpthprtrlmugrofpj.supabase.co', key: 'sb_publishable_u9lUyPB8fr2jmHji_ZVAJA_OtxLQuoS' };
+var STSLOT = 'songreq-state', CMDSLOT = 'songreq-cmd';
+function $(id) { return document.getElementById(id); }
+var P = new URLSearchParams(location.search);
+var code = P.get('c') || '';
+try { if (!code) code = localStorage.getItem('songreq.code') || ''; } catch (e) {}
+if (!code) { $('noCode').classList.add('show'); $('status').textContent = ''; }
+
+function sbCall(fn, args) {
+  return fetch(SB.url + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SB.key }, body: JSON.stringify(args) })
+    .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, body: b }; }, function () { return { ok: r.ok, body: null }; }); });
+}
+function fmt(sec) { var m = Math.floor(sec / 60), s = sec % 60; return m + ':' + (s < 10 ? '0' : '') + s; }
+
+/* ---------- 送指令 ---------- */
+function optimistic(cmd, arg) {
+  if (!st) return;
+  if (cmd === 'pause') st.paused = true;
+  else if (cmd === 'resume') st.paused = false;
+  else if (cmd === 'stop') { st.stopped = true; st.paused = true; st.queue = []; st.ar = 0; }
+  else if (cmd === 'start') { st.stopped = false; st.paused = false; }
+  else if (cmd === 'vol') st.vol = +arg;
+  else if (cmd === 'ar') st.ar = +arg ? 1 : 0;
+  else if (cmd === 'clear') st.queue = [];
+  else if (cmd === 'remove') st.queue = st.queue.filter(function (q) { return q.id !== arg; });
+  else if (cmd === 'top') { for (var i = 0; i < st.queue.length; i++) if (st.queue[i].id === arg) { st.queue.unshift(st.queue.splice(i, 1)[0]); break; } }
+  render();
+}
+var cmds = [], counter = 0, sending = Promise.resolve(), msgTimer = null;
+function msg(t, err) { var m = $('msg'); m.textContent = t; m.className = err ? 'err' : ''; clearTimeout(msgTimer); msgTimer = setTimeout(function () { m.textContent = ''; }, 3500); }
+function send(cmd, arg) {
+  if (!code) { msg('沒有雲端代號', true); return; }
+  var id = Date.now() * 100 + (counter++ % 100);
+  cmds.push({ id: id, cmd: cmd, arg: arg === undefined ? null : arg });
+  if (cmds.length > 20) cmds = cmds.slice(-20);
+  optimistic(cmd, arg);                          // 先在畫面上反應，OBS 回報後再以 OBS 的為準
+  var snapshot = cmds.slice();
+  sending = sending.then(function () {
+    return sbCall('live_put', { p_code: code, p_slot: CMDSLOT, p_data: { v: 1, cmds: snapshot }, p_expected: null });
+  }).then(function (r) {
+    if (r.ok && r.body && r.body.ok === true) msg('已送出，OBS 約 1～2 秒內執行'); else msg('送出失敗，請檢查網路', true);
+  }, function () { msg('送出失敗，請檢查網路', true); });
+  setTimeout(poll, 1500); setTimeout(poll, 3200);
+}
+
+/* ---------- 讀狀態 ---------- */
+var st = null, volDrag = false, lastQ = null;
+function render() {
+  var online = st && (Date.now() - st.t) < 45000;
+  $('dot').className = online ? 'on' : 'off';
+  $('offline').classList.toggle('show', !!code && !online);
+  $('stoppedBar').classList.toggle('show', !!(online && st.stopped));
+  $('status').textContent = !code ? '' : (st ? (online ? 'OBS 已連線 · ' + Math.max(0, Math.round((Date.now() - st.t) / 1000)) + ' 秒前更新' : 'OBS 沒有回應（上次更新在 ' + Math.round((Date.now() - st.t) / 1000) + ' 秒前）') : '還沒收到 OBS 的狀態…');
+  var s = st || { now: null, queue: [], paused: false, stopped: false, vol: 0, ar: 0, lyr: 0, off: 0 };
+  $('nowTitle').textContent = s.now ? s.now.title : (online ? '目前沒有歌在播' : '—');
+  $('nowBy').textContent = s.now ? (s.now.auto ? '自動重播　' : '點歌：' + s.now.who + '　') + fmt(s.now.sec) + (s.paused ? '　⏸ 已暫停' : '') : '';
+  $('bPause').textContent = s.paused ? '▶ 繼續' : '⏸ 暫停';
+  $('bPause').disabled = !s.now; $('bSkip').disabled = !s.now;
+  $('bStop').disabled = !!s.stopped; $('bStart').disabled = !s.stopped;
+  if (!volDrag) { $('vol').value = s.vol; $('volN').textContent = s.vol + '%'; }
+  $('ar').checked = !!s.ar;
+  $('lyrState').textContent = s.lyr ? '有歌詞（偏移 ' + (s.off >= 0 ? '+' : '') + (s.off || 0).toFixed(1) + ' 秒）' : '這首沒有歌詞';
+  var qj = JSON.stringify(s.queue);
+  if (qj === lastQ) return;                      // 清單沒變就不重畫，免得按鈕在你點的瞬間被換掉
+  lastQ = qj;
+  var ul = $('queue'); ul.textContent = '';
+  $('qn').textContent = s.queue.length;
+  if (!s.queue.length) { var li = document.createElement('li'); li.className = 'empty'; li.textContent = '沒有待播的歌'; ul.appendChild(li); }
+  s.queue.forEach(function (q, i) {
+    var li = document.createElement('li');
+    var n = document.createElement('span'); n.className = 'n'; n.textContent = (i + 1) + '.';
+    var t = document.createElement('div'); t.className = 't';
+    var b = document.createElement('b'); b.textContent = q.title;
+    var sp = document.createElement('span'); sp.textContent = q.who + '　' + fmt(q.sec);
+    t.appendChild(b); t.appendChild(sp);
+    li.appendChild(n); li.appendChild(t);
+    if (i > 0) { var up = document.createElement('button'); up.className = 'small'; up.textContent = '⬆ 插隊'; up.onclick = function () { send('top', q.id); }; li.appendChild(up); }
+    var del = document.createElement('button'); del.className = 'small'; del.textContent = '✕'; del.title = '刪除'; del.onclick = function () { send('remove', q.id); }; li.appendChild(del);
+    ul.appendChild(li);
+  });
+}
+function poll() {
+  if (!code) return;
+  sbCall('live_get', { p_code: code, p_slot: STSLOT }).then(function (r) {
+    if (!r.ok) { $('status').textContent = '讀不到雲端，請檢查網路'; return; }
+    var row = Array.isArray(r.body) ? r.body[0] : null;
+    st = row && row.data && typeof row.data === 'object' ? row.data : null;
+    render();
+  }, function () { $('status').textContent = '讀不到雲端，請檢查網路'; });
+}
+
+/* ---------- 按鈕 ---------- */
+$('bPause').onclick = function () { send(st && st.paused ? 'resume' : 'pause'); };
+$('bSkip').onclick = function () { send('skip'); };
+$('bStop').onclick = function () { if (confirm('要停止點歌嗎？會暫停播放、清空待播清單、擋下新點歌。')) send('stop'); };
+$('bStart').onclick = function () { send('start'); };
+$('bClear').onclick = function () { if (confirm('要清空待播清單嗎？')) send('clear'); };
+$('bLE').onclick = function () { send('lyrE'); };
+$('bLL').onclick = function () { send('lyrL'); };
+$('bL0').onclick = function () { send('lyrReset'); };
+$('ar').onchange = function () { send('ar', $('ar').checked ? 1 : 0); };
+var volTimer = null;
+$('vol').oninput = function () { volDrag = true; $('volN').textContent = $('vol').value + '%'; clearTimeout(volTimer); volTimer = setTimeout(function () { send('vol', +$('vol').value); setTimeout(function () { volDrag = false; }, 2500); }, 350); };
+$('bVolD').onclick = function () { var v = Math.max(0, (st ? st.vol : 50) - 10); $('vol').value = v; $('volN').textContent = v + '%'; send('vol', v); };
+$('bVolU').onclick = function () { var v = Math.min(100, (st ? st.vol : 50) + 10); $('vol').value = v; $('volN').textContent = v + '%'; send('vol', v); };
+
+$('foot').textContent = code ? '代號後 4 碼：' + code.slice(-4) + '（代號就是密碼，不要把這個頁面網址貼給別人）' : '';
+poll(); setInterval(poll, 1500); setInterval(render, 1000);
+window.__pad = { send: send, poll: poll, state: function () { return st; } };
+})();
+</script>
+</body>
+</html>
