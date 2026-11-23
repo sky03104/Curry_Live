@@ -750,7 +750,7 @@ function lyrFetch(song) {
   return p.then(function (l) { lyrCache.set(song.id, l); return l; });
 }
 function lyrLoad(song) {
-  lyr.token++; lyr.lines = null; lyr.offset = 0; lyr.idx = -2;
+  adOn = false; lyr.token++; lyr.lines = null; lyr.offset = 0; lyr.idx = -2;
   $('lyr').classList.remove('on');
   $('lPrev').textContent = $('lCur').textContent = $('lNext').textContent = '';
   if (!song || !cfg.lyr) return;
@@ -769,8 +769,26 @@ function lyrShift(d) {
   lyrTick();
 }
 function lyrReset() { lyr.offset = 0; lyr.idx = -2; say('歌詞時間已歸零', true); lyrTick(); }
+// 廣告偵測（猜的）：廣告播放時，播放器回報的影片代號或長度會跟我們要播的歌對不上
+function adPlaying() {
+  if (!playerReady || !now || paused) return false;
+  try {
+    var vd = player.getVideoData && player.getVideoData();
+    if (vd && vd.video_id && vd.video_id !== now.id) return true;
+    var d = player.getDuration && player.getDuration();
+    if (d > 0 && now.sec > 0 && Math.abs(d - now.sec) > 6) return true;
+  } catch (e) {}
+  return false;
+}
+var adOn = false;
 function lyrTick() {
   if (!lyr.lines || !playerReady) return;
+  var ad = adPlaying();
+  if (ad) {
+    if (!adOn) { adOn = true; $('lPrev').textContent = ''; $('lNext').textContent = ''; $('lCur').textContent = '📢 廣告中，歌詞稍後繼續'; }
+    return;
+  }
+  if (adOn) { adOn = false; lyr.idx = -2; }
   var t;
   try { t = player.getCurrentTime(); } catch (e) { return; }
   t += lyr.offset;
