@@ -103,6 +103,8 @@ function $(id) { return document.getElementById(id); }
 var P = new URLSearchParams(location.search);
 var code = P.get('c') || '';
 try { if (!code) code = localStorage.getItem('songreq.code') || ''; } catch (e) {}
+// 把代號記在這個瀏覽器，並把網址列上的代號拿掉（避免直播分享畫面時露出代號）；存不進去就保留網址
+try { if (code && P.get('c')) { localStorage.setItem('songreq.code', code); if (localStorage.getItem('songreq.code') === code) history.replaceState(null, '', location.pathname); } } catch (e) {}
 if (!code) { $('noCode').classList.add('show'); $('status').textContent = ''; }
 
 function sbCall(fn, args) {
@@ -203,7 +205,7 @@ $('vol').oninput = function () { volDrag = true; $('volN').textContent = $('vol'
 $('bVolD').onclick = function () { var v = Math.max(0, (st ? st.vol : 50) - 10); $('vol').value = v; $('volN').textContent = v + '%'; send('vol', v); };
 $('bVolU').onclick = function () { var v = Math.min(100, (st ? st.vol : 50) + 10); $('vol').value = v; $('volN').textContent = v + '%'; send('vol', v); };
 
-$('foot').textContent = code ? '代號後 4 碼：' + code.slice(-4) + '（代號就是密碼，不要把這個頁面網址貼給別人）' : '';
+
 poll(); setInterval(poll, 1500); setInterval(render, 1000);
 window.__pad = { send: send, poll: poll, state: function () { return st; } };
 })();
