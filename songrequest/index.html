@@ -112,9 +112,9 @@ body.obs #panel{display:none}
     <input type="text" id="f_key2" placeholder="沒有就留空" autocomplete="off">
     <div class="hint">主要金鑰當天額度用完才會自動換這一把。⚠ 額度是算在「專案」上，同一個專案的兩把金鑰共用額度，所以備用金鑰要來自<b>不同專案</b>才有用。用多個專案是否符合 YouTube 規定官方沒有明說，風險自己評估。</div>
 
-    <label for="f_host">② 你的 TikTok 帳號（主播）</label>
-    <input type="text" id="f_host" placeholder="例如 curry_live（不用加 @）" autocomplete="off">
-    <div class="hint">只有這個帳號的留言可以用「跳過」「清空」。比對的是帳號代號，不是暱稱，別人改暱稱冒充不了。</div>
+    <label for="f_host">② 管理員的 TikTok 帳號（主播、助手）</label>
+    <input type="text" id="f_host" placeholder="例如 curry_live, helper_01（多個用逗號分開，不用加 @）" autocomplete="off">
+    <div class="hint">只有這些帳號的留言可以用「跳過」「清空」等管理指令，可以填好幾個，用逗號分開。比對的是帳號代號，不是暱稱，別人改暱稱冒充不了。</div>
 
     <div class="row">
       <div><label for="f_max">每人最多排幾首</label><input type="number" id="f_max" min="1" max="20"></div>
@@ -191,7 +191,8 @@ function normCfg(c) {
   return c;
 }
 var cfg = loadCfg();
-function hostId() { return cfg.host.replace(/^@/, '').trim().toLowerCase(); }
+// 管理員帳號可填多個，用逗號、頓號、空白或換行分開
+function hostIds() { return String(cfg.host || '').split(/[,，、;；\s]+/).map(function (x) { return x.replace(/^@/, '').trim().toLowerCase(); }).filter(Boolean); }
 function banWords() {
   return cfg.ban.split(/[,，、\n]/).map(function (s) { return s.trim().toLowerCase(); }).filter(Boolean);
 }
@@ -483,9 +484,10 @@ function onChat(ev) {
 }
 function isHost(ev) {
   if (ev.hostTest) return true;
-  var h = hostId();
-  if (!h) return false;
-  return (ev.uniqueId && ev.uniqueId.toLowerCase() === h) || (ev.userId && String(ev.userId).toLowerCase() === h);
+  var hs = hostIds();
+  if (!hs.length) return false;
+  var u = ev.uniqueId ? ev.uniqueId.toLowerCase() : '', id = ev.userId ? String(ev.userId).toLowerCase() : '';
+  return hs.indexOf(u) >= 0 || hs.indexOf(id) >= 0;
 }
 function doSkip()  { if (!now) return; say('主播跳過了這首', true); playNext(); }
 function doClear() { queue.length = 0; say('待播清單已清空', true); render(); }
