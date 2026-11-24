@@ -213,7 +213,9 @@ var queue = [];              // 待播
 var history = [];            // 這次觀眾點過、播過的歌（依順序），沒人點歌時拿來自動重播
 var replayIdx = 0;           // 下一首要自動重播第幾首
 var paused = false, stopped = false, arBeforeStop = 1;   // 暫停中／主播按了「停止點歌」
-var played = new Set();      // 這次開啟後播過的歌（不再重複排）
+var played = new Map();      // 播過的歌 → 播的時間；10 分鐘內不能重複點（超過就可以再點）
+var REPEAT_BLOCK_MS = 10 * 60 * 1000;
+function recentlyPlayed(id) { var t = played.get(id); return t != null && Date.now() - t < REPEAT_BLOCK_MS; }
 var cache = new Map();       // 歌名 → 搜尋結果（省 YouTube 額度）
 var toasts = [];
 var chain = Promise.resolve();
@@ -323,7 +325,7 @@ function startNow() {
 }
 function playNext() {
   now = queue.shift() || null;
-  if (now) { played.add(now.id); history.push({ id: now.id, title: now.title, channel: now.channel, sec: now.sec }); }
+  if (now) { played.set(now.id, Date.now()); history.push({ id: now.id, title: now.title, channel: now.channel, sec: now.sec }); }
   else if (cfg.ar && history.length) {                    // 沒人點歌、也沒待播：從第一首開始自動重播這場點過的歌，播完一輪回到第一首
     var h = history[replayIdx % history.length]; replayIdx++;
     now = { id: h.id, title: h.title, channel: h.channel, sec: h.sec, uid: '', who: '自動重播', auto: true };
@@ -451,7 +453,7 @@ function request(ev, query) {
     var s = r.song;
     if (userCount(ev.uid) >= cfg.max) { say(who + '：你已經排了 ' + cfg.max + ' 首，等播完再點'); return; }
     if ((now && now.id === s.id) || queue.some(function (q) { return q.id === s.id; })) { say(who + '：「' + short(s.title, 16) + '」已經在清單裡了'); return; }
-    if (played.has(s.id)) { say(who + '：「' + short(s.title, 16) + '」剛剛播過了'); return; }
+    if (recentlyPlayed(s.id)) { say(who + '：「' + short(s.title, 16) + '」剛剛播過了'); return; }
     s.uid = ev.uid; s.who = ev.name;
     queue.push(s);
     if (!now) { playNext(); say(who + ' 點的歌開始播放', true); }
@@ -930,7 +932,7 @@ loadPlayerApi();
 if (OBS || P.get('tikfinity') === '1') connectTikFinity();
 
 /* 測試用 */
-window.__song = { runCmd: runCmd, pollCmds: pollCmds, pushState: pushState, stateObj: stateObj, store: store, saveCache: saveCache, loadSongCache: loadSongCache, forgetSong: forgetSong, trimStore: trimStore, setVol: setVol, pull: function () { return cloudPull(); }, onChat: onChat, cleanTitle: cleanTitle, lyrQueries: lyrQueries, parseLrc: parseLrc, pickLyric: pickLyric, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played) }; }, cfg: cfg };
+window.__song = { runCmd: runCmd, pollCmds: pollCmds, pushState: pushState, stateObj: stateObj, store: store, saveCache: saveCache, loadSongCache: loadSongCache, forgetSong: forgetSong, trimStore: trimStore, setVol: setVol, pull: function () { return cloudPull(); }, onChat: onChat, cleanTitle: cleanTitle, lyrQueries: lyrQueries, parseLrc: parseLrc, pickLyric: pickLyric, state: function () { return { now: now, queue: queue.slice(), played: Array.from(played.keys()) }; }, cfg: cfg };
 })();
 </script>
 </body>
