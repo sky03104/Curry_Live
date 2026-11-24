@@ -213,8 +213,8 @@ var queue = [];              // 待播
 var history = [];            // 這次觀眾點過、播過的歌（依順序），沒人點歌時拿來自動重播
 var replayIdx = 0;           // 下一首要自動重播第幾首
 var paused = false, stopped = false, arBeforeStop = 1;   // 暫停中／主播按了「停止點歌」
-var played = new Map();      // 播過的歌 → 播的時間；10 分鐘內不能重複點（超過就可以再點）
-var REPEAT_BLOCK_MS = 10 * 60 * 1000;
+var played = new Map();      // 播過的歌 → 播的時間；5 分鐘內不能重複點（超過就可以再點）
+var REPEAT_BLOCK_MS = 5 * 60 * 1000;
 function recentlyPlayed(id) { var t = played.get(id); return t != null && Date.now() - t < REPEAT_BLOCK_MS; }
 var cache = new Map();       // 歌名 → 搜尋結果（省 YouTube 額度）
 var toasts = [];
