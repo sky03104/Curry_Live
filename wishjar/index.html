@@ -36,7 +36,8 @@ if (OBS) document.body.classList.add('obs');
 var CFG = {
   max: clampNum(P.get('max'), 20, 800, 350),       // 畫面上最多同時有幾個禮物（超過會把最早的拿掉）
   cap: clampNum(P.get('cap'), 1, 100, 25),         // 一次送禮最多掉幾個（連送 99 個也只掉這麼多）
-  title: P.get('title') || '許願碗',                // 瓶子上方的標題，空白就不顯示：&title=
+  title: P.get('title') || '',                     // 碗上方的標題，預設不顯示；想要就加 &title=文字
+  stats: P.get('stats') === '1',                   // 預設不顯示禮物個數與鑽石數；想要就加 &stats=1
   coin: P.get('coin') === '1',                     // 預設用觀眾送的禮物自己的圖片；&coin=1 改成全部畫成金黃色銅錢
   tiktokfinity: P.get('tikfinity') !== '0'         // &tikfinity=0 可以關掉連線（只用測試按鈕）
 };
@@ -272,7 +273,7 @@ function frame() {
   // 瓶子上方的標題與累計（字用白色粗黑外框，直播壓縮後比較看得清楚）
   var ty = 34 * K;
   if (CFG.title) { outlineText(CFG.title, jar.cx, ty, 30 * K); ty += 28 * K; }
-  outlineText('🎁 ' + stats.count + ' 個　💎 ' + stats.diamonds.toLocaleString(), jar.cx, ty, 20 * K);
+  if (CFG.stats) outlineText('🎁 ' + stats.count + ' 個　💎 ' + stats.diamonds.toLocaleString(), jar.cx, ty, 20 * K);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
