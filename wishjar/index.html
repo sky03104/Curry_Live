@@ -37,6 +37,7 @@ var CFG = {
   max: clampNum(P.get('max'), 20, 800, 350),       // 畫面上最多同時有幾個禮物（超過會把最早的拿掉）
   cap: clampNum(P.get('cap'), 1, 100, 25),         // 一次送禮最多掉幾個（連送 99 個也只掉這麼多）
   title: P.get('title') || '許願碗',                // 瓶子上方的標題，空白就不顯示：&title=
+  coin: P.get('coin') !== '0',                     // 預設所有禮物都畫成金黃色銅錢；&coin=0 改回用禮物自己的圖片
   tiktokfinity: P.get('tikfinity') !== '0'         // &tikfinity=0 可以關掉連線（只用測試按鈕）
 };
 function clampNum(v, lo, hi, def) { v = parseFloat(v); return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : def; }
@@ -91,6 +92,28 @@ function layout() {
 window.addEventListener('resize', layout);
 layout();
 
+/* ---------- 銅錢圖（程式畫的，先畫好存起來） ---------- */
+var COIN_TONES = [['#fff4b0', '#f7c92b', '#b8860b'], ['#ffe98a', '#efb81c', '#a87408'], ['#fff0a0', '#ffd24a', '#c28a10']];
+var coinSprites = COIN_TONES.map(function (tone) {
+  var S = 128, c = document.createElement('canvas'); c.width = c.height = S;
+  var g = c.getContext('2d'), R = S / 2 - 3, m = S / 2;
+  var rg = g.createRadialGradient(m - R * 0.3, m - R * 0.3, R * 0.1, m, m, R);
+  rg.addColorStop(0, tone[0]); rg.addColorStop(0.55, tone[1]); rg.addColorStop(1, tone[2]);
+  g.beginPath(); g.arc(m, m, R, 0, 7); g.fillStyle = rg; g.fill();
+  g.lineWidth = 4; g.strokeStyle = '#8a5a00'; g.stroke();                       // 外緣
+  g.beginPath(); g.arc(m, m, R * 0.84, 0, 7); g.lineWidth = 3; g.strokeStyle = 'rgba(138,90,0,.7)'; g.stroke();   // 內圈
+  var h = R * 0.36;                                                              // 中間的方孔
+  g.save(); g.globalCompositeOperation = 'destination-out'; g.fillRect(m - h, m - h, h * 2, h * 2); g.restore();
+  g.lineWidth = 4; g.strokeStyle = '#8a5a00'; g.strokeRect(m - h, m - h, h * 2, h * 2);
+  g.fillStyle = 'rgba(138,90,0,.75)';                                            // 上下左右四個小記號（像錢幣上的字）
+  var d = R * 0.6, w = R * 0.16;
+  g.fillRect(m - w, m - d - w, w * 2, w * 1.6); g.fillRect(m - w, m + d - w * 0.6, w * 2, w * 1.6);
+  g.fillRect(m - d - w, m - w, w * 1.6, w * 2); g.fillRect(m + d - w * 0.6, m - w, w * 1.6, w * 2);
+  g.beginPath(); g.arc(m, m, R, Math.PI * 1.05, Math.PI * 1.45);                 // 高光
+  g.lineWidth = 6; g.lineCap = 'round'; g.strokeStyle = 'rgba(255,255,255,.55)'; g.stroke();
+  return c;
+});
+
 /* ---------- 禮物圖片 ---------- */
 var imgCache = new Map();
 var FALLBACK = ['🎁', '🌹', '💎', '🧸', '⭐', '🍭', '💖', '🎈'];
@@ -125,7 +148,7 @@ function spawn(gift) {
   Body.setVelocity(b, { x: (Math.random() - 0.5) * 2, y: 2 + Math.random() * 3 });
   Body.setAngularVelocity(b, (Math.random() - 0.5) * 0.2);
   World.add(world, b);
-  items.push({ body: b, url: gift.icon || '', size: size, emoji: FALLBACK[hash(gift.name || '') % FALLBACK.length], born: performance.now() });
+  items.push({ body: b, coin: Math.floor(Math.random() * coinSprites.length), url: gift.icon || '', size: size, emoji: FALLBACK[hash(gift.name || '') % FALLBACK.length], born: performance.now() });
   stats.count++; stats.diamonds += gift.diamonds || 0;
   trim();
 }
@@ -141,7 +164,7 @@ function trim() {
 function drop(name, diamonds, count, icon) {
   var n = Math.max(1, Math.min(CFG.cap, Math.floor(count || 1)));
   var g = { name: name || '', diamonds: diamonds || 0, icon: icon || '' };
-  getImg(g.icon);
+  if (!CFG.coin) getImg(g.icon);
   for (var i = 0; i < n; i++) (function (k) { setTimeout(function () { spawn(g); }, k * 110); })(i);
 }
 function clearAll() {
@@ -160,6 +183,11 @@ function drawJarBack() {             // 禮物後面：碗口裡面看到的內�
   var g = ctx.createLinearGradient(0, T - ry, 0, T + ry);
   g.addColorStop(0, 'rgba(235,245,252,.95)'); g.addColorStop(1, 'rgba(190,220,238,.95)');
   ctx.fillStyle = g; ctx.fill();
+  // 碗身的淺藍色（畫在禮物後面，禮物才不會被染色）
+  bowlBody();
+  var g2 = ctx.createLinearGradient(0, T, 0, T + jar.depth);
+  g2.addColorStop(0, 'rgba(140,200,230,.65)'); g2.addColorStop(1, 'rgba(95,165,205,.85)');
+  ctx.fillStyle = g2; ctx.fill();
   ctx.restore();
 }
 function drawJar() {                 // 禮物前面：半透明的碗身、碗口邊、圈足、高光
@@ -169,11 +197,10 @@ function drawJar() {                 // 禮物前面：半透明的碗身、碗�
   var fw = jar.w * 0.28, fh = jar.foot;
   ctx.beginPath(); ctx.moveTo(cx - fw / 2, B - fh); ctx.lineTo(cx - fw / 2 - 4 * K, B); ctx.lineTo(cx + fw / 2 + 4 * K, B); ctx.lineTo(cx + fw / 2, B - fh); ctx.closePath();
   ctx.fillStyle = 'rgba(110,170,205,.95)'; ctx.fill(); ctx.lineWidth = 3 * K; ctx.strokeStyle = '#2f6c93'; ctx.stroke();
-  // 碗身（半透明淺藍，禮物看得到）
+  // 碗身外框
   bowlBody();
-  var g = ctx.createLinearGradient(0, T, 0, T + jar.depth);
-  g.addColorStop(0, 'rgba(140,200,230,.55)'); g.addColorStop(1, 'rgba(95,165,205,.75)');
-  ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 4 * K; ctx.strokeStyle = '#2f6c93'; ctx.stroke();
+  ctx.fillStyle = 'rgba(200,230,245,.10)'; ctx.fill();                     // 前面一層很淡的玻璃感
+  ctx.lineWidth = 4 * K; ctx.strokeStyle = '#2f6c93'; ctx.stroke();
   // 碗口前緣
   ctx.beginPath(); ctx.ellipse(cx, T, rx, ry, 0, 0, Math.PI); ctx.lineWidth = 4 * K; ctx.strokeStyle = '#2f6c93'; ctx.stroke();
   ctx.beginPath(); ctx.ellipse(cx, T, rx, ry, 0, Math.PI, Math.PI * 2); ctx.lineWidth = 3 * K; ctx.strokeStyle = 'rgba(47,108,147,.8)'; ctx.stroke();
@@ -189,11 +216,13 @@ function outlineText(txt, x, y, px, align) {
   ctx.fillStyle = '#fff'; ctx.fillText(txt, x, y);
 }
 function drawItem(it) {
-  var b = it.body, s = it.size, img = getImg(it.url);
+  var b = it.body, s = it.size, img = CFG.coin ? null : getImg(it.url);
   ctx.save();
   ctx.globalAlpha = it.alpha == null ? 1 : it.alpha;
   ctx.translate(b.position.x, b.position.y); ctx.rotate(b.angle);
-  if (img) {
+  if (CFG.coin) {
+    ctx.drawImage(coinSprites[it.coin], -s / 2, -s / 2, s, s);
+  } else if (img) {
     ctx.drawImage(img, -s / 2, -s / 2, s, s);
   } else {                                                    // 沒有圖片（還沒收到圖片網址／載入失敗）時畫一顆圓圓的表情符號
     ctx.beginPath(); ctx.arc(0, 0, s * 0.46, 0, 7);
