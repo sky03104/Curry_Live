@@ -58,9 +58,9 @@ function layout() {
   W = window.innerWidth; H = window.innerHeight;
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   // 碗：上面是寬寬的碗口，往下收成半橢圓的碗身，底下一個小圈足。碗深＝碗寬的一半
-  jar.w = Math.min(W * 0.7, H * 0.6 / 0.56);          // 碗旁邊留一些空位，滿出來的禮物才有地方掉
-  jar.depth = jar.w * 0.5;
-  jar.foot = jar.w * 0.06;
+  jar.w = Math.min(W * 0.7, H * 0.6 / 0.47);          // 碗旁邊留一些空位，滿出來的禮物才有地方掉
+  jar.depth = jar.w * 0.428;                           // 碗深、圈足高度都照碗圖片的比例
+  jar.foot = jar.w * 0.0405;
   jar.h = jar.depth + jar.foot;
   K = jar.w / 300;
   jar.cx = W * 0.5;
@@ -91,6 +91,19 @@ function layout() {
 }
 window.addEventListener('resize', layout);
 layout();
+
+/* ---------- 碗的圖片（後半：碗口內側＋碗身；前半：碗身前面那層，半透明蓋在禮物上） ---------- */
+var BOWL = { back: new Image(), front: new Image(), ok: 0, S: 780, cx: 127, cy: 88, openW: 222 };   // 數字是原圖（260 像素）裡的位置
+['back', 'front'].forEach(function (k) {
+  BOWL[k].onload = function () { BOWL.ok++; };
+  BOWL[k].src = 'bowl_' + k + '.png';
+});
+function bowlDraw(img, alpha) {
+  var s = jar.w / BOWL.openW, T = jar.bottom - jar.h, d = 260 * s;
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.drawImage(img, jar.cx - BOWL.cx * s, T - BOWL.cy * s, d, d);
+  ctx.restore();
+}
 
 /* ---------- 銅錢圖（程式畫的，先畫好存起來） ---------- */
 var COIN_TONES = [['#fff4b0', '#f7c92b', '#b8860b'], ['#ffe98a', '#efb81c', '#a87408'], ['#fff0a0', '#ffd24a', '#c28a10']];
@@ -176,7 +189,8 @@ function clearAll() {
 function bowlBody() {                // 碗身外形（半橢圓）
   ctx.beginPath(); ctx.ellipse(jar.cx, jar.bottom - jar.h, jar.w / 2, jar.depth, 0, 0, Math.PI); ctx.closePath();
 }
-function drawJarBack() {             // 禮物後面：碗口裡面看到的內側
+function drawJarBack() {
+  if (BOWL.ok >= 2) { bowlDraw(BOWL.back, 1); return; }             // 禮物後面：碗口裡面看到的內側
   var cx = jar.cx, T = jar.bottom - jar.h, rx = jar.w / 2, ry = jar.depth * 0.16;
   ctx.save();
   ctx.beginPath(); ctx.ellipse(cx, T, rx, ry, 0, 0, Math.PI * 2);
@@ -190,7 +204,8 @@ function drawJarBack() {             // 禮物後面：碗口裡面看到的內�
   ctx.fillStyle = g2; ctx.fill();
   ctx.restore();
 }
-function drawJar() {                 // 禮物前面：半透明的碗身、碗口邊、圈足、高光
+function drawJar() {
+  if (BOWL.ok >= 2) { bowlDraw(BOWL.front, 0.3); return; }                 // 禮物前面：半透明的碗身、碗口邊、圈足、高光
   var cx = jar.cx, T = jar.bottom - jar.h, rx = jar.w / 2, ry = jar.depth * 0.16, B = jar.bottom;
   ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   // 圈足
