@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>禮物許願瓶</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:transparent;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
+  body:not(.obs){background:#20232c}
+  canvas{position:fixed;inset:0;width:100%;height:100%}
+  #panel{position:fixed;left:8px;top:8px;display:flex;flex-wrap:wrap;gap:6px;max-width:300px;z-index:5}
+  body.obs #panel{display:none}
+  #panel button,#panel select{font:inherit;font-size:13px;padding:6px 9px;border-radius:7px;border:1px solid #555;background:#2f3440;color:#fff;cursor:pointer}
+  #status{position:fixed;left:8px;bottom:6px;font-size:12px;color:#aab;z-index:5}
+  body.obs #status{display:none}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="panel">
+  <select id="dia"><option value="1">1 鑽（小）</option><option value="10">10 鑽</option><option value="100" selected>100 鑽</option><option value="1000">1000 鑽</option><option value="10000">10000 鑽（大）</option></select>
+  <button id="b1">丟 1 個</button>
+  <button id="b20">丟 20 個</button>
+  <button id="bc">清空瓶子</button>
+</div>
+<div id="status">TikFinity：未連線</div>
+<script src="matter.min.js"></script>
+<script>
+(function () {
+'use strict';
+var P = new URLSearchParams(location.search);
+var OBS = P.get('obs') === '1';
+if (OBS) document.body.classList.add('obs');
+
+/* ---------- 設定（都可以用網址參數改，預設值夠用） ---------- */
+var CFG = {
+  max: clampNum(P.get('max'), 20, 600, 220),       // 畫面上最多同時有幾個禮物（超過會把最早的拿掉）
+  cap: clampNum(P.get('cap'), 1, 100, 25),         // 一次送禮最多掉幾個（連送 99 個也只掉這麼多）
+  title: P.get('title') || '許願瓶',                // 瓶子上方的標題，空白就不顯示：&title=
+  tiktokfinity: P.get('tikfinity') !== '0'         // &tikfinity=0 可以關掉連線（只用測試按鈕）
+};
+function clampNum(v, lo, hi, def) { v = parseFloat(v); return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : def; }
+
+/* ---------- 物理世界 ---------- */
+var M = Matter, Engine = M.Engine, Bodies = M.Bodies, Body = M.Body, World = M.World;
+var engine = Engine.create({ gravity: { x: 0, y: 1.0 } });
+var world = engine.world;
+var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+var W = 0, H = 0, DPR = 1, K = 1;
+var jar = { cx: 0, w: 0, h: 0, bottom: 0, wall: 14 };   // 瓶子的位置與大小
+var statics = [];
+var items = [];                // 掉進來的禮物 { body, img(url), size, born }
+var stats = { count: 0, diamonds: 0 };
+
+function layout() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  K = Math.max(0.6, Math.min(1.5, Math.min(W, H) / 700));
+  jar.w = Math.min(W * 0.52, 360 * K * 1.3);
+  jar.h = Math.min(H * 0.58, jar.w * 1.25);
+  jar.cx = W * 0.5;
+  jar.bottom = H - 16;
+  jar.wall = Math.max(10, 14 * K);
+  statics.forEach(function (b) { World.remove(world, b); });
+  statics = [];
+  var t = jar.wall, L = jar.cx - jar.w / 2, R = jar.cx + jar.w / 2, B = jar.bottom, T = jar.bottom - jar.h;
+  var opt = { isStatic: true, friction: 0.4, restitution: 0.1 };
+  statics.push(
+    Bodies.rectangle(jar.cx, B + t / 2, jar.w + t * 2, t, opt),                 // 瓶底
+    Bodies.rectangle(L - t / 2, (T + B) / 2, t, jar.h + t, opt),                // 左壁
+    Bodies.rectangle(R + t / 2, (T + B) / 2, t, jar.h + t, opt),                // 右壁
+    Bodies.circle(L - t / 2, T, t * 0.55, opt), Bodies.circle(R + t / 2, T, t * 0.55, opt), // 瓶口圓角：滿出來的禮物會順著滑到旁邊
+    Bodies.rectangle(W / 2, H + 40, W * 3, 80, opt),                            // 地板（瓶子旁邊掉出去的禮物堆在這裡）
+    Bodies.rectangle(-40, H / 2, 80, H * 3, opt), Bodies.rectangle(W + 40, H / 2, 80, H * 3, opt)  // 左右牆（不讓禮物滾出畫面）
+  );
+  World.add(world, statics);
+}
+window.addEventListener('resize', layout);
+layout();
+
+/* ---------- 禮物圖片 ---------- */
+var imgCache = new Map();
+var FALLBACK = ['🎁', '🌹', '💎', '🧸', '⭐', '🍭', '💖', '🎈'];
+function getImg(url) {
+  if (!url) return null;
+  var e = imgCache.get(url);
+  if (e) return e.ok ? e.img : null;
+  var img = new Image();
+  e = { img: img, ok: false };
+  img.referrerPolicy = 'no-referrer';
+  img.onload = function () { e.ok = true; };
+  img.onerror = function () { e.ok = false; };
+  img.src = url;
+  imgCache.set(url, e);
+  if (imgCache.size > 300) imgCache.delete(imgCache.keys().next().value);
+  return null;
+}
+function hash(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); }
+
+/* ---------- 丟一個禮物進瓶子 ---------- */
+function sizeFor(diamonds) {
+  var d = Math.max(1, diamonds || 1);
+  return Math.min(92, 32 + 13 * Math.log10(d + 1)) * K;          // 1 鑽≈36、100 鑽≈58、1000 鑽≈71、10000 鑽≈84
+}
+function spawn(gift) {
+  var size = sizeFor(gift.diamonds);
+  var r = size * 0.46;
+  var spread = Math.random() < 0.8 ? jar.w * 0.32 : jar.w * 0.62;   // 大多掉進瓶口，偶爾偏一點掉到瓶子外面
+  var x = jar.cx + (Math.random() * 2 - 1) * spread;
+  var y = -size;
+  var b = Bodies.circle(x, y, r, { restitution: 0.25, friction: 0.35, frictionAir: 0.012, density: 0.002, slop: 0.05 });
+  Body.setVelocity(b, { x: (Math.random() - 0.5) * 2, y: 2 + Math.random() * 3 });
+  Body.setAngularVelocity(b, (Math.random() - 0.5) * 0.2);
+  World.add(world, b);
+  items.push({ body: b, url: gift.icon || '', size: size, emoji: FALLBACK[hash(gift.name || '') % FALLBACK.length], born: performance.now() });
+  stats.count++; stats.diamonds += gift.diamonds || 0;
+  trim();
+}
+function inJar(b) { return Math.abs(b.position.x - jar.cx) < jar.w / 2 && b.position.y > jar.bottom - jar.h; }
+function trim() {
+  while (items.length > CFG.max) {                                   // 太多時先拿掉瓶子外面最早的，沒有再拿最早的
+    var i = items.findIndex(function (it) { return !inJar(it.body) && performance.now() - it.born > 4000; });
+    if (i < 0) i = 0;
+    World.remove(world, items[i].body);
+    items.splice(i, 1);
+  }
+}
+function drop(name, diamonds, count, icon) {
+  var n = Math.max(1, Math.min(CFG.cap, Math.floor(count || 1)));
+  var g = { name: name || '', diamonds: diamonds || 0, icon: icon || '' };
+  getImg(g.icon);
+  for (var i = 0; i < n; i++) (function (k) { setTimeout(function () { spawn(g); }, k * 110); })(i);
+}
+function clearAll() {
+  items.forEach(function (it) { World.remove(world, it.body); });
+  items.length = 0; stats.count = 0; stats.diamonds = 0;
+}
+
+/* ---------- 畫面 ---------- */
+function jarPath(L, T, w, rr) {
+  ctx.beginPath();
+  ctx.moveTo(L, T); ctx.lineTo(L, jar.bottom - rr); ctx.quadraticCurveTo(L, jar.bottom, L + rr, jar.bottom);
+  ctx.lineTo(L + w - rr, jar.bottom); ctx.quadraticCurveTo(L + w, jar.bottom, L + w, jar.bottom - rr); ctx.lineTo(L + w, T);
+}
+function drawJarBack() {
+  var L = jar.cx - jar.w / 2, T = jar.bottom - jar.h, w = jar.w, rr = Math.min(40 * K, w / 6);
+  ctx.save(); jarPath(L, T, w, rr); ctx.closePath();
+  var g = ctx.createLinearGradient(L, 0, L + w, 0);
+  g.addColorStop(0, 'rgba(255,255,255,.20)'); g.addColorStop(0.5, 'rgba(255,255,255,.07)'); g.addColorStop(1, 'rgba(255,255,255,.18)');
+  ctx.fillStyle = g; ctx.fill(); ctx.restore();
+}
+function drawJar() {
+  var L = jar.cx - jar.w / 2, T = jar.bottom - jar.h, w = jar.w, h = jar.h, rr = Math.min(40 * K, w / 6);
+  ctx.save();
+  // 玻璃外框（畫在禮物前面，看起來禮物是在瓶子裡面）
+  jarPath(L, T, w, rr);
+  ctx.lineWidth = 4 * K; ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineJoin = 'round'; ctx.stroke();
+  // 高光
+  ctx.beginPath(); ctx.moveTo(L + w * 0.12, T + h * 0.08); ctx.lineTo(L + w * 0.12, T + h * 0.55);
+  ctx.lineWidth = 5 * K; ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.stroke();
+  // 瓶口邊
+  ctx.beginPath(); ctx.moveTo(L - 8 * K, T); ctx.lineTo(L + w + 8 * K, T);
+  ctx.lineWidth = 5 * K; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.stroke();
+  ctx.restore();
+}
+function outlineText(txt, x, y, px, align) {
+  ctx.font = '900 ' + px + 'px "Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif';
+  ctx.textAlign = align || 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(4, px * 0.22); ctx.strokeStyle = '#000'; ctx.strokeText(txt, x, y);
+  ctx.fillStyle = '#fff'; ctx.fillText(txt, x, y);
+}
+function drawItem(it) {
+  var b = it.body, s = it.size, img = getImg(it.url);
+  ctx.save();
+  ctx.globalAlpha = it.alpha == null ? 1 : it.alpha;
+  ctx.translate(b.position.x, b.position.y); ctx.rotate(b.angle);
+  if (img) {
+    ctx.drawImage(img, -s / 2, -s / 2, s, s);
+  } else {                                                    // 沒有圖片（還沒收到圖片網址／載入失敗）時畫一顆圓圓的表情符號
+    ctx.beginPath(); ctx.arc(0, 0, s * 0.46, 0, 7);
+    ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.stroke();
+    ctx.font = Math.round(s * 0.6) + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000';
+    ctx.fillText(it.emoji, 0, s * 0.04);
+  }
+  ctx.restore();
+}
+var OUT_STAY = 7000, OUT_FADE = 1500;
+function fadeOutside() {
+  var now = performance.now();
+  for (var i = items.length - 1; i >= 0; i--) {
+    var it = items[i];
+    if (inJar(it.body) || it.body.position.y < jar.bottom - jar.h - 40) { it.outSince = 0; it.alpha = 1; continue; }
+    if (!it.outSince) it.outSince = now;
+    var t = now - it.outSince - OUT_STAY;
+    it.alpha = t <= 0 ? 1 : Math.max(0, 1 - t / OUT_FADE);
+    if (it.alpha <= 0) { World.remove(world, it.body); items.splice(i, 1); }
+  }
+}
+function frame() {
+  Engine.update(engine, 1000 / 60); Engine.update(engine, 1000 / 60);   // 每格算兩次，高速掉落時比較不會穿過瓶壁
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  drawJarBack();
+  fadeOutside();
+  for (var i = 0; i < items.length; i++) drawItem(items[i]);
+  drawJar();
+  // 瓶子上方的標題與累計（字用白色粗黑外框，直播壓縮後比較看得清楚）
+  var ty = 34 * K;
+  if (CFG.title) { outlineText(CFG.title, jar.cx, ty, 30 * K); ty += 28 * K; }
+  outlineText('🎁 ' + stats.count + ' 個　💎 ' + stats.diamonds.toLocaleString(), jar.cx, ty, 20 * K);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- 接 TikFinity（禮物事件格式照亂鬥遊戲 js/events.js 的寫法） ---------- */
+function findGiftImage(data) {
+  var isUrl = function (v) { return typeof v === 'string' && /^https?:\/\/\S+$/.test(v) && /\.(png|webp|jpe?g|image|awebp)(\b|~|\?|$)|tiktokcdn|ibyteimg|byteimg/i.test(v); };
+  var skip = /profile|avatar|badge|fans|follow|userdetail|^user$|touser|anchor|author/i, prefer = /gift|icon|image|picture/i, fb = '';
+  (function walk(node, path, depth) {
+    if (!node || depth > 6) return '';
+    if (Array.isArray(node)) { for (var i = 0; i < node.length; i++) { var v = node[i]; if (isUrl(v)) { if (prefer.test(path)) return v; fb = fb || v; } else { var r = walk(v, path, depth + 1); if (r) return r; } } return ''; }
+    if (typeof node !== 'object') return '';
+    for (var k in node) {
+      if (skip.test(k)) continue;
+      var v2 = node[k], p = path + '.' + k;
+      if (isUrl(v2)) { if (prefer.test(p)) { fb = v2; return v2; } fb = fb || v2; }
+      else if (v2 && typeof v2 === 'object') { var r2 = walk(v2, p, depth + 1); if (r2) return r2; }
+    }
+    return '';
+  })(data, '', 0);
+  return fb;
+}
+var streaks = new Map();
+function readGift(msg) {
+  var d = msg.data || {};
+  var u = d.user || d;
+  var uid = String(u.userId || u.uniqueId || u.id || u.displayId || '');
+  var layers = [d, d.giftDetails, d.gift, d.extendedGiftInfo].filter(function (x) { return x && typeof x === 'object'; });
+  function pick() { for (var i = 0; i < layers.length; i++) for (var j = 0; j < arguments.length; j++) { var v = layers[i][arguments[j]]; if (v !== undefined && v !== null && v !== '') return v; } }
+  var giftId = String(pick('giftId', 'gift_id', 'id') || '');
+  var total = Number(pick('repeatCount', 'repeat_count')) || 1, count = total;
+  if (Number(pick('giftType', 'gift_type', 'type')) === 1) {         // 連送：只算比上次多出來的
+    var key = uid + '|' + giftId + '|' + (d.groupId || '');
+    var ended = pick('repeatEnd', 'repeat_end');
+    count = total - (streaks.get(key) || 0);
+    if (ended && ended !== '0') streaks.delete(key); else streaks.set(key, total);
+    if (streaks.size > 5000) streaks.clear();
+  }
+  if (count <= 0) return null;
+  var first = function (l) { return (Array.isArray(l) && l[0]) || ''; }, E = d.extendedGiftInfo || {};
+  var icon = String(d.giftPictureUrl || ((d.giftDetails || {}).giftImage || {}).giftPictureUrl ||
+    first(((d.gift || {}).icon || {}).urlList) || first(((d.gift || {}).image || {}).urlList) ||
+    first((E.icon || {}).url_list) || first((E.image || {}).url_list) || findGiftImage(d) || '');
+  return { name: String(pick('giftName', 'name') || ''), diamonds: Number(pick('diamondCount', 'diamond_count')) || 0, count: count, icon: icon };
+}
+var statusEl = document.getElementById('status');
+function connect() {
+  if (!CFG.tiktokfinity) { statusEl.textContent = 'TikFinity：已關閉（只能用測試按鈕）'; return; }
+  var ws;
+  try { ws = new WebSocket('ws://localhost:21213/'); } catch (e) { setTimeout(connect, 5000); return; }
+  ws.onopen = function () { statusEl.textContent = 'TikFinity：已連線'; };
+  ws.onmessage = function (e) {
+    var msg; try { msg = JSON.parse(e.data); } catch (x) { return; }
+    if (msg && msg.event === 'gift') { var g = readGift(msg); if (g) drop(g.name, g.diamonds, g.count, g.icon); }
+  };
+  ws.onclose = function () { statusEl.textContent = 'TikFinity：未連線，重試中…'; setTimeout(connect, 3000); };
+  ws.onerror = function () { try { ws.close(); } catch (x) {} };
+}
+connect();
+
+/* ---------- 測試按鈕與測試用接口 ---------- */
+var diaSel = document.getElementById('dia');
+document.getElementById('b1').onclick = function () { drop('測試' + Math.floor(Math.random() * 8), +diaSel.value, 1, ''); };
+document.getElementById('b20').onclick = function () { drop('測試' + Math.floor(Math.random() * 8), +diaSel.value, 20, ''); };
+document.getElementById('bc').onclick = clearAll;
+window.__jar = {
+  drop: drop, clear: clearAll, readGift: readGift, cfg: CFG,
+  state: function () {
+    var out = 0; items.forEach(function (it) { if (!inJar(it.body)) out++; });
+    return { total: items.length, outside: out, inside: items.length - out, stats: stats, jar: jar, W: W, H: H };
+  }
+};
+})();
+</script>
+</body>
+</html>
