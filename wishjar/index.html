@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>禮物許願瓶</title>
+<title>禮物許願碗</title>
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:transparent;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
   body:not(.obs){background:#20232c}
@@ -36,7 +36,7 @@ if (OBS) document.body.classList.add('obs');
 var CFG = {
   max: clampNum(P.get('max'), 20, 800, 350),       // 畫面上最多同時有幾個禮物（超過會把最早的拿掉）
   cap: clampNum(P.get('cap'), 1, 100, 25),         // 一次送禮最多掉幾個（連送 99 個也只掉這麼多）
-  title: P.get('title') || '許願瓶',                // 瓶子上方的標題，空白就不顯示：&title=
+  title: P.get('title') || '許願碗',                // 瓶子上方的標題，空白就不顯示：&title=
   tiktokfinity: P.get('tikfinity') !== '0'         // &tikfinity=0 可以關掉連線（只用測試按鈕）
 };
 function clampNum(v, lo, hi, def) { v = parseFloat(v); return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : def; }
@@ -56,33 +56,35 @@ function layout() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
   W = window.innerWidth; H = window.innerHeight;
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
-  // 玻璃罐（像梅森罐：瓶口有一圈邊，往下收成脖子，再放寬成瓶身）。寬：高 ≈ 0.72
-  jar.h = Math.min(H * 0.8, W * 0.74 / 0.72);
-  jar.w = jar.h * 0.72;
+  // 碗：上面是寬寬的碗口，往下收成半橢圓的碗身，底下一個小圈足。碗深＝碗寬的一半
+  jar.w = Math.min(W * 0.7, H * 0.6 / 0.56);          // 碗旁邊留一些空位，滿出來的禮物才有地方掉
+  jar.depth = jar.w * 0.5;
+  jar.foot = jar.w * 0.06;
+  jar.h = jar.depth + jar.foot;
   K = jar.w / 300;
   jar.cx = W * 0.5;
   jar.bottom = H - 16;
-  jar.wall = Math.max(8, 12 * K);
-  jar.neckW = jar.w * 0.86;            // 瓶口（脖子）寬度，比瓶身窄一點
-  jar.rimH = jar.h * 0.07;             // 瓶口那圈邊的高度
-  jar.shoulderY = jar.h * 0.2;         // 瓶身開始變寬的位置（從瓶口往下算）
+  jar.wall = Math.max(10, 12 * K);
+  jar.neckW = jar.w * 0.75;
+  jar.rimH = 0;
   statics.forEach(function (b) { World.remove(world, b); });
   statics = [];
-  var t = jar.wall, cx = jar.cx, B = jar.bottom, T = B - jar.h;
-  var hw = jar.w / 2, nw = jar.neckW / 2, sy = T + jar.shoulderY, ny = T + jar.rimH;
+  var t = jar.wall, cx = jar.cx, T = jar.bottom - jar.h, a = jar.w / 2 + t / 2, b = jar.depth + t / 2;
   var opt = { isStatic: true, friction: 0.4, restitution: 0.1 };
-  function seg(x1, y1, x2, y2) {       // 一段有厚度的牆
+  function seg(x1, y1, x2, y2) {
     var len = Math.hypot(x2 - x1, y2 - y1);
     return Bodies.rectangle((x1 + x2) / 2, (y1 + y2) / 2, len + t * 0.6, t, Object.assign({ angle: Math.atan2(y2 - y1, x2 - x1) }, opt));
   }
+  var N = 30, prev = null;                                    // 半橢圓碗身：用一小段一小段的牆圍起來
+  for (var k = 0; k <= N; k++) {
+    var th = Math.PI * k / N, px = cx + a * Math.cos(th), py = T + b * Math.sin(th);
+    if (prev) statics.push(seg(prev[0], prev[1], px, py));
+    prev = [px, py];
+  }
   statics.push(
-    Bodies.rectangle(cx, B + t / 2, jar.w + t * 2, t, opt),                    // 瓶底
-    seg(cx - hw - t / 2, sy, cx - hw - t / 2, B), seg(cx + hw + t / 2, sy, cx + hw + t / 2, B),            // 瓶身左右壁
-    seg(cx - nw - t / 2, ny, cx - hw - t / 2, sy), seg(cx + nw + t / 2, ny, cx + hw + t / 2, sy),          // 肩膀（斜的）
-    seg(cx - nw - t / 2, T, cx - nw - t / 2, ny), seg(cx + nw + t / 2, T, cx + nw + t / 2, ny),            // 瓶口（脖子）
-    Bodies.circle(cx - nw - t / 2, T, t * 0.6, opt), Bodies.circle(cx + nw + t / 2, T, t * 0.6, opt),      // 瓶口圓邊：滿出來的禮物會順著滑到旁邊
-    Bodies.rectangle(W / 2, H + 40, W * 3, 80, opt),                           // 地板（瓶子旁邊掉出去的禮物堆在這裡）
-    Bodies.rectangle(-40, H / 2, 80, H * 3, opt), Bodies.rectangle(W + 40, H / 2, 80, H * 3, opt)        // 左右牆
+    Bodies.circle(cx - a, T, t * 0.6, opt), Bodies.circle(cx + a, T, t * 0.6, opt),                    // 碗口圓邊：滿出來的禮物會順著滑到碗旁邊
+    Bodies.rectangle(W / 2, H + 40, W * 3, 80, opt),                                                  // 地板
+    Bodies.rectangle(-40, H / 2, 80, H * 3, opt), Bodies.rectangle(W + 40, H / 2, 80, H * 3, opt)   // 左右牆
   );
   World.add(world, statics);
 }
@@ -111,7 +113,7 @@ function hash(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s
 /* ---------- 丟一個禮物進瓶子 ---------- */
 function sizeFor(diamonds) {
   var d = Math.max(1, diamonds || 1);
-  return Math.min(0.18, 0.06 + 0.024 * Math.log10(d + 1)) * jar.w;   // 1 鑽≈瓶子寬的 7%、100 鑽≈11%、1000 鑽≈13%、10000 鑽≈16%
+  return Math.min(0.14, 0.05 + 0.02 * Math.log10(d + 1)) * jar.w;     // 1 鑽≈碗寬的 5.6%、100 鑽≈9%、1000 鑽≈11%、10000 鑽≈13%
 }
 function spawn(gift) {
   var size = sizeFor(gift.diamonds);
@@ -127,7 +129,7 @@ function spawn(gift) {
   stats.count++; stats.diamonds += gift.diamonds || 0;
   trim();
 }
-function inJar(b) { return Math.abs(b.position.x - jar.cx) < jar.w / 2 && b.position.y > jar.bottom - jar.h + jar.rimH; }
+function inJar(b) { return Math.abs(b.position.x - jar.cx) < jar.w / 2 && b.position.y > jar.bottom - jar.h; }
 function trim() {
   while (items.length > CFG.max) {                                   // 太多時先拿掉瓶子外面最早的，沒有再拿最早的
     var i = items.findIndex(function (it) { return !inJar(it.body) && performance.now() - it.born > 4000; });
@@ -148,46 +150,36 @@ function clearAll() {
 }
 
 /* ---------- 畫面 ---------- */
-function jarPath() {                 // 瓶身外形（脖子 → 肩膀 → 瓶身 → 圓角瓶底），順時針
-  var cx = jar.cx, hw = jar.w / 2, nw = jar.neckW / 2, T = jar.bottom - jar.h, B = jar.bottom;
-  var ny = T + jar.rimH, sy = T + jar.shoulderY, rr = jar.w * 0.12;
-  ctx.beginPath();
-  ctx.moveTo(cx - nw, T); ctx.lineTo(cx - nw, ny);
-  ctx.quadraticCurveTo(cx - nw, sy - 6 * K, cx - hw, sy);
-  ctx.lineTo(cx - hw, B - rr); ctx.quadraticCurveTo(cx - hw, B, cx - hw + rr, B);
-  ctx.lineTo(cx + hw - rr, B); ctx.quadraticCurveTo(cx + hw, B, cx + hw, B - rr);
-  ctx.lineTo(cx + hw, sy); ctx.quadraticCurveTo(cx + nw, sy - 6 * K, cx + nw, ny); ctx.lineTo(cx + nw, T);
+function bowlBody() {                // 碗身外形（半橢圓）
+  ctx.beginPath(); ctx.ellipse(jar.cx, jar.bottom - jar.h, jar.w / 2, jar.depth, 0, 0, Math.PI); ctx.closePath();
 }
-function drawJarBack() {             // 禮物後面：淡淡的玻璃底色＋瓶口後半圈
-  var cx = jar.cx, nw = jar.neckW / 2, T = jar.bottom - jar.h, ey = Math.max(6, jar.h * 0.022);
-  ctx.save(); jarPath(); ctx.closePath();
-  var g = ctx.createLinearGradient(cx - jar.w / 2, 0, cx + jar.w / 2, 0);
-  g.addColorStop(0, 'rgba(255,255,255,.22)'); g.addColorStop(0.5, 'rgba(255,255,255,.07)'); g.addColorStop(1, 'rgba(255,255,255,.2)');
+function drawJarBack() {             // 禮物後面：碗口裡面看到的內側
+  var cx = jar.cx, T = jar.bottom - jar.h, rx = jar.w / 2, ry = jar.depth * 0.16;
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(cx, T, rx, ry, 0, 0, Math.PI * 2);
+  var g = ctx.createLinearGradient(0, T - ry, 0, T + ry);
+  g.addColorStop(0, 'rgba(235,245,252,.95)'); g.addColorStop(1, 'rgba(190,220,238,.95)');
   ctx.fillStyle = g; ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx, T, nw, ey, 0, Math.PI, 0);                 // 瓶口後緣
-  ctx.lineWidth = 3 * K; ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.stroke();
   ctx.restore();
 }
-function drawJar() {                 // 禮物前面：玻璃外框、瓶口邊、螺紋、高光
-  var cx = jar.cx, hw = jar.w / 2, nw = jar.neckW / 2, T = jar.bottom - jar.h, B = jar.bottom;
-  var ey = Math.max(6, jar.h * 0.022), rimW = nw + 7 * K;
+function drawJar() {                 // 禮物前面：半透明的碗身、碗口邊、圈足、高光
+  var cx = jar.cx, T = jar.bottom - jar.h, rx = jar.w / 2, ry = jar.depth * 0.16, B = jar.bottom;
   ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  jarPath(); ctx.lineWidth = 3.5 * K; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.stroke();
-  // 瓶口外圈（比脖子寬一點）
-  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cx - rimW, T - 4 * K, rimW * 2, jar.rimH * 0.7, 6 * K) : ctx.rect(cx - rimW, T - 4 * K, rimW * 2, jar.rimH * 0.7);
-  ctx.lineWidth = 3.5 * K; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fill(); ctx.stroke();
-  // 瓶口前半圈
-  ctx.beginPath(); ctx.ellipse(cx, T, nw, ey, 0, 0, Math.PI); ctx.lineWidth = 3 * K; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.stroke();
-  // 螺紋
-  ctx.lineWidth = 2 * K; ctx.strokeStyle = 'rgba(255,255,255,.55)';
-  for (var k = 1; k <= 2; k++) { var yy = T + jar.rimH * (0.35 + 0.3 * k); ctx.beginPath(); ctx.moveTo(cx - nw, yy); ctx.quadraticCurveTo(cx, yy + ey * 1.6, cx + nw, yy); ctx.stroke(); }
-  // 瓶底的厚玻璃
-  ctx.beginPath(); ctx.ellipse(cx, B - 5 * K, hw * 0.86, ey * 1.3, 0, 0, Math.PI); ctx.lineWidth = 2.5 * K; ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.stroke();
+  // 圈足
+  var fw = jar.w * 0.28, fh = jar.foot;
+  ctx.beginPath(); ctx.moveTo(cx - fw / 2, B - fh); ctx.lineTo(cx - fw / 2 - 4 * K, B); ctx.lineTo(cx + fw / 2 + 4 * K, B); ctx.lineTo(cx + fw / 2, B - fh); ctx.closePath();
+  ctx.fillStyle = 'rgba(110,170,205,.95)'; ctx.fill(); ctx.lineWidth = 3 * K; ctx.strokeStyle = '#2f6c93'; ctx.stroke();
+  // 碗身（半透明淺藍，禮物看得到）
+  bowlBody();
+  var g = ctx.createLinearGradient(0, T, 0, T + jar.depth);
+  g.addColorStop(0, 'rgba(140,200,230,.55)'); g.addColorStop(1, 'rgba(95,165,205,.75)');
+  ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 4 * K; ctx.strokeStyle = '#2f6c93'; ctx.stroke();
+  // 碗口前緣
+  ctx.beginPath(); ctx.ellipse(cx, T, rx, ry, 0, 0, Math.PI); ctx.lineWidth = 4 * K; ctx.strokeStyle = '#2f6c93'; ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(cx, T, rx, ry, 0, Math.PI, Math.PI * 2); ctx.lineWidth = 3 * K; ctx.strokeStyle = 'rgba(47,108,147,.8)'; ctx.stroke();
   // 高光
-  ctx.lineWidth = 6 * K; ctx.strokeStyle = 'rgba(255,255,255,.5)';
-  ctx.beginPath(); ctx.moveTo(cx - hw + 12 * K, T + jar.h * 0.3); ctx.lineTo(cx - hw + 12 * K, T + jar.h * 0.7); ctx.stroke();
-  ctx.lineWidth = 3 * K; ctx.strokeStyle = 'rgba(255,255,255,.4)';
-  ctx.beginPath(); ctx.moveTo(cx + hw - 12 * K, T + jar.h * 0.35); ctx.lineTo(cx + hw - 12 * K, T + jar.h * 0.6); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(cx, T, rx * 0.86, jar.depth * 0.8, 0, Math.PI * 0.62, Math.PI * 0.86);
+  ctx.lineWidth = 7 * K; ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.stroke();
   ctx.restore();
 }
 function outlineText(txt, x, y, px, align) {
@@ -218,7 +210,7 @@ function fadeOutside() {
   var now = performance.now();
   for (var i = items.length - 1; i >= 0; i--) {
     var it = items[i];
-    if (inJar(it.body) || it.body.position.y < jar.bottom - jar.h - 40) { it.outSince = 0; it.alpha = 1; continue; }
+    if (inJar(it.body) || it.body.speed > 1.2) { it.outSince = 0; it.alpha = 1; continue; }   // 在碗裡，或還在掉（還沒停下來）的不算
     if (!it.outSince) it.outSince = now;
     var t = now - it.outSince - OUT_STAY;
     it.alpha = t <= 0 ? 1 : Math.max(0, 1 - t / OUT_FADE);
