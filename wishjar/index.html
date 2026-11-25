@@ -39,6 +39,7 @@ var CFG = {
   title: P.get('title') || '',                     // 碗上方的標題，預設不顯示；想要就加 &title=文字
   stats: P.get('stats') === '1',                   // 預設不顯示禮物個數與鑽石數；想要就加 &stats=1
   coin: P.get('coin') === '1',                     // 預設用觀眾送的禮物自己的圖片；&coin=1 改成全部畫成金黃色銅錢
+  host: String(P.get('host') || '').split(/[,，、;；\s]+/).map(function (x) { return x.replace(/^@/, '').trim().toLowerCase(); }).filter(Boolean),   // 主播（管理員）的 TikTok 帳號，可填多個：&host=帳號1,帳號2
   tiktokfinity: P.get('tikfinity') !== '0'         // &tikfinity=0 可以關掉連線（只用測試按鈕）
 };
 function clampNum(v, lo, hi, def) { v = parseFloat(v); return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : def; }
@@ -321,6 +322,22 @@ function readGift(msg) {
     first((E.icon || {}).url_list) || first((E.image || {}).url_list) || findGiftImage(d) || '');
   return { name: String(pick('giftName', 'name') || ''), diamonds: Number(pick('diamondCount', 'diamond_count')) || 0, count: count, icon: icon };
 }
+// 主播留言「清空許願碗」（也認「清空碗」「clear」）就把碗清空；只認 &host= 填的帳號（比對 TikTok 帳號代號，不比暱稱，別人改暱稱冒充不了）
+var CMD_CLEAR = /^!?(清空許願碗|清空碗|clear)$/i;
+function isHostMsg(d) {
+  if (!CFG.host.length) return false;
+  var u = d.user || {};
+  var ids = [d.uniqueId, u.uniqueId, d.userId, u.userId, d.user_id, d.displayId, u.displayId].map(function (x) { return String(x || '').toLowerCase(); });
+  return ids.some(function (x) { return x && CFG.host.indexOf(x) >= 0; });
+}
+function handleMsg(msg) {
+  if (!msg) return;
+  if (msg.event === 'gift') { var g = readGift(msg); if (g) drop(g.name, g.diamonds, g.count, g.icon); return; }
+  if (msg.event === 'chat') {
+    var d = msg.data || {}, text = String(d.comment || d.content || '').trim();
+    if (CMD_CLEAR.test(text) && isHostMsg(d)) clearAll();
+  }
+}
 var statusEl = document.getElementById('status');
 function connect() {
   if (!CFG.tiktokfinity) { statusEl.textContent = 'TikFinity：已關閉（只能用測試按鈕）'; return; }
@@ -329,7 +346,7 @@ function connect() {
   ws.onopen = function () { statusEl.textContent = 'TikFinity：已連線'; };
   ws.onmessage = function (e) {
     var msg; try { msg = JSON.parse(e.data); } catch (x) { return; }
-    if (msg && msg.event === 'gift') { var g = readGift(msg); if (g) drop(g.name, g.diamonds, g.count, g.icon); }
+    handleMsg(msg);
   };
   ws.onclose = function () { statusEl.textContent = 'TikFinity：未連線，重試中…'; setTimeout(connect, 3000); };
   ws.onerror = function () { try { ws.close(); } catch (x) {} };
@@ -342,7 +359,7 @@ document.getElementById('b1').onclick = function () { drop('測試' + Math.floor
 document.getElementById('b20').onclick = function () { drop('測試' + Math.floor(Math.random() * 8), +diaSel.value, 20, ''); };
 document.getElementById('bc').onclick = clearAll;
 window.__jar = {
-  drop: drop, clear: clearAll, items: items, readGift: readGift, cfg: CFG,
+  drop: drop, clear: clearAll, onMsg: handleMsg, items: items, readGift: readGift, cfg: CFG,
   state: function () {
     var out = 0; items.forEach(function (it) { if (!inJar(it.body)) out++; });
     return { total: items.length, outside: out, inside: items.length - out, stats: stats, jar: jar, W: W, H: H };
