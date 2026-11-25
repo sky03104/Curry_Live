@@ -37,7 +37,7 @@ var CFG = {
   max: clampNum(P.get('max'), 20, 800, 350),       // 畫面上最多同時有幾個禮物（超過會把最早的拿掉）
   cap: clampNum(P.get('cap'), 1, 100, 25),         // 一次送禮最多掉幾個（連送 99 個也只掉這麼多）
   title: P.get('title') || '許願碗',                // 瓶子上方的標題，空白就不顯示：&title=
-  coin: P.get('coin') !== '0',                     // 預設所有禮物都畫成金黃色銅錢；&coin=0 改回用禮物自己的圖片
+  coin: P.get('coin') === '1',                     // 預設用觀眾送的禮物自己的圖片；&coin=1 改成全部畫成金黃色銅錢
   tiktokfinity: P.get('tikfinity') !== '0'         // &tikfinity=0 可以關掉連線（只用測試按鈕）
 };
 function clampNum(v, lo, hi, def) { v = parseFloat(v); return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : def; }
