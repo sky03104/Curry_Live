@@ -45,7 +45,7 @@ function clampNum(v, lo, hi, def) { v = parseFloat(v); return isFinite(v) ? Math
 
 /* ---------- 物理世界 ---------- */
 var M = Matter, Engine = M.Engine, Bodies = M.Bodies, Body = M.Body, World = M.World;
-var engine = Engine.create({ gravity: { x: 0, y: 1.0 } });
+var engine = Engine.create({ gravity: { x: 0, y: 0.32 } });
 var world = engine.world;
 var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 var W = 0, H = 0, DPR = 1, K = 1;
@@ -59,7 +59,7 @@ function layout() {
   W = window.innerWidth; H = window.innerHeight;
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   // 碗：上面是寬寬的碗口，往下收成半橢圓的碗身，底下一個小圈足。碗深＝碗寬的一半
-  jar.w = Math.min(W * 0.7, H * 0.6 / 0.47);          // 碗旁邊留一些空位，滿出來的禮物才有地方掉
+  jar.w = Math.min(W * 0.86, H * 0.55 / 0.47);        // 碗盡量撐滿寬度，上面留空間給禮物掉下來；兩旁留一點空位給滿出來的禮物
   jar.depth = jar.w * 0.428;                           // 碗深、圈足高度都照碗圖片的比例
   jar.foot = jar.w * 0.0405;
   jar.h = jar.depth + jar.foot;
@@ -150,7 +150,7 @@ function hash(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s
 /* ---------- 丟一個禮物進瓶子 ---------- */
 function sizeFor(diamonds) {
   var d = Math.max(1, diamonds || 1);
-  return Math.min(0.14, 0.05 + 0.02 * Math.log10(d + 1)) * jar.w;     // 1 鑽≈碗寬的 5.6%、100 鑽≈9%、1000 鑽≈11%、10000 鑽≈13%
+  return Math.min(0.26, 0.10 + 0.03 * Math.log10(d + 1)) * jar.w;     // 1 鑽≈碗寬的 11%、100 鑽≈16%、1000 鑽≈19%、10000 鑽≈22%
 }
 function spawn(gift) {
   var size = sizeFor(gift.diamonds);
@@ -158,7 +158,7 @@ function spawn(gift) {
   var spread = Math.random() < 0.8 ? jar.neckW * 0.36 : jar.neckW * 0.75;   // 大多掉進瓶口，偶爾偏一點掉到瓶子外面
   var x = jar.cx + (Math.random() * 2 - 1) * spread;
   var y = -size;
-  var b = Bodies.circle(x, y, r, { restitution: 0.25, friction: 0.35, frictionAir: 0.012, density: 0.002, slop: 0.05 });
+  var b = Bodies.circle(x, y, r, { restitution: 0.25, friction: 0.35, frictionAir: 0.02, density: 0.002, slop: 0.05 });
   Body.setVelocity(b, { x: (Math.random() - 0.5) * 2, y: 2 + Math.random() * 3 });
   Body.setAngularVelocity(b, (Math.random() - 0.5) * 0.2);
   World.add(world, b);
@@ -263,7 +263,9 @@ function fadeOutside() {
   }
 }
 function frame() {
-  Engine.update(engine, 1000 / 60); Engine.update(engine, 1000 / 60);   // 每格算兩次，高速掉落時比較不會穿過瓶壁
+  var now = performance.now(), dt = Math.min(34, Math.max(8, now - (frame.last || now - 16)));   // 照真實經過的時間算，不管直播軟體跑 30 還是 60 格，掉落速度都一樣
+  frame.last = now;
+  Engine.update(engine, dt / 2); Engine.update(engine, dt / 2);          // 分兩小步算，比較不會穿過碗壁
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0, 0, W, H);
   drawJarBack();
@@ -340,7 +342,7 @@ document.getElementById('b1').onclick = function () { drop('測試' + Math.floor
 document.getElementById('b20').onclick = function () { drop('測試' + Math.floor(Math.random() * 8), +diaSel.value, 20, ''); };
 document.getElementById('bc').onclick = clearAll;
 window.__jar = {
-  drop: drop, clear: clearAll, readGift: readGift, cfg: CFG,
+  drop: drop, clear: clearAll, items: items, readGift: readGift, cfg: CFG,
   state: function () {
     var out = 0; items.forEach(function (it) { if (!inJar(it.body)) out++; });
     return { total: items.length, outside: out, inside: items.length - out, stats: stats, jar: jar, W: W, H: H };
