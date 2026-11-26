@@ -58,16 +58,17 @@ var items = [];                // 掉進來的禮物 { body, img(url), size, bor
 var stats = { count: 0, diamonds: 0 };
 
 /* ---------- 碗的圖片（後半：碗口內側＋碗身；前半：碗身前面那層，半透明蓋在禮物上）；用 &bowl=代號 選碗，清單在 bowls.js ---------- */
-var BOWL = { back: new Image(), front: new Image(), ok: 0, U: 260, cx: 127, cy: 88, openW: 222, depth: 0.428, foot: 0.0405, Uh: 0, fit: false, floorGap: 0, noseY: 0 };
+var BOWL = { back: new Image(), front: new Image(), ok: 0, U: 260, cx: 127, cy: 88, openW: 222, depth: 0.428, foot: 0.0405, Uh: 0, fit: false, floorGap: 0, noseY: 0, anim: null, head: null, headOk: false };
 (function () {
   var list = window.WJ_BOWLS || [], want = P.get('bowl'), b = null;
   list.forEach(function (x) { if (x.id === want) b = x; });
   b = b || list[0];
-  if (b) { ['U', 'Uh', 'fit', 'floorGap', 'noseY', 'cx', 'cy', 'openW', 'depth', 'foot'].forEach(function (k) { if (b[k] != null) BOWL[k] = b[k]; }); }
+  if (b) { ['U', 'Uh', 'fit', 'floorGap', 'noseY', 'anim', 'cx', 'cy', 'openW', 'depth', 'foot'].forEach(function (k) { if (b[k] != null) BOWL[k] = b[k]; }); }
   ['back', 'front'].forEach(function (k) {
     BOWL[k].onload = function () { BOWL.ok++; };
     BOWL[k].src = b ? b[k] : 'bowl_' + k + '.png';
   });
+  if (BOWL.anim) { BOWL.head = new Image(); BOWL.head.onload = function () { BOWL.headOk = true; }; BOWL.head.src = BOWL.anim.head; }   // 動畫版：狗頭另外一層，會動
 })();
 
 function layout() {
@@ -210,8 +211,51 @@ function clearAll() {
 function bowlBody() {                // 碗身外形（半橢圓）
   ctx.beginPath(); ctx.ellipse(jar.cx, jar.bottom - jar.h, jar.w / 2, jar.depth, 0, 0, Math.PI); ctx.closePath();
 }
+/* ---------- 動畫版：狗頭會動、一個個把禮物吃掉 ---------- */
+var HEAD = { D: 0, lastBite: 0, flights: 0, eaten: 0 }, EAT = { next: 0 };
+function headPose(now) {                                         // 狗頭的姿勢：D＝低頭吃東西的程度（0 站著、1 低頭）；一直是往下、往碗那邊（左）動，不會往上，才不會露出頭後面的洞
+  var D = HEAD.D, chew = Math.sin(now / 75) * D, idle = Math.sin(now / 1100);
+  return { rot: -0.09 * D + chew * 0.015 + idle * 0.004 * (1 - D), dx: -14 * D, dy: 30 * D + chew * 5 + (idle * 0.5 + 0.5) * 2 * (1 - D), sy: 1 - 0.015 * Math.abs(chew) };
+}
+function bowlOrigin() { var s = jar.w / BOWL.openW, T = jar.bottom - jar.h; return { s: s, ox: jar.cx - BOWL.cx * s, oy: T - BOWL.cy * s }; }
+function drawHead(now) {
+  var A = BOWL.anim, o = bowlOrigin(), po = headPose(now), s = o.s;
+  ctx.save();
+  ctx.translate(o.ox + (A.px + po.dx) * s, o.oy + (A.py + po.dy) * s);
+  ctx.rotate(po.rot); ctx.scale(1, po.sy);
+  ctx.drawImage(BOWL.head, (A.hx - A.px) * s, (A.hy - A.py) * s, BOWL.head.naturalWidth * s, BOWL.head.naturalHeight * s);
+  ctx.restore();
+}
+function mouthPos(now) {                                          // 嘴巴現在在畫面上的位置（跟著頭動）
+  var A = BOWL.anim, o = bowlOrigin(), po = headPose(now), s = o.s;
+  var lx = (A.mx - A.px) * s, ly = (A.my - A.py) * s * po.sy, c = Math.cos(po.rot), sn = Math.sin(po.rot);
+  return { x: o.ox + (A.px + po.dx) * s + lx * c - ly * sn, y: o.oy + (A.py + po.dy) * s + lx * sn + ly * c };
+}
+function eatTick(now, dt) {
+  var A = BOWL.anim; if (!A || !BOWL.headOk) return;
+  var elig = 0, pick = null, flights = 0, i;
+  items.forEach(function (it) {
+    if (it.eat) { flights++; return; }
+    if (it.dying) return;
+    var sp = it.body.speed;
+    if (sp > 2.5) it.settledAt = 0; else if (sp < 1.2 && !it.settledAt) it.settledAt = now;      // 停下來才開始算 3 秒
+    if (it.settledAt && now - it.settledAt >= 3000) { elig++; if (!pick || it.born < pick.born) pick = it; }
+  });
+  var gap = Math.max(280, Math.min(900, 900 / (1 + elig / 12)));                                    // 排隊的越多，吃得越快
+  if (pick && now >= EAT.next) { pick.eat = { t0: now, x0: pick.body.position.x, y0: pick.body.position.y, dur: 520 }; Body.setStatic(pick.body, true); EAT.next = now + gap; flights++; }
+  for (i = items.length - 1; i >= 0; i--) {
+    var it2 = items[i]; if (!it2.eat) continue;
+    var p = Math.min(1, (now - it2.eat.t0) / it2.eat.dur), e = p * p * (3 - 2 * p), m = mouthPos(now);
+    Body.setPosition(it2.body, { x: it2.eat.x0 + (m.x - it2.eat.x0) * e, y: it2.eat.y0 + (m.y - it2.eat.y0) * e - Math.sin(Math.PI * p) * it2.size * 0.6 });
+    it2.scale = 1 - 0.65 * p;
+    if (p >= 1) { World.remove(world, it2.body); items.splice(i, 1); HEAD.lastBite = now; HEAD.eaten++; flights--; }
+  }
+  HEAD.flights = flights;
+  var active = flights > 0 || now - HEAD.lastBite < 700;
+  HEAD.D += ((active ? 1 : 0) - HEAD.D) * Math.min(1, dt / 1000 * 7);
+}
 function drawJarBack() {
-  if (BOWL.ok >= 2) { bowlDraw(BOWL.back, 1); return; }             // 禮物後面：碗口裡面看到的內側
+  if (BOWL.ok >= 2) { bowlDraw(BOWL.back, 1); if (BOWL.anim && BOWL.headOk) drawHead(performance.now()); return; }             // 禮物後面：碗口裡面看到的內側（動畫版再畫會動的狗頭）
   var cx = jar.cx, T = jar.bottom - jar.h, rx = jar.w / 2, ry = jar.depth * 0.16;
   ctx.save();
   ctx.beginPath(); ctx.ellipse(cx, T, rx, ry, 0, 0, Math.PI * 2);
@@ -256,6 +300,7 @@ function drawItem(it) {
   ctx.save();
   ctx.globalAlpha = it.alpha == null ? 1 : it.alpha;
   ctx.translate(b.position.x, b.position.y); ctx.rotate(b.angle);
+  if (it.scale) ctx.scale(it.scale, it.scale);                // 被狗吃掉時越縮越小
   if (CFG.coin) {
     ctx.drawImage(coinSprites[it.coin], -s / 2, -s / 2, s, s);
   } else if (img) {
@@ -276,7 +321,7 @@ function fadeOutside() {
   if (jar.noseY != null) {                                                // 有狗鼻子高度的碗：不計時消失；堆到鼻子高度才從最下面開始一個個消失
     var T = jar.bottom - jar.h, G = [{ top: Infinity, low: null }, { top: Infinity, low: null }, { top: Infinity, low: null }];   // 三堆：碗左邊的地板、碗右邊的地板、碗口上方堆起來的；各堆各算，哪一堆堆到鼻子高度，就從那一堆最下面開始消失
     items.forEach(function (it) {
-      if (it.dying || it.body.speed > 1.2) return;                        // 還在掉、已經在消失的不算
+      if (it.dying || it.eat || it.body.speed > 1.2) return;              // 還在掉、已經在消失、正被狗吃的不算
       var y = it.body.position.y, inC = inJar(it.body);
       if (inC && y >= T) return;                                          // 在碗裡面的不管
       var g = G[inC ? 2 : (it.body.position.x < jar.cx ? 0 : 1)];
@@ -309,6 +354,7 @@ function frame() {
   Engine.update(engine, dt / 2); Engine.update(engine, dt / 2);          // 分兩小步算，比較不會穿過碗壁
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.clearRect(0, 0, W, H);
+  eatTick(now, dt);
   drawJarBack();
   fadeOutside();
   for (var i = 0; i < items.length; i++) drawItem(items[i]);
@@ -401,6 +447,7 @@ document.getElementById('bc').onclick = clearAll;
 window.__jar = {
   drop: drop, clear: clearAll, onMsg: handleMsg, items: items, readGift: readGift, cfg: CFG,
   nose: function () { return jar.noseY; },
+  head: function () { return HEAD; },
   state: function () {
     var out = 0; items.forEach(function (it) { if (!inJar(it.body)) out++; });
     return { total: items.length, outside: out, inside: items.length - out, stats: stats, jar: jar, W: W, H: H };
