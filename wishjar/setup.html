@@ -49,6 +49,8 @@
       <div class="row"><input type="checkbox" id="coin"><label for="coin" style="margin:0">所有禮物都畫成金黃色銅錢（不勾＝用觀眾送的禮物圖片）</label></div>
       <label>幾鑽以上的禮物才會掉下來（0＝全部都掉）</label><input type="number" id="min" min="0">
       <div class="hint">看「單個禮物」的鑽石數，不是連送的總數。例如填 10：玫瑰（1 鑽）連送 50 個也不掉，10 鑽以上的禮物才掉。</div>
+      <label>動畫版的狗：單個禮物超過幾鑽就不吃（0＝全部都吃）</label><input type="number" id="noeat" min="0">
+      <div class="hint">只對「動畫版」的兩個碗有用。例如填 100：超過 100 鑽的大禮不會被狗吃掉，會一直留在碗裡或地上（堆太高時仍會照原本規則從最下面消失）。</div>
       <label>畫面上最多同時有幾個禮物（20～800）</label><input type="number" id="max" min="20" max="800">
       <label>一次送禮最多掉幾個（1～100）</label><input type="number" id="cap" min="1" max="100">
     </div>
@@ -69,7 +71,7 @@
 (function () {
 'use strict';
 var KEY = 'curryLive.wishjar.setup.v1';
-var DEF = { min: 0, bowl: '', host: '', title: '', stats: false, coin: false, max: 350, cap: 25 };
+var DEF = { min: 0, bowl: '', host: '', title: '', stats: false, coin: false, noeat: 0, max: 350, cap: 25 };
 var S = {};
 try { S = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
 Object.keys(DEF).forEach(function (k) { if (S[k] == null) S[k] = DEF[k]; });
@@ -86,8 +88,8 @@ list.forEach(function (b) {
   bowlsEl.appendChild(d);
 });
 $('host').value = S.host; $('title').value = S.title; $('stats').checked = !!S.stats; $('coin').checked = !!S.coin;
-$('min').value = S.min; $('max').value = S.max; $('cap').value = S.cap;
-['host', 'title', 'stats', 'coin', 'min', 'max', 'cap'].forEach(function (id) {
+$('min').value = S.min; $('noeat').value = S.noeat || 0; $('max').value = S.max; $('cap').value = S.cap;
+['host', 'title', 'stats', 'coin', 'min', 'noeat', 'max', 'cap'].forEach(function (id) {
   $(id).addEventListener('input', function () {
     var e = $(id); S[id] = e.type === 'checkbox' ? e.checked : (e.type === 'number' ? Number(e.value) : e.value);
     refresh();
@@ -107,6 +109,8 @@ function query(preview) {
   var mx = clamp(S.max, 20, 800, 350), cp = clamp(S.cap, 1, 100, 25);
   var mn = clamp(S.min, 0, 1000000, 0);
   if (mn > 0) q.push('min=' + mn);
+  var ne = clamp(S.noeat, 0, 1000000, 0);
+  if (ne > 0) q.push('noeat=' + ne);
   if (mx !== 350) q.push('max=' + mx);
   if (cp !== 25) q.push('cap=' + cp);
   return q.join('&');

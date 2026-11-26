@@ -40,6 +40,7 @@ var CFG = {
   title: P.get('title') || '',                     // 碗上方的標題，預設不顯示；想要就加 &title=文字
   stats: P.get('stats') === '1',                   // 預設不顯示禮物個數與鑽石數；想要就加 &stats=1
   min: clampNum(P.get('min'), 0, 1000000, 0),      // 單個禮物的鑽石數低於這個數字就不掉（預設 0＝全部都掉）；&min=10 表示 10 鑽以上才掉
+  noeat: clampNum(P.get('noeat'), 0, 1000000, 0),    // 動畫版的狗不吃「單個禮物鑽石數超過這個數字」的禮物（0＝全部都吃）；&noeat=100 表示超過 100 鑽的不吃
   coin: P.get('coin') === '1',                     // 預設用觀眾送的禮物自己的圖片；&coin=1 改成全部畫成金黃色銅錢
   host: String(P.get('host') || '').split(/[,，、;；\s]+/).map(function (x) { return x.replace(/^@/, '').trim().toLowerCase(); }).filter(Boolean),   // 主播（管理員）的 TikTok 帳號，可填多個：&host=帳號1,帳號2
   tiktokfinity: P.get('tikfinity') !== '0'         // &tikfinity=0 可以關掉連線（只用測試按鈕）
@@ -183,7 +184,7 @@ function spawn(gift) {
   Body.setVelocity(b, { x: (Math.random() - 0.5) * 2, y: 2 + Math.random() * 3 });
   Body.setAngularVelocity(b, (Math.random() - 0.5) * 0.2);
   World.add(world, b);
-  items.push({ body: b, coin: Math.floor(Math.random() * coinSprites.length), url: gift.icon || '', size: size, emoji: FALLBACK[hash(gift.name || '') % FALLBACK.length], born: performance.now() });
+  items.push({ body: b, coin: Math.floor(Math.random() * coinSprites.length), url: gift.icon || '', size: size, emoji: FALLBACK[hash(gift.name || '') % FALLBACK.length], dia: gift.diamonds || 0, born: performance.now() });
   stats.count++; stats.diamonds += gift.diamonds || 0;
   trim();
 }
@@ -263,6 +264,7 @@ function eatTick(now, dt) {
   items.forEach(function (it) {
     if (it.eat) { flights++; return; }
     if (it.dying) return;
+    if (CFG.noeat > 0 && it.dia > CFG.noeat) return;                                                // 超過設定鑽石數的大禮：狗不吃，留在原地
     var sp = it.body.speed;
     if (sp > 2.5) it.settledAt = 0; else if (sp < 1.2 && !it.settledAt) it.settledAt = now;      // 停下來才開始算 3 秒
     if (it.settledAt && now - it.settledAt >= 3000) { elig++; if (!pick || it.born < pick.born) pick = it; }
