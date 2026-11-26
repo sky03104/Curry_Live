@@ -39,6 +39,7 @@ var CFG = {
   cap: clampNum(P.get('cap'), 1, 100, 25),         // 一次送禮最多掉幾個（連送 99 個也只掉這麼多）
   title: P.get('title') || '',                     // 碗上方的標題，預設不顯示；想要就加 &title=文字
   stats: P.get('stats') === '1',                   // 預設不顯示禮物個數與鑽石數；想要就加 &stats=1
+  min: clampNum(P.get('min'), 0, 1000000, 0),      // 單個禮物的鑽石數低於這個數字就不掉（預設 0＝全部都掉）；&min=10 表示 10 鑽以上才掉
   coin: P.get('coin') === '1',                     // 預設用觀眾送的禮物自己的圖片；&coin=1 改成全部畫成金黃色銅錢
   host: String(P.get('host') || '').split(/[,，、;；\s]+/).map(function (x) { return x.replace(/^@/, '').trim().toLowerCase(); }).filter(Boolean),   // 主播（管理員）的 TikTok 帳號，可填多個：&host=帳號1,帳號2
   tiktokfinity: P.get('tikfinity') !== '0'         // &tikfinity=0 可以關掉連線（只用測試按鈕）
@@ -185,6 +186,7 @@ function trim() {
   }
 }
 function drop(name, diamonds, count, icon) {
+  if ((diamonds || 0) < CFG.min) return;                             // 單價低於門檻的禮物不掉（照單個禮物的鑽石數比，不是連送總數）
   var n = Math.max(1, Math.min(CFG.cap, Math.floor(count || 1)));
   var g = { name: name || '', diamonds: diamonds || 0, icon: icon || '' };
   if (!CFG.coin) getImg(g.icon);
