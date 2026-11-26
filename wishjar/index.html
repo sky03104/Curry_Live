@@ -58,12 +58,12 @@ var items = [];                // 掉進來的禮物 { body, img(url), size, bor
 var stats = { count: 0, diamonds: 0 };
 
 /* ---------- 碗的圖片（後半：碗口內側＋碗身；前半：碗身前面那層，半透明蓋在禮物上）；用 &bowl=代號 選碗，清單在 bowls.js ---------- */
-var BOWL = { back: new Image(), front: new Image(), ok: 0, U: 260, cx: 127, cy: 88, openW: 222, depth: 0.428, foot: 0.0405 };
+var BOWL = { back: new Image(), front: new Image(), ok: 0, U: 260, cx: 127, cy: 88, openW: 222, depth: 0.428, foot: 0.0405, Uh: 0, fit: false, floorGap: 0 };
 (function () {
   var list = window.WJ_BOWLS || [], want = P.get('bowl'), b = null;
   list.forEach(function (x) { if (x.id === want) b = x; });
   b = b || list[0];
-  if (b) { ['U', 'cx', 'cy', 'openW', 'depth', 'foot'].forEach(function (k) { if (b[k] != null) BOWL[k] = b[k]; }); }
+  if (b) { ['U', 'Uh', 'fit', 'floorGap', 'cx', 'cy', 'openW', 'depth', 'foot'].forEach(function (k) { if (b[k] != null) BOWL[k] = b[k]; }); }
   ['back', 'front'].forEach(function (k) {
     BOWL[k].onload = function () { BOWL.ok++; };
     BOWL[k].src = b ? b[k] : 'bowl_' + k + '.png';
@@ -75,13 +75,20 @@ function layout() {
   W = window.innerWidth; H = window.innerHeight;
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   // 碗：上面是寬寬的碗口，往下收成半橢圓的碗身，底下一個小圈足。碗深＝碗寬的一半
-  jar.w = Math.min(W * 0.86, H * 0.55 / (BOWL.depth + BOWL.foot));        // 碗盡量撐滿寬度，上面留空間給禮物掉下來；兩旁留一點空位給滿出來的禮物
+  if (BOWL.fit) {                                           // 整張圖（碗＋狗）縮到剛好放進畫面，碗在圖裡的位置照圖算；圖底部就是地板，滿出來的禮物掉到碗旁邊的地板上
+    var fs = Math.min(W * 0.94 / BOWL.U, (H - 8) / BOWL.Uh);
+    jar.w = BOWL.openW * fs;
+    jar.cx = (W - BOWL.U * fs) / 2 + BOWL.cx * fs;
+    jar.bottom = H - 4 - BOWL.floorGap * fs;
+  } else {
+    jar.w = Math.min(W * 0.86, H * 0.55 / (BOWL.depth + BOWL.foot));        // 碗盡量撐滿寬度，上面留空間給禮物掉下來；兩旁留一點空位給滿出來的禮物
+    jar.cx = W * 0.5;
+    jar.bottom = H - 16;
+  }
   jar.depth = jar.w * BOWL.depth;                           // 碗深、圈足高度都照碗圖片的比例
   jar.foot = jar.w * BOWL.foot;
   jar.h = jar.depth + jar.foot;
   K = jar.w / 300;
-  jar.cx = W * 0.5;
-  jar.bottom = H - 16;
   jar.wall = Math.max(10, 12 * K);
   jar.neckW = jar.w * 0.75;
   jar.rimH = 0;
@@ -101,7 +108,7 @@ function layout() {
   }
   statics.push(
     Bodies.circle(cx - a, T, t * 0.6, opt), Bodies.circle(cx + a, T, t * 0.6, opt),                    // 碗口圓邊：滿出來的禮物會順著滑到碗旁邊
-    Bodies.rectangle(W / 2, H + 40, W * 3, 80, opt),                                                  // 地板
+    Bodies.rectangle(W / 2, (BOWL.fit ? jar.bottom : H) + 40, W * 3, 80, opt),                         // 地板（用整張圖時，地板就是碗底那條線）
     Bodies.rectangle(-40, H / 2, 80, H * 3, opt), Bodies.rectangle(W + 40, H / 2, 80, H * 3, opt)   // 左右牆
   );
   World.add(world, statics);
@@ -110,9 +117,9 @@ window.addEventListener('resize', layout);
 layout();
 
 function bowlDraw(img, alpha) {
-  var s = jar.w / BOWL.openW, T = jar.bottom - jar.h, d = BOWL.U * s;
+  var s = jar.w / BOWL.openW, T = jar.bottom - jar.h, d = BOWL.U * s, dh = (BOWL.Uh || BOWL.U) * s;
   ctx.save(); ctx.globalAlpha = alpha;
-  ctx.drawImage(img, jar.cx - BOWL.cx * s, T - BOWL.cy * s, d, d);
+  ctx.drawImage(img, jar.cx - BOWL.cx * s, T - BOWL.cy * s, d, dh);
   ctx.restore();
 }
 
@@ -176,7 +183,7 @@ function spawn(gift) {
   stats.count++; stats.diamonds += gift.diamonds || 0;
   trim();
 }
-function inJar(b) { return Math.abs(b.position.x - jar.cx) < jar.w / 2 && b.position.y > jar.bottom - jar.h; }
+function inJar(b) { return Math.abs(b.position.x - jar.cx) < jar.w / 2 && (BOWL.fit || b.position.y > jar.bottom - jar.h); }   // 用整張圖的碗：碗口正上方堆起來的禮物也算在碗裡（不會淡出），滑到旁邊才算滿出來
 function trim() {
   while (items.length > CFG.max) {                                   // 太多時先拿掉瓶子外面最早的，沒有再拿最早的
     var i = items.findIndex(function (it) { return !inJar(it.body) && performance.now() - it.born > 4000; });
@@ -217,7 +224,7 @@ function drawJarBack() {
   ctx.restore();
 }
 function drawJar() {
-  if (BOWL.ok >= 2) { bowlDraw(BOWL.front, 0.3); return; }                 // 禮物前面：半透明的碗身、碗口邊、圈足、高光
+  if (BOWL.ok >= 2) { bowlDraw(BOWL.front, BOWL.fit ? 1 : 0.3); return; }                 // 禮物前面：半透明的碗身、碗口邊、圈足、高光
   var cx = jar.cx, T = jar.bottom - jar.h, rx = jar.w / 2, ry = jar.depth * 0.16, B = jar.bottom;
   ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   // 圈足
