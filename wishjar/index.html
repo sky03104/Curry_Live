@@ -25,6 +25,7 @@
 </div>
 <div id="status">TikFinity：未連線</div>
 <script src="matter.min.js"></script>
+<script src="bowls.js"></script>
 <script>
 (function () {
 'use strict';
@@ -38,6 +39,7 @@ var CFG = {
   cap: clampNum(P.get('cap'), 1, 100, 25),         // 一次送禮最多掉幾個（連送 99 個也只掉這麼多）
   title: P.get('title') || '',                     // 碗上方的標題，預設不顯示；想要就加 &title=文字
   stats: P.get('stats') === '1',                   // 預設不顯示禮物個數與鑽石數；想要就加 &stats=1
+  min: clampNum(P.get('min'), 0, 1000000, 0),      // 單個禮物的鑽石數低於這個數字就不掉（預設 0＝全部都掉）；&min=10 表示 10 鑽以上才掉
   coin: P.get('coin') === '1',                     // 預設用觀眾送的禮物自己的圖片；&coin=1 改成全部畫成金黃色銅錢
   host: String(P.get('host') || '').split(/[,，、;；\s]+/).map(function (x) { return x.replace(/^@/, '').trim().toLowerCase(); }).filter(Boolean),   // 主播（管理員）的 TikTok 帳號，可填多個：&host=帳號1,帳號2
   tiktokfinity: P.get('tikfinity') !== '0'         // &tikfinity=0 可以關掉連線（只用測試按鈕）
@@ -55,14 +57,27 @@ var statics = [];
 var items = [];                // 掉進來的禮物 { body, img(url), size, born }
 var stats = { count: 0, diamonds: 0 };
 
+/* ---------- 碗的圖片（後半：碗口內側＋碗身；前半：碗身前面那層，半透明蓋在禮物上）；用 &bowl=代號 選碗，清單在 bowls.js ---------- */
+var BOWL = { back: new Image(), front: new Image(), ok: 0, U: 260, cx: 127, cy: 88, openW: 222, depth: 0.428, foot: 0.0405 };
+(function () {
+  var list = window.WJ_BOWLS || [], want = P.get('bowl'), b = null;
+  list.forEach(function (x) { if (x.id === want) b = x; });
+  b = b || list[0];
+  if (b) { ['U', 'cx', 'cy', 'openW', 'depth', 'foot'].forEach(function (k) { if (b[k] != null) BOWL[k] = b[k]; }); }
+  ['back', 'front'].forEach(function (k) {
+    BOWL[k].onload = function () { BOWL.ok++; };
+    BOWL[k].src = b ? b[k] : 'bowl_' + k + '.png';
+  });
+})();
+
 function layout() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
   W = window.innerWidth; H = window.innerHeight;
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
   // 碗：上面是寬寬的碗口，往下收成半橢圓的碗身，底下一個小圈足。碗深＝碗寬的一半
-  jar.w = Math.min(W * 0.86, H * 0.55 / 0.47);        // 碗盡量撐滿寬度，上面留空間給禮物掉下來；兩旁留一點空位給滿出來的禮物
-  jar.depth = jar.w * 0.428;                           // 碗深、圈足高度都照碗圖片的比例
-  jar.foot = jar.w * 0.0405;
+  jar.w = Math.min(W * 0.86, H * 0.55 / (BOWL.depth + BOWL.foot));        // 碗盡量撐滿寬度，上面留空間給禮物掉下來；兩旁留一點空位給滿出來的禮物
+  jar.depth = jar.w * BOWL.depth;                           // 碗深、圈足高度都照碗圖片的比例
+  jar.foot = jar.w * BOWL.foot;
   jar.h = jar.depth + jar.foot;
   K = jar.w / 300;
   jar.cx = W * 0.5;
@@ -94,14 +109,8 @@ function layout() {
 window.addEventListener('resize', layout);
 layout();
 
-/* ---------- 碗的圖片（後半：碗口內側＋碗身；前半：碗身前面那層，半透明蓋在禮物上） ---------- */
-var BOWL = { back: new Image(), front: new Image(), ok: 0, S: 780, cx: 127, cy: 88, openW: 222 };   // 數字是原圖（260 像素）裡的位置
-['back', 'front'].forEach(function (k) {
-  BOWL[k].onload = function () { BOWL.ok++; };
-  BOWL[k].src = 'bowl_' + k + '.png';
-});
 function bowlDraw(img, alpha) {
-  var s = jar.w / BOWL.openW, T = jar.bottom - jar.h, d = 260 * s;
+  var s = jar.w / BOWL.openW, T = jar.bottom - jar.h, d = BOWL.U * s;
   ctx.save(); ctx.globalAlpha = alpha;
   ctx.drawImage(img, jar.cx - BOWL.cx * s, T - BOWL.cy * s, d, d);
   ctx.restore();
@@ -177,6 +186,7 @@ function trim() {
   }
 }
 function drop(name, diamonds, count, icon) {
+  if ((diamonds || 0) < CFG.min) return;                             // 單價低於門檻的禮物不掉（照單個禮物的鑽石數比，不是連送總數）
   var n = Math.max(1, Math.min(CFG.cap, Math.floor(count || 1)));
   var g = { name: name || '', diamonds: diamonds || 0, icon: icon || '' };
   if (!CFG.coin) getImg(g.icon);

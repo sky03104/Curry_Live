@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>許願碗設定</title>
+<style>
+  :root{--bg:#f4f6fa;--card:#fff;--ink:#1d2433;--sub:#667;--line:#d7dce6;--acc:#2f7de1}
+  @media (prefers-color-scheme:dark){:root{--bg:#171a22;--card:#222733;--ink:#eef1f7;--sub:#9aa3b5;--line:#384052;--acc:#5aa2ff}}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:16px;display:grid;grid-template-columns:1fr 340px;gap:16px}
+  @media (max-width:820px){.wrap{grid-template-columns:1fr}}
+  h1{font-size:20px;margin:0 0 4px} .sub{color:var(--sub);font-size:13px;margin:0 0 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .card h2{font-size:15px;margin:0 0 8px}
+  label{display:block;font-size:13px;margin:8px 0 3px} .hint{color:var(--sub);font-size:12px;margin-top:3px}
+  input[type=text],input[type=number]{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink);font:inherit}
+  .bowls{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+  .bowl{border:2px solid var(--line);border-radius:10px;padding:6px;cursor:pointer;text-align:center;font-size:13px;background:#20232c}
+  .bowl.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset}
+  .bowl .pic{position:relative;width:100%;aspect-ratio:1}
+  .bowl .pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+  .bowl span{color:#fff}
+  .row{display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0}
+  .out{width:100%;box-sizing:border-box;height:96px;padding:8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink);font:12px/1.4 monospace;word-break:break-all}
+  button{font:inherit;padding:9px 14px;border:0;border-radius:9px;background:var(--acc);color:#fff;cursor:pointer;font-weight:600}
+  .prev{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#20232c;position:sticky;top:12px}
+  .prev iframe{display:block;border:0;width:100%;height:340px}
+  .prev p{margin:0;padding:6px 10px;font-size:12px;color:#aab}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>🍚 許願碗設定</h1>
+    <p class="sub">在這裡選碗、填主播帳號，下面會自動產生直播軟體要貼的網址。設定會記在這個瀏覽器，下次開啟還在。</p>
+
+    <div class="card"><h2>1. 選一個碗</h2><div class="bowls" id="bowls"></div></div>
+
+    <div class="card"><h2>2. 主播（管理員）帳號</h2>
+      <label>TikTok 帳號（可填多個，用逗號分開，不用加 @）</label>
+      <input type="text" id="host" placeholder="例如：帳號甲,帳號乙">
+      <div class="hint">這些帳號在直播間留言「清空許願碗」就能清空碗。比對的是帳號代號，不是暱稱。不填就沒有清空指令。</div>
+    </div>
+
+    <div class="card"><h2>3. 其他設定</h2>
+      <label>碗上方的標題（不填就不顯示）</label><input type="text" id="title">
+      <div class="row"><input type="checkbox" id="stats"><label for="stats" style="margin:0">顯示禮物個數與鑽石數</label></div>
+      <div class="row"><input type="checkbox" id="coin"><label for="coin" style="margin:0">所有禮物都畫成金黃色銅錢（不勾＝用觀眾送的禮物圖片）</label></div>
+      <label>幾鑽以上的禮物才會掉下來（0＝全部都掉）</label><input type="number" id="min" min="0">
+      <div class="hint">看「單個禮物」的鑽石數，不是連送的總數。例如填 10：玫瑰（1 鑽）連送 50 個也不掉，10 鑽以上的禮物才掉。</div>
+      <label>畫面上最多同時有幾個禮物（20～800）</label><input type="number" id="max" min="20" max="800">
+      <label>一次送禮最多掉幾個（1～100）</label><input type="number" id="cap" min="1" max="100">
+    </div>
+
+    <div class="card"><h2>4. 貼進直播軟體的網址</h2>
+      <textarea class="out" id="out" readonly></textarea>
+      <div class="row"><button id="copy">📋 複製網址</button><span id="msg" class="hint"></span></div>
+      <div class="hint">貼到 OBS 的「瀏覽器來源」，或 TikTok LIVE Studio 的網頁來源。改了設定要重新複製、重貼。要同時連 TikFinity 電腦版才收得到禮物。</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="prev"><iframe id="pv" title="預覽"></iframe><p>預覽（左上角有測試按鈕，可以丟禮物看看）</p></div>
+  </div>
+</div>
+<script src="bowls.js"></script>
+<script>
+(function () {
+'use strict';
+var KEY = 'curryLive.wishjar.setup.v1';
+var DEF = { min: 0, bowl: '', host: '', title: '', stats: false, coin: false, max: 350, cap: 25 };
+var S = {};
+try { S = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) {}
+Object.keys(DEF).forEach(function (k) { if (S[k] == null) S[k] = DEF[k]; });
+var list = window.WJ_BOWLS || [];
+if (!list.some(function (b) { return b.id === S.bowl; })) S.bowl = list[0] ? list[0].id : '';
+
+var $ = function (id) { return document.getElementById(id); };
+var bowlsEl = $('bowls');
+list.forEach(function (b) {
+  var d = document.createElement('div'); d.className = 'bowl'; d.dataset.id = b.id;
+  d.innerHTML = '<div class="pic"><img src="' + b.back + '" alt=""><img src="' + b.front + '" alt="" style="opacity:.35"></div><span></span>';
+  d.querySelector('span').textContent = b.name;
+  d.onclick = function () { S.bowl = b.id; refresh(); };
+  bowlsEl.appendChild(d);
+});
+$('host').value = S.host; $('title').value = S.title; $('stats').checked = !!S.stats; $('coin').checked = !!S.coin;
+$('min').value = S.min; $('max').value = S.max; $('cap').value = S.cap;
+['host', 'title', 'stats', 'coin', 'min', 'max', 'cap'].forEach(function (id) {
+  $(id).addEventListener('input', function () {
+    var e = $(id); S[id] = e.type === 'checkbox' ? e.checked : (e.type === 'number' ? Number(e.value) : e.value);
+    refresh();
+  });
+});
+
+function clamp(v, a, b, d) { v = Number(v); return isFinite(v) ? Math.max(a, Math.min(b, Math.round(v))) : d; }
+function query(preview) {
+  var q = [];
+  if (!preview) q.push('obs=1'); else q.push('tikfinity=0');
+  if (list.length > 1 && S.bowl && S.bowl !== list[0].id) q.push('bowl=' + encodeURIComponent(S.bowl));
+  var hosts = String(S.host || '').split(/[,，、;；\s]+/).map(function (x) { return x.replace(/^@/, '').trim(); }).filter(Boolean);
+  if (hosts.length && !preview) q.push('host=' + hosts.map(encodeURIComponent).join(','));
+  if (S.title && String(S.title).trim()) q.push('title=' + encodeURIComponent(String(S.title).trim()));
+  if (S.stats) q.push('stats=1');
+  if (S.coin) q.push('coin=1');
+  var mx = clamp(S.max, 20, 800, 350), cp = clamp(S.cap, 1, 100, 25);
+  var mn = clamp(S.min, 0, 1000000, 0);
+  if (mn > 0) q.push('min=' + mn);
+  if (mx !== 350) q.push('max=' + mx);
+  if (cp !== 25) q.push('cap=' + cp);
+  return q.join('&');
+}
+var base = new URL('./', location.href).href;
+var lastPrev = '';
+function refresh() {
+  [].forEach.call(bowlsEl.children, function (c) { c.classList.toggle('on', c.dataset.id === S.bowl); });
+  $('out').value = base + '?' + query(false);
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+  var pv = base + '?' + query(true);
+  if (pv !== lastPrev) { lastPrev = pv; $('pv').src = pv; }
+}
+$('copy').onclick = function () {
+  var t = $('out'); t.select();
+  var done = function () { $('msg').textContent = '已複製！'; setTimeout(function () { $('msg').textContent = ''; }, 2500); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t.value).then(done, function () { document.execCommand('copy'); done(); });
+  else { document.execCommand('copy'); done(); }
+};
+refresh();
+})();
+</script>
+</body>
+</html>
